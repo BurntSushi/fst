@@ -1,81 +1,29 @@
-use quickcheck::{Arbitrary, Gen, TestResult, quickcheck};
+use quickcheck::{TestResult, quickcheck};
 
 use {
     NONE_STATE,
     Builder, BuilderNode, BuilderTransition, CompiledAddr, Fst, Output, Node,
 };
 
-#[derive(Clone, Debug)]
-struct NonEmptyBytes(Vec<u8>);
+#[test]
+fn prop_emits_inputs() {
+    fn p(mut bs: Vec<Vec<u8>>) -> TestResult {
+        bs.sort();
+        bs.dedup();
 
-impl Arbitrary for NonEmptyBytes {
-    fn arbitrary<G: Gen>(g: &mut G) -> NonEmptyBytes {
-        // let size = g.size();
-        let size = g.gen_range(1, 10);
-        let mut bytes = vec![0; size];
-        for i in 0..size {
-            bytes[i] = g.gen_range(0, 5);
+        let mut bfst = Builder::memory();
+        for word in &bs {
+            bfst.add(word).unwrap();
         }
-        NonEmptyBytes(bytes)
-    }
-
-    fn shrink(&self) -> Box<Iterator<Item=NonEmptyBytes>> {
-        Box::new(self.0.shrink()
-                       .filter(|bytes| !bytes.is_empty())
-                       .map(NonEmptyBytes))
-    }
-}
-
-impl Arbitrary for BuilderNode {
-    fn arbitrary<G: Gen>(g: &mut G) -> BuilderNode {
-        let mut trans = Vec::<BuilderTransition>::arbitrary(g);
-        trans.truncate(256);
-        for (i, ref mut t) in trans.iter_mut().enumerate() {
-            t.inp = i as u8;
+        let fst = Fst::new(bfst.into_inner().unwrap());
+        let mut rdr = fst.reader();
+        let mut words = vec![];
+        while let Some(w) = rdr.next() {
+            words.push(w.0.to_owned());
         }
-        BuilderNode {
-            is_final: bool::arbitrary(g),
-            trans: trans,
-        }
+        TestResult::from_bool(bs == words)
     }
-
-    fn shrink(&self) -> Box<Iterator<Item=BuilderNode>> {
-        let v = (self.is_final, self.trans.clone());
-        Box::new(v.shrink().map(|(is_final, mut trans)| {
-            trans.truncate(256);
-            // for (i, ref mut t) in trans.iter_mut().enumerate() {
-                // t.inp = i as u8;
-            // }
-            BuilderNode { is_final: is_final, trans: trans }
-        }))
-    }
-}
-
-impl Arbitrary for BuilderTransition {
-    fn arbitrary<G: Gen>(g: &mut G) -> BuilderTransition {
-        BuilderTransition {
-            addr: CompiledAddr::arbitrary(g),
-            inp: u8::arbitrary(g),
-            out: Output::arbitrary(g),
-        }
-    }
-
-    fn shrink(&self) -> Box<Iterator<Item=BuilderTransition>> {
-        let v = (self.addr.clone(), self.inp, self.out);
-        Box::new(v.shrink().map(|(addr, inp, out)| {
-             BuilderTransition { addr: addr, inp: inp, out: out }
-        }))
-    }
-}
-
-impl Arbitrary for Output {
-    fn arbitrary<G: Gen>(g: &mut G) -> Output {
-        Output(Option::<u64>::arbitrary(g))
-    }
-
-    fn shrink(&self) -> Box<Iterator<Item=Output>> {
-        Box::new(self.0.shrink().map(Output))
-    }
+    quickcheck(p as fn(Vec<Vec<u8>>) -> TestResult)
 }
 
 fn nodes_equal(compiled: &Node, uncompiled: &BuilderNode) -> bool {
@@ -84,6 +32,7 @@ fn nodes_equal(compiled: &Node, uncompiled: &BuilderNode) -> bool {
     for (ct, ut)
      in compiled.transitions().zip(uncompiled.trans.iter().cloned()) {
         assert_eq!(ct.0, ut.inp);
+        assert_eq!(ct.1, ut.out);
         assert_eq!(ct.2, ut.addr);
     }
     true
@@ -104,28 +53,6 @@ fn roundtrip(bnode: &BuilderNode) -> bool {
 
 fn trans(addr: CompiledAddr, inp: u8) -> BuilderTransition {
     BuilderTransition { addr: addr, inp: inp, out: Output(None) }
-}
-
-#[test]
-fn prop_emits_inputs() {
-    fn p(bs: Vec<NonEmptyBytes>) -> TestResult {
-        let mut bs: Vec<Vec<u8>> = bs.into_iter().map(|x| x.0).collect();
-        bs.sort();
-        bs.dedup();
-
-        let mut bfst = Builder::memory();
-        for word in &bs {
-            bfst.add(word).unwrap();
-        }
-        let fst = Fst::new(bfst.into_inner().unwrap());
-        let mut rdr = fst.reader();
-        let mut words = vec![];
-        while let Some(w) = rdr.next() {
-            words.push(w.0.to_owned());
-        }
-        TestResult::from_bool(bs == words)
-    }
-    quickcheck(p as fn(Vec<NonEmptyBytes>) -> TestResult)
 }
 
 #[test]
@@ -172,52 +99,111 @@ fn bin_many_trans() {
     assert_eq!(compile(&node).1.len(), 22);
 }
 
-#[test]
-fn scratch() {
+fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
+        where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
-    bfst.add("").unwrap();
-    bfst.add("abcdefghijklmnopqrstuvwxyzabcdefghiklmnopqrstuvwxyz").unwrap();
-    bfst.add("bcdefghijklmnopqrstuvwxyz").unwrap();
-    bfst.add("jan").unwrap();
-    bfst.add("jbm").unwrap();
-    bfst.add("jcm").unwrap();
-    bfst.add("jdm").unwrap();
-    bfst.add("jem").unwrap();
-    bfst.add("jfm").unwrap();
-    bfst.add("jgm").unwrap();
-    bfst.add("jhm").unwrap();
-    bfst.add("jim").unwrap();
-    bfst.add("jjm").unwrap();
-    bfst.add("jkm").unwrap();
-    bfst.add("july").unwrap();
-    bfst.add("jun").unwrap();
+    let mut ss: Vec<Vec<u8>> =
+        ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
+    ss.sort();
+    ss.dedup();
+    for s in ss.into_iter() {
+        bfst.add(s).unwrap();
+    }
+    Fst::new(bfst.into_inner().unwrap())
+}
 
-    // let x1 = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    // let x2 = vec![0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    // let x3 = vec![1, 0];
-    // bfst.add(x1).unwrap();
-    // bfst.add(x2).unwrap();
-    // bfst.add(x3).unwrap();
+fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
+        where I: IntoIterator<Item=(S, u64)>, S: AsRef<[u8]> {
+    let mut bfst = Builder::memory();
+    let mut ss: Vec<(Vec<u8>, u64)> =
+        ss.into_iter().map(|(s, o)| (s.as_ref().to_vec(), o)).collect();
+    ss.sort();
+    ss.dedup();
+    for (s, o) in ss.into_iter() {
+        bfst.insert(s, o).unwrap();
+    }
+    Fst::new(bfst.into_inner().unwrap())
+}
 
-    // bfst.add(vec![0, 0, 0, 2]).unwrap();
-    // bfst.add(vec![0, 1, 0, 1]).unwrap();
-    // bfst.add(vec![0, 1, 1, 0, 0, 0, 0, 0, 3]).unwrap();
-    // bfst.add(vec![0, 1, 2, 0, 0]).unwrap();
-    // bfst.add(vec![0, 2, 0, 0, 0, 0, 1]).unwrap();
-    // bfst.add(vec![0, 3, 0, 1, 0]).unwrap();
-    // bfst.add(vec![0, 4, 2, 4]).unwrap();
-    // bfst.add(vec![1, 4, 2, 4]).unwrap();
-    // bfst.add(vec![2, 0, 1]).unwrap();
-
-    let buf = bfst.into_inner().unwrap();
-    let fst = Fst::new(buf);
-
+fn fst_words<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
+    let mut words = vec![];
     let mut rdr = fst.reader();
-    while let Some(v) = rdr.next() {
-        println!("{}", ::std::str::from_utf8(v.0).unwrap());
-        // println!("### {:?}", v);
+    while let Some((word, _)) = rdr.next() {
+        words.push(word.to_vec());
+    }
+    words
+}
+
+macro_rules! test_set {
+    ($name:ident, $($s:expr),+) => {
+        #[test]
+        fn $name() {
+            let fst = fst_set(vec![$($s),*]);
+            let mut rdr = fst.reader();
+            $(assert_eq!(rdr.next().unwrap().0, $s.as_bytes());)*
+            assert_eq!(rdr.next(), None);
+        }
     }
 }
+
+macro_rules! test_set_fail {
+    ($name:ident, $($s:expr),+) => {
+        #[test]
+        #[should_panic]
+        fn $name() {
+            let mut bfst = Builder::memory();
+            $(bfst.add($s).unwrap();)*
+        }
+    }
+}
+
+test_set!(fst_set_only_empty, "");
+test_set!(fst_set_one, "a");
+test_set!(fst_set_two, "a", "b");
+test_set!(fst_set_jan, "jam", "jbm", "jcm", "jdm", "jem", "jfm", "jgm");
+
+test_set_fail!(fst_set_dupe_empty, "", "");
+test_set_fail!(fst_set_dupe, "a", "a");
+test_set_fail!(fst_set_order, "b", "a");
+test_set_fail!(fst_set_order_2, "a", "b", "c", "a");
+
+#[test]
+fn fst_set_100000() {
+    let text = include_str!("./data/words-100000");
+    let words: Vec<Vec<u8>> = text.lines()
+                                  .map(|s| s.as_bytes().to_vec())
+                                  .collect();
+    let fst = fst_set(words.clone());
+    assert_eq!(words, fst_words(&fst));
+}
+
+macro_rules! test_map {
+    ($name:ident, $($s:expr, $o:expr),+) => {
+        #[test]
+        fn $name() {
+            let fst = fst_map(vec![$(($s, $o)),*]);
+            let mut rdr = fst.reader();
+            $({
+                let (s, o) = rdr.next().unwrap();
+                assert_eq!((s, o.0.unwrap()), ($s.as_bytes(), $o));
+            })*
+            assert_eq!(rdr.next(), None);
+        }
+    }
+}
+
+test_map!(fst_map_only_empty1, "", 0);
+test_map!(fst_map_only_empty2, "", 100);
+test_map!(fst_map_only_empty3, "", 9999999999);
+test_map!(fst_map_one1, "a", 0);
+test_map!(fst_map_one2, "a", 100);
+test_map!(fst_map_one3, "a", 999999999);
+test_map!(fst_map_two, "a", 1, "b", 2);
+test_map!(
+    fst_map_many,
+    "a", 34786, "ab", 26 //, "abc", 58976, "abcd", 25
+    // "z", 58, "zabc", 6798
+);
 
 #[test]
 fn out_scratch() {

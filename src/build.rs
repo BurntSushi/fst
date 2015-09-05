@@ -48,15 +48,18 @@ pub struct Builder<W> {
     empty_output: Option<Output>,
 }
 
+#[derive(Debug)]
 struct UnfinishedNodes {
     stack: Vec<BuilderNodeUnfinished>,
 }
 
+#[derive(Debug)]
 struct BuilderNodeUnfinished {
     node: BuilderNode,
     last: Option<LastTransition>,
 }
 
+#[derive(Debug)]
 struct LastTransition {
     inp: u8,
     out: Output,
@@ -94,6 +97,7 @@ impl<W: io::Write> Builder<W> {
         let mut root_node = self.unfinished.pop_root();
         root_node.is_final = self.empty_output.is_some();
         let root_addr = try!(self.compile(&root_node));
+        println!("{} |--> {:?}", root_addr, root_node);
         if let Some(empty_output) = self.empty_output {
             try!(self.wtr.write_u8(1));
             try!(self.wtr.write_u64::<LittleEndian>(empty_output.encode()));
@@ -137,6 +141,7 @@ impl<W: io::Write> Builder<W> {
         while istate + 1 < self.unfinished.len() {
             let node = self.unfinished.pop_freeze(addr);
             addr = try!(self.compile(&node));
+            println!("{} |--> {:?}", addr, node);
             assert!(addr != NONE_STATE);
         }
         self.unfinished.top_last_freeze(addr);
@@ -183,7 +188,7 @@ impl<W: io::Write> Builder<W> {
                 last.push(b);
             }
         } else {
-            self.last = Some(vec![]);
+            self.last = Some(bs.to_vec());
         }
         Ok(())
     }
@@ -231,6 +236,7 @@ impl UnfinishedNodes {
         if bs.is_empty() {
             return;
         }
+        println!("suffix output for {:?}: {:?}", bs, out);
         let last = self.stack.len().checked_sub(1).unwrap();
         assert!(self.stack[last].last.is_none());
         self.stack[last].last = Some(LastTransition { inp: bs[0], out: out });
@@ -283,6 +289,26 @@ impl BuilderNodeUnfinished {
     }
 
     fn add_output_prefix(&mut self, prefix: Output) {
+        // BREADCRUMBS
+        //
+        // The key here is that we need "final output" attached to the
+        // *state*. This is necessary to non-empty final states. e.g.,
+        //
+        //     a => 5
+        //     ab => 4
+        //
+        // When `a` is added, you get:
+        //
+        //     root --a/5--> F
+        //
+        // When `ab` is added, you get:
+        //
+        //     root --a/4--> F --b/0--> F
+        //
+        // What we need is:
+        //
+        //     root --a/4--> F/1 --b/0--> F
+        println!("adding output prefix {:?} to {:?}", prefix, self);
         for t in &mut self.node.trans {
             t.out = prefix.cat(t.out);
         }

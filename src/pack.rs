@@ -25,17 +25,34 @@ impl Packer {
         self.nbytes
     }
 
-    pub fn read<R: io::Read>(&self, mut rdr: R) -> io::Result<u64> {
-        Ok(try!(rdr.read_uint::<LittleEndian>(self.nbytes as usize)))
+    pub fn read<R: io::Read>(&self, rdr: R) -> io::Result<u64> {
+        unpack_uint(rdr, self.nbytes)
     }
 
-    pub fn write<W: io::Write>(&self, mut wtr: W, n: u64) -> io::Result<()> {
-        let n: [u8; 8] = unsafe { mem::transmute(n.to_le()) };
-        wtr.write_all(&n[0..self.nbytes as usize])
+    pub fn write<W: io::Write>(&self, wtr: W, n: u64) -> io::Result<()> {
+        pack_uint_in(wtr, n, self.nbytes)
     }
 }
 
-fn bytes_needed(n: u64) -> u8 {
+pub fn unpack_uint<R: io::Read>(mut rdr: R, nbytes: u8) -> io::Result<u64> {
+    rdr.read_uint::<LittleEndian>(nbytes as usize).map_err(From::from)
+}
+
+pub fn pack_uint<W: io::Write>(wtr: W, n: u64) -> io::Result<u8> {
+    let nbytes = bytes_needed(n);
+    pack_uint_in(wtr, n, nbytes).map(|_| nbytes)
+}
+
+fn pack_uint_in<W: io::Write>(
+    mut wtr: W,
+    n: u64,
+    nbytes: u8,
+) -> io::Result<()> {
+    let n: [u8; 8] = unsafe { mem::transmute(n.to_le()) };
+    wtr.write_all(&n[0..nbytes as usize])
+}
+
+pub fn bytes_needed(n: u64) -> u8 {
     if n < 1 << 8 as u64 {
         1
     } else if n < 1 << 16 as u64 {

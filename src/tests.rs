@@ -1,103 +1,4 @@
-use quickcheck::{TestResult, quickcheck};
-
-use {
-    NONE_STATE,
-    Builder, BuilderNode, BuilderTransition, CompiledAddr, Fst, Output, Node,
-};
-
-#[test]
-fn prop_emits_inputs() {
-    fn p(mut bs: Vec<Vec<u8>>) -> TestResult {
-        bs.sort();
-        bs.dedup();
-
-        let mut bfst = Builder::memory();
-        for word in &bs {
-            bfst.add(word).unwrap();
-        }
-        let fst = Fst::new(bfst.into_inner().unwrap());
-        let mut rdr = fst.reader();
-        let mut words = vec![];
-        while let Some(w) = rdr.next() {
-            words.push(w.0.to_owned());
-        }
-        TestResult::from_bool(bs == words)
-    }
-    quickcheck(p as fn(Vec<Vec<u8>>) -> TestResult)
-}
-
-fn nodes_equal(compiled: &Node, uncompiled: &BuilderNode) -> bool {
-    assert_eq!(compiled.is_final(), uncompiled.is_final);
-    assert_eq!(compiled.len(), uncompiled.trans.len());
-    for (ct, ut)
-     in compiled.transitions().zip(uncompiled.trans.iter().cloned()) {
-        assert_eq!(ct.0, ut.inp);
-        assert_eq!(ct.1, ut.out);
-        assert_eq!(ct.2, ut.addr);
-    }
-    true
-}
-
-fn compile(node: &BuilderNode) -> (CompiledAddr, Vec<u8>) {
-    let mut buf = vec![0, 0, 0, 0, 0, 0, 0, 0]; // first 8 are reserved
-    node.compile_to(&mut buf, NONE_STATE, 8).unwrap();
-    (buf.len() as CompiledAddr - 1, buf)
-}
-
-fn roundtrip(bnode: &BuilderNode) -> bool {
-    let (addr, bytes) = compile(bnode);
-    let node = Node::new(addr, &bytes);
-    assert_eq!(node.end_addr(), 8);
-    nodes_equal(&node, &bnode)
-}
-
-fn trans(addr: CompiledAddr, inp: u8) -> BuilderTransition {
-    BuilderTransition { addr: addr, inp: inp, out: Output(None) }
-}
-
-#[test]
-fn bin_no_trans() {
-    let node = BuilderNode {
-        is_final: false,
-        trans: vec![],
-    };
-    roundtrip(&node);
-    assert_eq!(compile(&node).1.len(), 10);
-}
-
-#[test]
-fn bin_one_label_packed() {
-    let node = BuilderNode {
-        is_final: false,
-        trans: vec![trans(2, b'a')],
-    };
-    roundtrip(&node);
-    assert_eq!(compile(&node).1.len(), 10);
-}
-
-#[test]
-fn bin_one_label_not_packed() {
-    let node = BuilderNode {
-        is_final: false,
-        trans: vec![trans(2, b'~')],
-    };
-    roundtrip(&node);
-    assert_eq!(compile(&node).1.len(), 11);
-}
-
-#[test]
-fn bin_many_trans() {
-    let node = BuilderNode {
-        is_final: false,
-        trans: vec![
-            trans(2, b'a'), trans(3, b'b'),
-            trans(4, b'c'), trans(5, b'd'),
-            trans(6, b'e'), trans(7, b'f'),
-        ],
-    };
-    roundtrip(&node);
-    assert_eq!(compile(&node).1.len(), 22);
-}
+use {Builder, Fst, Output};
 
 fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
@@ -159,7 +60,8 @@ macro_rules! test_set_fail {
 
 test_set!(fst_set_only_empty, "");
 test_set!(fst_set_one, "a");
-test_set!(fst_set_two, "a", "b");
+test_set!(fst_set_two1, "a", "b");
+test_set!(fst_set_two2, "a", "ab");
 test_set!(fst_set_jan, "jam", "jbm", "jcm", "jdm", "jem", "jfm", "jgm");
 
 test_set_fail!(fst_set_dupe_empty, "", "");
@@ -199,10 +101,11 @@ test_map!(fst_map_one1, "a", 0);
 test_map!(fst_map_one2, "a", 100);
 test_map!(fst_map_one3, "a", 999999999);
 test_map!(fst_map_two, "a", 1, "b", 2);
+test_map!(fst_map_many1, "a", 34786, "ab", 26);
 test_map!(
-    fst_map_many,
-    "a", 34786, "ab", 26 //, "abc", 58976, "abcd", 25
-    // "z", 58, "zabc", 6798
+    fst_map_many2,
+    "a", 34786, "ab", 26, "abc", 58976, "abcd", 25,
+    "z", 58, "zabc", 6798
 );
 
 #[test]

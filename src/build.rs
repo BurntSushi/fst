@@ -5,10 +5,8 @@ use std::ptr;
 use byteorder::{WriteBytesExt, LittleEndian};
 
 use ioutil::CountingWriter;
-
-use super::{
-    VERSION,
-    FINAL_EMPTY_STATE, NONE_STATE,
+use {
+    VERSION, NONE_STATE,
     BuilderNode, BuilderTransition, CompiledAddr, Output,
 };
 
@@ -39,13 +37,6 @@ pub struct Builder<W> {
     /// this case actually corresponds to the next state for the transition,
     /// since states are compiled in reverse.)
     last_addr: CompiledAddr,
-    /// An output value associated with the empty string.
-    ///
-    /// This unfortunately seems to be a special case. The output value is
-    /// encoded in the byte range [len - 16..len - 8], preceded by a single
-    /// byte that indicates whether the empty string is in the automaton or
-    /// not.
-    empty_output: Option<Output>,
 }
 
 #[derive(Debug)]
@@ -82,29 +73,20 @@ impl<W: io::Write> Builder<W> {
         // special markers. e.g., `0` means "final state with no transitions."
         // We also use the first 8 bytes to encode the API version.
         try!(wtr.write_u64::<LittleEndian>(VERSION));
-        Ok(Builder {
+        let b = Builder {
             wtr: wtr,
             unfinished: UnfinishedNodes::new(),
             registry: Registry::new(50_000, 5),
             last: None,
             last_addr: NONE_STATE,
-            empty_output: None,
-        })
+        };
+        Ok(b)
     }
 
     pub fn into_inner(mut self) -> io::Result<W> {
         try!(self.compile_from(0));
         let mut root_node = self.unfinished.pop_root();
-        root_node.is_final = self.empty_output.is_some();
         let root_addr = try!(self.compile(&root_node));
-        println!("{} |--> {:?}", root_addr, root_node);
-        if let Some(empty_output) = self.empty_output {
-            try!(self.wtr.write_u8(1));
-            try!(self.wtr.write_u64::<LittleEndian>(empty_output.encode()));
-        } else {
-            try!(self.wtr.write_u8(0));
-            try!(self.wtr.write_u64::<LittleEndian>(Output::none().encode()));
-        }
         try!(self.wtr.write_u64::<LittleEndian>(root_addr));
         try!(self.wtr.flush());
         Ok(self.wtr.into_inner())
@@ -125,7 +107,7 @@ impl<W: io::Write> Builder<W> {
         let bs = bs.as_ref();
         try!(self.check_last_key(bs));
         if bs.is_empty() {
-            self.empty_output = Some(out);
+            self.unfinished.set_root_output(out);
             return Ok(());
         }
         let (prefix_len, out) =
@@ -137,11 +119,15 @@ impl<W: io::Write> Builder<W> {
     }
 
     fn compile_from(&mut self, istate: usize) -> io::Result<()> {
-        let mut addr = FINAL_EMPTY_STATE;
+        let mut addr = NONE_STATE;
         while istate + 1 < self.unfinished.len() {
-            let node = self.unfinished.pop_freeze(addr);
+            let node =
+                if addr == NONE_STATE {
+                    self.unfinished.pop_empty()
+                } else {
+                    self.unfinished.pop_freeze(addr)
+                };
             addr = try!(self.compile(&node));
-            println!("{} |--> {:?}", addr, node);
             assert!(addr != NONE_STATE);
         }
         self.unfinished.top_last_freeze(addr);
@@ -149,9 +135,6 @@ impl<W: io::Write> Builder<W> {
     }
 
     fn compile(&mut self, node: &BuilderNode) -> io::Result<CompiledAddr> {
-        if node.is_final && node.trans.is_empty() {
-            return Ok(FINAL_EMPTY_STATE);
-        }
         Ok(match self.registry.entry(&node) {
             RegistryEntry::Rejected => {
                 let start_addr = self.wtr.count() as CompiledAddr;
@@ -209,6 +192,7 @@ impl UnfinishedNodes {
         self.stack.push(BuilderNodeUnfinished {
             node: BuilderNode {
                 is_final: is_final,
+                final_output: Output::none(),
                 trans: vec![],
             },
             last: None,
@@ -227,6 +211,17 @@ impl UnfinishedNodes {
         unfinished.node
     }
 
+    fn pop_empty(&mut self) -> BuilderNode {
+        let mut unfinished = self.stack.pop().unwrap();
+        assert!(unfinished.last.is_none());
+        unfinished.node
+    }
+
+    fn set_root_output(&mut self, out: Output) {
+        self.stack[0].node.is_final = true;
+        self.stack[0].node.final_output = out;
+    }
+
     fn top_last_freeze(&mut self, addr: CompiledAddr) {
         let last = self.stack.len().checked_sub(1).unwrap();
         self.stack[last].last_compiled(addr);
@@ -236,7 +231,6 @@ impl UnfinishedNodes {
         if bs.is_empty() {
             return;
         }
-        println!("suffix output for {:?}: {:?}", bs, out);
         let last = self.stack.len().checked_sub(1).unwrap();
         assert!(self.stack[last].last.is_none());
         self.stack[last].last = Some(LastTransition { inp: bs[0], out: out });
@@ -244,6 +238,7 @@ impl UnfinishedNodes {
             self.stack.push(BuilderNodeUnfinished {
                 node: BuilderNode {
                     is_final: false,
+                    final_output: Output::none(),
                     trans: vec![],
                 },
                 last: Some(LastTransition { inp: b, out: Output::none() }),
@@ -289,26 +284,9 @@ impl BuilderNodeUnfinished {
     }
 
     fn add_output_prefix(&mut self, prefix: Output) {
-        // BREADCRUMBS
-        //
-        // The key here is that we need "final output" attached to the
-        // *state*. This is necessary to non-empty final states. e.g.,
-        //
-        //     a => 5
-        //     ab => 4
-        //
-        // When `a` is added, you get:
-        //
-        //     root --a/5--> F
-        //
-        // When `ab` is added, you get:
-        //
-        //     root --a/4--> F --b/0--> F
-        //
-        // What we need is:
-        //
-        //     root --a/4--> F/1 --b/0--> F
-        println!("adding output prefix {:?} to {:?}", prefix, self);
+        if self.node.is_final {
+            self.node.final_output = prefix.cat(self.node.final_output);
+        }
         for t in &mut self.node.trans {
             t.out = prefix.cat(t.out);
         }
@@ -341,6 +319,7 @@ struct RegistryCell {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 struct RegistryNode {
     is_final: bool,
+    final_output: Output,
     trans: [CompiledAddr; 2],
     inputs: [u8; 2],
     outputs: [Output; 2],
@@ -388,8 +367,9 @@ impl Registry {
         n = n.wrapping_add(11 * node.trans[1] as usize);
         n = n.wrapping_add(3 * node.inputs[0] as usize);
         n = n.wrapping_add(5 * node.inputs[1] as usize);
-        n = n.wrapping_add(13 * node.outputs[0].0.unwrap_or(0) as usize);
-        n = n.wrapping_add(17 * node.outputs[1].0.unwrap_or(0) as usize);
+        n = n.wrapping_add(13 * node.outputs[0].encode() as usize);
+        n = n.wrapping_add(17 * node.outputs[1].encode() as usize);
+        n = n.wrapping_add(19 * node.final_output.encode() as usize);
         n % self.table_size
     }
 }
@@ -439,12 +419,14 @@ impl RegistryNode {
         match node.trans.len() {
             1 => Some(RegistryNode {
                 is_final: node.is_final,
+                final_output: node.final_output,
                 trans: [node.trans[0].addr, 0],
                 inputs: [node.trans[0].inp, 0],
                 outputs: [node.trans[0].out, Output::none()],
             }),
             2 => Some(RegistryNode {
                 is_final: node.is_final,
+                final_output: node.final_output,
                 trans: [node.trans[0].addr, node.trans[1].addr],
                 inputs: [node.trans[0].inp, node.trans[1].inp],
                 outputs: [node.trans[0].out, node.trans[1].out],
@@ -456,6 +438,7 @@ impl RegistryNode {
     fn none() -> RegistryNode {
         RegistryNode {
             is_final: false,
+            final_output: Output::none(),
             trans: [NONE_STATE, NONE_STATE],
             inputs: [0, 0],
             outputs: [Output::none(), Output::none()],

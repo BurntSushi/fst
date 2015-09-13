@@ -10,12 +10,15 @@ use std::io;
 use byteorder::{ReadBytesExt, LittleEndian};
 
 pub use build::Builder;
-use node::Node;
+pub use error::{Error, Result};
+pub use node::Node;
 
 mod build;
+mod error;
 mod ioutil;
 mod node;
 mod pack;
+mod registry;
 #[cfg(test)] mod tests;
 
 const VERSION: u64 = 1;
@@ -33,26 +36,41 @@ pub struct Fst<B> {
 struct BuilderNode {
     is_final: bool,
     final_output: Output,
-    trans: Vec<BuilderTransition>,
+    trans: Vec<Transition>,
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
-struct BuilderTransition {
-    addr: CompiledAddr,
-    inp: u8,
-    out: Output,
+pub struct Transition {
+    pub inp: u8,
+    pub out: Output,
+    pub addr: CompiledAddr,
 }
 
 impl<B: AsRef<[u8]>> Fst<B> {
-    pub fn new(data: B) -> Fst<B> {
+    pub fn new(data: B) -> Result<Fst<B>> {
+        if data.as_ref().len() < 16 {
+            return Err(Error::Format);
+        }
+        // The read_u64 unwraps below are OK because they can never fail.
+        // They can only fail when there is an IO error or if there is an
+        // unexpected EOF. However, we are reading from a byte slice (no
+        // IO errors possible) and we've confirmed the byte slice is at least
+        // 16 bytes (no unexpected EOF).
+        let version = data.as_ref().read_u64::<LittleEndian>().unwrap();
+        if version != VERSION {
+            return Err(Error::Version {
+                expected: VERSION,
+                got: version,
+            });
+        }
         let root_addr = {
             let mut last = &data.as_ref()[data.as_ref().len() - 8..];
             last.read_u64::<LittleEndian>().unwrap()
         };
-        Fst {
+        Ok(Fst {
             data: data,
             root_addr: root_addr,
-        }
+        })
     }
 
     pub fn into_inner(self) -> B {
@@ -72,11 +90,15 @@ impl<B: AsRef<[u8]>> Fst<B> {
         }
     }
 
-    fn root(&self) -> Node {
+    pub fn as_slice(&self) -> &[u8] {
+        self.data.as_ref()
+    }
+
+    pub fn root(&self) -> Node {
         self.node(self.root_addr)
     }
 
-    fn node(&self, addr: CompiledAddr) -> Node {
+    pub fn node(&self, addr: CompiledAddr) -> Node {
         Node::new(addr, &self.data.as_ref())
     }
 
@@ -87,34 +109,6 @@ impl<B: AsRef<[u8]>> Fst<B> {
         } else {
             None
         }
-    }
-
-    #[doc(hidden)]
-    pub fn csv<W: io::Write>(&self, mut wtr: W) -> io::Result<()> {
-        use std::collections::HashSet;
-
-        fn word(b: u8) -> String {
-            match b {
-                b'"' => "\"\"\"\"".into(),
-                b',' => "\",\"".into(),
-                b => (b as char).to_string(),
-            }
-        }
-
-        try!(writeln!(wtr, "word,in,out"));
-        let mut stack = vec![self.root_addr];
-        let mut seen = HashSet::new();
-        while let Some(addr) = stack.pop() {
-            if seen.contains(&addr) {
-                continue;
-            }
-            seen.insert(addr);
-            for (b, _, to_addr) in self.node(addr).transitions() {
-                stack.push(to_addr);
-                try!(writeln!(wtr, "{},{},{}", word(b), addr, to_addr));
-            }
-        }
-        Ok(())
     }
 
     #[doc(hidden)]
@@ -151,14 +145,14 @@ digraph automaton {{
             } else {
                 w!(out, "    {};\n", addr);
             }
-            for (b, _, to_addr) in node.transitions() {
-                let edge = (addr, to_addr, b);
+            for t in node.transitions() {
+                let edge = (addr, t.addr, t.inp);
                 if !seen.contains(&edge) {
                     seen.insert(edge);
                     w!(out, "    {} -> {} [label={}];\n",
-                       addr, to_addr, word(b));
+                       addr, t.addr, word(t.inp));
                 }
-                stack.push(to_addr);
+                stack.push(t.addr);
             }
         }
         w!(out, "}}");
@@ -167,38 +161,35 @@ digraph automaton {{
 }
 
 #[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Output(Option<u64>);
+pub struct Output(u64);
 
 impl Output {
-    fn new(v: u64) -> Output {
-        assert!(v < ::std::u64::MAX);
-        Output(Some(v))
+    fn some(v: u64) -> Option<Output> {
+        if v == ::std::u64::MAX {
+            None
+        } else {
+            Some(Output(v + 1))
+        }
     }
 
     fn none() -> Output {
-        Output(None)
+        Output(0)
+    }
+
+    pub fn into_option(self) -> Option<u64> {
+        if self.is_none() { None } else { Some(self.0 - 1) }
     }
 
     fn encode(self) -> u64 {
-        match self.0 {
-            None => 0,
-            Some(v) => v + 1,
-        }
+        self.0
     }
 
     fn decode(v: u64) -> Output {
-        if v == 0 {
-            Output::none()
-        } else {
-            Output::new(v - 1)
-        }
+        Output(v)
     }
 
     fn is_some(self) -> bool {
-        match self.0 {
-            Some(_) => true,
-            None => false,
-        }
+        self.0 > 0
     }
 
     fn is_none(self) -> bool {
@@ -206,29 +197,16 @@ impl Output {
     }
 
     fn prefix(self, o: Output) -> Output {
-        match (self.0, o.0) {
-            (None, _) | (_, None) => Output(None),
-            (Some(x), Some(y)) => Output(Some(cmp::min(x, y))),
-        }
+        Output(cmp::min(self.0, o.0))
     }
 
     fn cat(self, o: Output) -> Output {
-        match (self.0, o.0) {
-            (None, x) | (x, None) => Output(x),
-            (Some(x), Some(y)) => Output(Some(x + y)),
-        }
+        Output(self.0 + o.0)
     }
 
     fn sub(self, o: Output) -> Output {
-        match (self.0, o.0) {
-            (x, None) => Output(x),
-            (None, Some(_)) => panic!("BUG: can't subtract from empty output"),
-            (Some(x), Some(y)) if x == y => Output(None),
-            (Some(x), Some(y)) => {
-                assert!(x > y);
-                Output(Some(x - y))
-            }
-        }
+        Output(self.0.checked_sub(o.0)
+                     .expect("BUG: underflow subtraction not allowed"))
     }
 }
 
@@ -259,20 +237,20 @@ impl<'a, B: AsRef<[u8]>> FstReader<'a, B> {
                 }
                 continue;
             }
-            let (inp, out, addr) = node.transition(state.trans);
-            self.inp.push(inp);
-            let out = state.out.cat(out);
+            let trans = node.transition(state.trans);
+            self.inp.push(trans.inp);
+            let out = state.out.cat(trans.out);
             self.stack.push(FstReaderState {
                 addr: state.addr,
                 trans: state.trans + 1,
                 out: state.out,
             });
             self.stack.push(FstReaderState {
-                addr: addr,
+                addr: trans.addr,
                 trans: 0,
                 out: out,
             });
-            let next_node = self.fst.node(addr);
+            let next_node = self.fst.node(trans.addr);
             if next_node.is_final() {
                 return Some((&self.inp, out.cat(next_node.final_output())));
             }

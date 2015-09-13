@@ -1,0 +1,265 @@
+use std::ptr;
+
+use {NONE_STATE, BuilderNode, CompiledAddr, Output};
+
+#[derive(Debug)]
+pub struct Registry {
+    table: Vec<RegistryCell>,
+    table_size: usize, // number of rows
+    lru_size: usize, // number of columns
+}
+
+#[derive(Debug)]
+struct RegistryLru<'a> {
+    cells: &'a mut [RegistryCell],
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct RegistryCell {
+    addr: CompiledAddr,
+    node: RegistryNode,
+}
+
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+struct RegistryNode {
+    is_final: bool,
+    final_output: Output,
+    trans: [CompiledAddr; 2],
+    inputs: [u8; 2],
+    outputs: [Output; 2],
+}
+
+#[derive(Debug)]
+pub enum RegistryEntry<'a> {
+    Found(CompiledAddr),
+    NotFound(&'a mut RegistryCell),
+    Rejected,
+}
+
+impl Registry {
+    pub fn new(table_size: usize, lru_size: usize) -> Registry {
+        let empty_cell = RegistryCell::none();
+        let ncells = table_size.checked_mul(lru_size).unwrap();
+        Registry {
+            table: vec![empty_cell; ncells],
+            table_size: table_size,
+            lru_size: lru_size,
+        }
+    }
+
+    pub fn entry<'a>(&'a mut self, bnode: &BuilderNode) -> RegistryEntry<'a> {
+        if self.table.is_empty() {
+            return RegistryEntry::Rejected;
+        }
+        let node = match RegistryNode::from_builder_node(bnode) {
+            None => return RegistryEntry::Rejected,
+            Some(node) => node,
+        };
+        let bucket = self.hash(&node);
+        let start = self.lru_size * bucket;
+        let end = start + self.lru_size;
+        RegistryLru { cells: &mut self.table[start..end] }.entry(node)
+    }
+
+    fn hash(&self, node: &RegistryNode) -> usize {
+        // The overhead of std's SipHasher is just so not worth it.
+        // (In my unscientific tests, this dumb hash function has no
+        // observable impact on compression ratio, but results in a perf
+        // boost of ~38%.)
+        let mut n: usize = 0;
+        n = n.wrapping_add(2 * node.is_final as usize);
+        n = n.wrapping_add(7 * node.trans[0] as usize);
+        n = n.wrapping_add(11 * node.trans[1] as usize);
+        n = n.wrapping_add(3 * node.inputs[0] as usize);
+        n = n.wrapping_add(5 * node.inputs[1] as usize);
+        n = n.wrapping_add(13 * node.outputs[0].encode() as usize);
+        n = n.wrapping_add(17 * node.outputs[1].encode() as usize);
+        n = n.wrapping_add(19 * node.final_output.encode() as usize);
+        n % self.table_size
+    }
+}
+
+impl<'a> RegistryLru<'a> {
+    fn entry(mut self, node: RegistryNode) -> RegistryEntry<'a> {
+        if let Some(i) = self.cells.iter().position(|c| c.node == node) {
+            let addr = self.cells[i].addr;
+            self.promote(i);
+            RegistryEntry::Found(addr)
+        } else {
+            let last = self.cells.len() - 1;
+            self.cells[last].node = node;
+            self.promote(last);
+            RegistryEntry::NotFound(&mut self.cells[0])
+        }
+    }
+
+    fn promote(&mut self, i: usize) {
+        assert!(i < self.cells.len());
+        let cell = self.cells[i];
+        let p = self.cells.as_mut_ptr();
+        unsafe { ptr::copy(p, p.offset(1), i); }
+        self.cells[0] = cell;
+    }
+}
+
+impl RegistryCell {
+    fn none() -> RegistryCell {
+        RegistryCell {
+            addr: NONE_STATE,
+            node: RegistryNode::none(),
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        self.addr == NONE_STATE
+    }
+
+    pub fn insert(&mut self, addr: CompiledAddr) {
+        self.addr = addr;
+    }
+}
+
+impl RegistryNode {
+    fn from_builder_node(node: &BuilderNode) -> Option<RegistryNode> {
+        match node.trans.len() {
+            0 if node.is_final => Some(RegistryNode {
+                is_final: true,
+                final_output: node.final_output,
+                trans: [NONE_STATE, NONE_STATE],
+                inputs: [0, 0],
+                outputs: [Output::none(), Output::none()],
+            }),
+            1 => Some(RegistryNode {
+                is_final: node.is_final,
+                final_output: node.final_output,
+                trans: [node.trans[0].addr, 0],
+                inputs: [node.trans[0].inp, 0],
+                outputs: [node.trans[0].out, Output::none()],
+            }),
+            2 => Some(RegistryNode {
+                is_final: node.is_final,
+                final_output: node.final_output,
+                trans: [node.trans[0].addr, node.trans[1].addr],
+                inputs: [node.trans[0].inp, node.trans[1].inp],
+                outputs: [node.trans[0].out, node.trans[1].out],
+            }),
+            _ => None,
+        }
+    }
+
+    fn none() -> RegistryNode {
+        RegistryNode {
+            is_final: false,
+            final_output: Output::none(),
+            trans: [NONE_STATE, NONE_STATE],
+            inputs: [0, 0],
+            outputs: [Output::none(), Output::none()],
+        }
+    }
+
+    fn is_none(&self) -> bool {
+        !self.is_final && self.trans == [NONE_STATE, NONE_STATE]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use {BuilderNode, Output, Transition};
+    use super::{Registry, RegistryEntry};
+
+    fn assert_rejected(entry: RegistryEntry) {
+        match entry {
+            RegistryEntry::Rejected => {}
+            entry => panic!("expected rejected entry, got: {:?}", entry),
+        }
+    }
+
+    fn assert_not_found(entry: RegistryEntry) {
+        match entry {
+            RegistryEntry::NotFound(_) => {}
+            entry => panic!("expected nout found entry, got: {:?}", entry),
+        }
+    }
+
+    fn assert_insert_and_found(reg: &mut Registry, bnode: &BuilderNode) {
+        match reg.entry(&bnode) {
+            RegistryEntry::NotFound(cell) => cell.insert(1234),
+            entry => panic!("unexpected not found entry, got: {:?}", entry),
+        }
+        match reg.entry(&bnode) {
+            RegistryEntry::Found(addr) => assert_eq!(addr, 1234),
+            entry => panic!("unexpected found entry, got: {:?}", entry),
+        }
+    }
+
+    #[test]
+    fn empty_is_ok() {
+        let mut reg = Registry::new(0, 0);
+        let bnode = BuilderNode {
+            is_final: false,
+            final_output: Output::none(),
+            trans: vec![],
+        };
+        assert_rejected(reg.entry(&bnode));
+    }
+
+    #[test]
+    fn one_final_is_ok() {
+        let mut reg = Registry::new(1, 1);
+        let bnode = BuilderNode {
+            is_final: true,
+            final_output: Output::none(),
+            trans: vec![],
+        };
+        assert_insert_and_found(&mut reg, &bnode);
+        assert_rejected(
+            reg.entry(&BuilderNode { is_final: false, .. bnode.clone() }));
+    }
+
+    #[test]
+    fn one_with_trans_is_ok() {
+        let mut reg = Registry::new(1, 1);
+        let bnode = BuilderNode {
+            is_final: false,
+            final_output: Output::none(),
+            trans: vec![Transition {
+                addr: 0, inp: b'a', out: Output::none(),
+            }],
+        };
+        assert_insert_and_found(&mut reg, &bnode);
+        assert_not_found(
+            reg.entry(&BuilderNode { is_final: true, .. bnode.clone() }));
+        assert_not_found(reg.entry(&BuilderNode {
+            trans: vec![Transition {
+                addr: 0, inp: b'b', out: Output::none(),
+            }],
+            .. bnode.clone()
+        }));
+        assert_not_found(reg.entry(&BuilderNode {
+            trans: vec![Transition {
+                addr: 0, inp: b'a', out: Output::some(1).unwrap(),
+            }],
+            .. bnode.clone()
+        }));
+    }
+
+    #[test]
+    fn lru_works() {
+        let mut reg = Registry::new(1, 1);
+
+        let bnode1 = BuilderNode {
+            is_final: true,
+            final_output: Output::none(),
+            trans: vec![],
+        };
+        assert_insert_and_found(&mut reg, &bnode1);
+
+        let bnode2 = BuilderNode {
+            is_final: true,
+            final_output: Output::some(1).unwrap(),
+            trans: vec![],
+        };
+        assert_insert_and_found(&mut reg, &bnode2);
+        assert_not_found(reg.entry(&bnode1));
+    }
+}

@@ -17,6 +17,12 @@ license = "Unlicense/MIT"
 name = "fst"
 path = "src/bin/main.rs"
 
+[[bench]]
+name = "build"
+path = "./benches/build.rs"
+test = false
+bench = true
+
 [dependencies]
 byteorder = "*"
 

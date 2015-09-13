@@ -1,4 +1,4 @@
-use {Builder, Fst, Output};
+use {Builder, Error, Fst, Output};
 
 fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
@@ -10,7 +10,7 @@ fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
     for s in ss.into_iter() {
         bfst.add(s).unwrap();
     }
-    Fst::new(bfst.into_inner().unwrap())
+    Fst::new(bfst.into_inner().unwrap()).unwrap()
 }
 
 fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
@@ -23,7 +23,7 @@ fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
     for (s, o) in ss.into_iter() {
         bfst.insert(s, o).unwrap();
     }
-    Fst::new(bfst.into_inner().unwrap())
+    Fst::new(bfst.into_inner().unwrap()).unwrap()
 }
 
 fn fst_words<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
@@ -31,6 +31,15 @@ fn fst_words<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
     let mut rdr = fst.reader();
     while let Some((word, _)) = rdr.next() {
         words.push(word.to_vec());
+    }
+    words
+}
+
+fn fst_words_outputs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<(Vec<u8>, u64)> {
+    let mut words = vec![];
+    let mut rdr = fst.reader();
+    while let Some((word, out)) = rdr.next() {
+        words.push((word.to_vec(), out.into_option().unwrap()));
     }
     words
 }
@@ -71,7 +80,7 @@ test_set_fail!(fst_set_order_2, "a", "b", "c", "a");
 
 #[test]
 fn fst_set_100000() {
-    let text = include_str!("./data/words-100000");
+    let text = include_str!("./../data/words-100000");
     let words: Vec<Vec<u8>> = text.lines()
                                   .map(|s| s.as_bytes().to_vec())
                                   .collect();
@@ -87,7 +96,7 @@ macro_rules! test_map {
             let mut rdr = fst.reader();
             $({
                 let (s, o) = rdr.next().unwrap();
-                assert_eq!((s, o.0.unwrap()), ($s.as_bytes(), $o));
+                assert_eq!((s, o.into_option().unwrap()), ($s.as_bytes(), $o));
             })*
             assert_eq!(rdr.next(), None);
         }
@@ -109,19 +118,69 @@ test_map!(
 );
 
 #[test]
-fn out_scratch() {
+fn fst_map_100000_increments() {
+    let text = include_str!("./../data/words-100000");
+    let words: Vec<(Vec<u8>, u64)> =
+        text.lines()
+            .enumerate()
+            .map(|(i, s)| (s.as_bytes().to_vec(), i as u64))
+            .collect();
+    let fst = fst_map(words.clone());
+    assert_eq!(words, fst_words_outputs(&fst));
+}
+
+#[test]
+fn fst_map_100000_lengths() {
+    let text = include_str!("./../data/words-100000");
+    let words: Vec<(Vec<u8>, u64)> =
+        text.lines()
+            .map(|s| (s.as_bytes().to_vec(), s.len() as u64))
+            .collect();
+    let fst = fst_map(words.clone());
+    assert_eq!(words, fst_words_outputs(&fst));
+}
+
+#[test]
+fn invalid_version() {
+    match Fst::new(vec![0; 16]) {
+        Err(Error::Version { expected, got }) => assert_eq!(got, 0),
+        Err(err) => panic!("expected version error, got {:?}", err),
+        Ok(_) => panic!("expected version error, got FST"),
+    }
+}
+
+#[test]
+fn invalid_format() {
+    match Fst::new(vec![0; 0]) {
+        Err(Error::Format) => {}
+        Err(err) => panic!("expected format error, got {:?}", err),
+        Ok(_) => panic!("expected format error, got FST"),
+    }
+}
+
+#[test]
+fn invalid_value() {
     let mut bfst = Builder::memory();
-    // bfst.add(b"abc").unwrap();
+    match bfst.insert("abc", ::std::u64::MAX) {
+        Err(Error::Value { got }) => assert_eq!(got, ::std::u64::MAX),
+        other => panic!("expected value error, got {:?}", other),
+    }
+}
+
+#[test]
+fn scratch() {
+    let mut bfst = Builder::memory();
     bfst.insert(b"", 10).unwrap();
     bfst.insert(b"abc", 5).unwrap();
     bfst.insert(b"abcd", 6).unwrap();
     bfst.insert(b"azzzzz", 1).unwrap();
 
-    let fst = Fst::new(bfst.into_inner().unwrap());
+    let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
     let mut rdr = fst.reader();
-    assert_eq!(rdr.next().unwrap(), (&b""[..], Output::new(10)));
-    assert_eq!(rdr.next().unwrap(), (&b"abc"[..], Output::new(5)));
-    assert_eq!(rdr.next().unwrap(), (&b"abcd"[..], Output::new(6)));
-    assert_eq!(rdr.next().unwrap(), (&b"azzzzz"[..], Output::new(1)));
+    assert_eq!(rdr.next().unwrap(), (&b""[..], Output::some(10).unwrap()));
+    assert_eq!(rdr.next().unwrap(), (&b"abc"[..], Output::some(5).unwrap()));
+    assert_eq!(rdr.next().unwrap(), (&b"abcd"[..], Output::some(6).unwrap()));
+    assert_eq!(rdr.next().unwrap(),
+               (&b"azzzzz"[..], Output::some(1).unwrap()));
     assert_eq!(rdr.next(), None);
 }

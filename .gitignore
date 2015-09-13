@@ -3,3 +3,8 @@ tags
 target
 *.lock
 tmp
+*.csv
+*.fst
+*-got
+*.csv.idx
+words

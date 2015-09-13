@@ -1,0 +1,57 @@
+#![feature(test)]
+
+extern crate fst;
+extern crate test;
+
+use std::collections::HashSet;
+
+use fst::{Builder, Fst};
+use test::Bencher;
+
+const WORDS: &'static str = include_str!("./../data/words-10000");
+
+fn get_words() -> Vec<String> {
+    WORDS.lines().map(|s| s.to_owned()).collect()
+}
+
+fn get_words_outputs() -> Vec<(String, u64)> {
+    WORDS.lines().map(|s| (s.to_owned(), s.len() as u64)).collect()
+}
+
+#[bench]
+fn build_fst_set(b: &mut Bencher) {
+    let words = get_words();
+    b.bytes = WORDS.len() as u64;
+    b.iter(|| {
+        let mut bfst = Builder::memory();
+        for word in &words {
+            bfst.add(word).unwrap();
+        }
+        Fst::new(bfst.into_inner().unwrap()).unwrap();
+    });
+}
+
+#[bench]
+fn build_fst_map(b: &mut Bencher) {
+    let words = get_words_outputs();
+    b.bytes = WORDS.len() as u64;
+    b.iter(|| {
+        let mut bfst = Builder::memory();
+        for &(ref word, len) in &words {
+            bfst.insert(word, len).unwrap();
+        }
+        Fst::new(bfst.into_inner().unwrap()).unwrap();
+    });
+}
+
+#[bench]
+fn build_hash_set(b: &mut Bencher) {
+    let words = get_words();
+    b.bytes = WORDS.len() as u64;
+    b.iter(|| {
+        let mut set = HashSet::new();
+        for word in &words {
+            set.insert(word);
+        }
+    });
+}

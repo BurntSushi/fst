@@ -6,13 +6,13 @@ use std::ops::Range;
 use byteorder::WriteBytesExt;
 
 use pack::{self, Packer};
-use {CompiledAddr, Output, BuilderNode, BuilderTransition};
+use {CompiledAddr, Output, BuilderNode, Transition};
 
 const COMMON_INPUTS: [u8; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 0
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 16
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 32
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 48
+    27, 28, 29, 30, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,       // 48
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 64
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 80
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,      // 96
@@ -27,13 +27,14 @@ const COMMON_INPUTS: [u8; 256] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 240
 ];
 
-const COMMON_INPUTS_INV: [u8; 26] = [
+const COMMON_INPUTS_INV: [u8; 31] = [
     b'a', b'b', b'c', b'd', b'e',
     b'f', b'g', b'h', b'i', b'j',
     b'k', b'l', b'm', b'n', b'o',
     b'p', b'q', b'r', b's', b't',
     b'u', b'v', b'w', b'x', b'y',
     b'z',
+    b'0', b'1', b'2', b'3', b'4',
 ];
 
 #[derive(Clone)]
@@ -50,19 +51,11 @@ impl<'b> fmt::Debug for Node<'b> {
         try!(writeln!(f, "  is_final: {}", self.is_final()));
         try!(writeln!(f, "  final_output: {:?}", self.final_output()));
         try!(writeln!(f, "  transitions:"));
-        for (inp, out, addr) in self.transitions() {
-            try!(writeln!(f, "    in: {}, out: {:?}, addr: {}",
-                          inp, out, addr));
+        for t in self.transitions() {
+            try!(writeln!(f, "{:?}", t));
         }
         Ok(())
     }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Transition {
-    inp: u8,
-    out: Output,
-    addr: CompiledAddr,
 }
 
 impl<'b> Node<'b> {
@@ -81,8 +74,12 @@ impl<'b> Node<'b> {
         Transitions { node: self, range: 0..self.len() as u8 }
     }
 
-    pub fn transition(&self, i: usize) -> (u8, Output, CompiledAddr) {
-        (self.input(i), self.output(i), self.transition_addr(i))
+    pub fn transition(&self, i: usize) -> Transition {
+        Transition {
+            inp: self.input(i),
+            out: self.output(i),
+            addr: self.transition_addr(i),
+        }
     }
 
     pub fn input(&self, i: usize) -> u8 {
@@ -121,8 +118,19 @@ impl<'b> Node<'b> {
         self.state.end_addr(self)
     }
 
-    fn bytes(&self) -> &[u8] {
+    pub fn bytes(&self) -> &[u8] {
         &self.data[self.end_addr()..]
+    }
+
+    pub fn state(&self) -> &'static str {
+        use self::State::*;
+        match self.state {
+            OneTransNextOutput(_) => "OneTransNextOutput",
+            OneTransNext(_) => "OneTransNext",
+            OneTransFinal(_) => "OneTransFinal",
+            OneTrans(_) => "OneTrans",
+            AnyTrans(_) => "AnyTrans",
+        }
     }
 }
 
@@ -344,11 +352,7 @@ impl StateOneTransNext {
     #[inline]
     fn set_common_input(&mut self, input: u8) {
         let val = COMMON_INPUTS[input as usize];
-        self.0 = if val <= 31 {
-            (self.0 & 0b110_00000) | val
-        } else {
-            0b110_00000
-        };
+        self.0 = (self.0 & 0b110_00000) | val;
     }
 
     #[inline]
@@ -387,7 +391,7 @@ impl StateOneTransFinal {
         mut wtr: W,
         addr: CompiledAddr,
         final_output: Output,
-        trans: BuilderTransition,
+        trans: Transition,
     ) -> io::Result<()> {
         let final_output = final_output.encode();
         let trans_output = trans.out.encode();
@@ -496,7 +500,7 @@ impl StateOneTransFinal {
 
 impl StateOneTrans {
     fn compile<W: io::Write>(
-        mut wtr: W, addr: CompiledAddr, trans: BuilderTransition,
+        mut wtr: W, addr: CompiledAddr, trans: Transition,
     ) -> io::Result<()> {
         let out = trans.out.encode();
         let output_pack_size = try!(pack::pack_uint(&mut wtr, out));
@@ -597,26 +601,34 @@ impl StateAnyTrans {
         let (mut min_addr, mut max_addr) = (::std::u64::MAX, 0);
         let mut min_out = node.final_output.encode();
         let mut max_out = node.final_output.encode();
+        let mut any_outs = node.final_output.is_some();
         for t in &node.trans {
             min_addr = cmp::min(min_addr, addr - t.addr);
             max_addr = cmp::max(max_addr, addr - t.addr);
             min_out = cmp::min(min_out, t.out.encode());
             max_out = cmp::max(max_out, t.out.encode());
+            any_outs = any_outs || t.out.is_some();
         }
         let trans_packer = Packer::for_range(min_addr, max_addr);
         let out_packer = Packer::for_range(min_out, max_out);
 
         let mut pack_sizes = PackSizes::new();
-        pack_sizes.set_output_pack_size(out_packer.bytes_needed());
+        if any_outs {
+            pack_sizes.set_output_pack_size(out_packer.bytes_needed());
+        } else {
+            pack_sizes.set_output_pack_size(0);
+        }
         pack_sizes.set_transition_pack_size(trans_packer.bytes_needed());
 
         let mut state = StateAnyTrans::new();
         state.set_final_state(node.is_final);
         state.set_state_ntrans(node.trans.len() as u8);
 
-        try!(out_packer.write(&mut wtr, node.final_output.encode()));
-        for t in node.trans.iter().rev() {
-            try!(out_packer.write(&mut wtr, t.out.encode()));
+        if any_outs {
+            try!(out_packer.write(&mut wtr, node.final_output.encode()));
+            for t in node.trans.iter().rev() {
+                try!(out_packer.write(&mut wtr, t.out.encode()));
+            }
         }
         for t in node.trans.iter().rev() {
             try!(trans_packer.write(&mut wtr, addr - t.addr));
@@ -693,6 +705,9 @@ impl StateAnyTrans {
 
     fn output(&self, node: &Node, i: usize) -> Output {
         let osize = self.sizes(node).output_pack_size();
+        if osize == 0 {
+            return Output::none();
+        }
         let tsize = self.sizes(node).transition_pack_size();
         let ntrans = self.ntrans(node);
         let at = node.start_addr()
@@ -707,6 +722,9 @@ impl StateAnyTrans {
 
     fn final_output(&self, node: &Node) -> Output {
         let osize = self.sizes(node).output_pack_size();
+        if osize == 0 {
+            return Output::none();
+        }
         let tsize = self.sizes(node).transition_pack_size();
         let ntrans = self.ntrans(node);
         let at = node.start_addr()
@@ -721,7 +739,6 @@ impl StateAnyTrans {
 
     fn trans_addr(&self, node: &Node, i: usize) -> CompiledAddr {
         assert!(i < self.ntrans(node));
-        let osize = self.sizes(node).output_pack_size();
         let tsize = self.sizes(node).transition_pack_size();
         let ntrans = self.ntrans(node);
         let at = node.start_addr()
@@ -790,9 +807,9 @@ pub struct Transitions<'b: 'n, 'n> {
 }
 
 impl<'b, 'n> Iterator for Transitions<'b, 'n> {
-    type Item = (u8, Output, CompiledAddr);
+    type Item = Transition;
 
-    fn next(&mut self) -> Option<(u8, Output, CompiledAddr)> {
+    fn next(&mut self) -> Option<Transition> {
         self.range.next().map(|i| self.node.transition(i as usize))
     }
 }
@@ -802,9 +819,7 @@ mod tests {
     use quickcheck::{TestResult, quickcheck};
 
     use node::Node;
-    use {
-        Builder, BuilderNode, BuilderTransition, CompiledAddr, Fst, Output,
-    };
+    use {Builder, BuilderNode, Transition, CompiledAddr, Fst, Output};
 
     const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
 
@@ -818,7 +833,7 @@ mod tests {
             for word in &bs {
                 bfst.add(word).unwrap();
             }
-            let fst = Fst::new(bfst.into_inner().unwrap());
+            let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
             let mut rdr = fst.reader();
             let mut words = vec![];
             while let Some(w) = rdr.next() {
@@ -836,9 +851,9 @@ mod tests {
         assert_eq!(compiled.final_output(), uncompiled.final_output);
         for (ct, ut)
          in compiled.transitions().zip(uncompiled.trans.iter().cloned()) {
-            assert_eq!(ct.0, ut.inp);
-            assert_eq!(ct.1, ut.out);
-            assert_eq!(ct.2, ut.addr);
+            assert_eq!(ct.inp, ut.inp);
+            assert_eq!(ct.out, ut.out);
+            assert_eq!(ct.addr, ut.addr);
         }
         true
     }
@@ -855,8 +870,8 @@ mod tests {
         nodes_equal(&node, &bnode)
     }
 
-    fn trans(addr: CompiledAddr, inp: u8) -> BuilderTransition {
-        BuilderTransition { addr: addr, inp: inp, out: Output(None) }
+    fn trans(addr: CompiledAddr, inp: u8) -> Transition {
+        Transition { inp: inp, out: Output::none(), addr: addr }
     }
 
     #[test]
@@ -868,7 +883,7 @@ mod tests {
         };
         let (addr, buf) = compile(&bnode);
         let node = Node::new(addr, &buf);
-        assert_eq!(node.bytes().len(), 4);
+        assert_eq!(node.bytes().len(), 3);
         roundtrip(&bnode);
     }
 
@@ -911,7 +926,7 @@ mod tests {
         };
         let (addr, buf) = compile(&bnode);
         let node = Node::new(addr, &buf);
-        assert_eq!(node.bytes().len(), 21);
+        assert_eq!(node.bytes().len(), 14);
         roundtrip(&bnode);
     }
 }

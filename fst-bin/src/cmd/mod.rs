@@ -4,8 +4,7 @@ pub mod csv {
     use bit_set::BitSet;
     use csv;
     use docopt::Docopt;
-    use fst;
-    use memmap::{Mmap, Protection};
+    use fst::fst;
 
     use util;
     use Error;
@@ -31,8 +30,7 @@ Usage: fst csv edges <input> [<output>]
         let wtr = try!(util::get_writer(args.arg_output));
         let mut wtr = csv::Writer::from_writer(wtr);
 
-        let mmap = try!(Mmap::open_path(args.arg_input, Protection::Read));
-        let fst = try!(fst::Fst::new(unsafe { mmap.as_slice() }));
+        let fst = try!(fst::Fst::from_file_path(args.arg_input));
         let mut set = BitSet::with_capacity(fst.as_slice().len());
 
         if args.cmd_edges {
@@ -80,7 +78,7 @@ pub mod mkset {
     use std::io::{BufRead, Write};
 
     use docopt::Docopt;
-    use fst;
+    use fst::fst;
 
     use util;
     use Error;
@@ -114,8 +112,7 @@ pub mod words {
     use std::io::Write;
 
     use docopt::Docopt;
-    use fst;
-    use memmap::{Mmap, Protection};
+    use fst::fst;
 
     use util;
     use Error;
@@ -136,16 +133,13 @@ Usage: fst words [options] <input> [<output>]
                                 .unwrap_or_else(|e| e.exit());
 
         let mut wtr = try!(util::get_buf_writer(args.arg_output));
-        let mmap = try!(Mmap::open_path(args.arg_input, Protection::Read));
-        {
-            let fst = try!(fst::Fst::new(unsafe { mmap.as_slice() }));
-            let mut rdr = fst.reader();
-            while let Some((word, _)) = rdr.next() {
-                try!(wtr.write_all(word));
-                try!(wtr.write_all(b"\n"));
-            }
-            try!(wtr.flush());
+        let fst = try!(fst::Fst::from_file_path(args.arg_input));
+        let mut rdr = fst.reader();
+        while let Some((word, _)) = rdr.next() {
+            try!(wtr.write_all(word));
+            try!(wtr.write_all(b"\n"));
         }
+        try!(wtr.flush());
         Ok(())
     }
 }

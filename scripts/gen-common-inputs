@@ -1,0 +1,39 @@
+#!/usr/bin/env python
+
+from __future__ import absolute_import, division, print_function
+import codecs
+from operator import itemgetter
+import sys
+
+
+if __name__ == '__main__':
+    # Get frequency counts of each byte.
+    freqs = [0] * 256  # byte |--> frequency
+    for fpath in sys.argv[1:]:
+        with codecs.open(fpath, 'r', 'utf-8') as fin:
+            for line in fin:
+                for byte in line.strip().encode('utf-8'):
+                    freqs[byte] += 1
+
+    # Create the inverse mapping.
+    orders = [0] * 256  # byte |--> sort index, descending
+    sort_by_freq = sorted(zip(range(256), freqs),
+                          key=itemgetter(1), reverse=True)
+    for sort_idx, byte in enumerate(map(itemgetter(0), sort_by_freq)):
+        orders[byte] = sort_idx
+
+    # Now write Rust.
+    olines = ['pub const COMMON_INPUTS: [u8; 256] = [']
+    for byte in range(256):
+        olines.append('    %3d, // %r' % (orders[byte], chr(byte)))
+    olines.append('];')
+    olines.append('')
+    olines.append('pub const COMMON_INPUTS_INV: [u8; 256] = [')
+    for sort_idx in range(256):
+        byte = orders.index(sort_idx)
+        if byte <= 127:
+            olines.append('    b%r,' % chr(byte))
+        else:
+            olines.append("    b'\\x%x'," % byte)
+    olines.append('];')
+    print('\n'.join(olines))

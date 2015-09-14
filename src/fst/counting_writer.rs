@@ -1,29 +1,13 @@
 use std::io;
 
-pub trait ReadExt: io::Read {
-    fn read_full(&mut self, buf: &mut [u8]) -> io::Result<()> {
-        let mut nread = 0usize;
-        while nread < buf.len() {
-            match self.read(&mut buf[nread..]) {
-                Ok(0) => return Err(io::Error::new(io::ErrorKind::Other,
-                                                   "unexpected EOF")),
-                Ok(n) => nread += n,
-                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {},
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(())
-    }
-}
-
-impl<T: io::Read> ReadExt for T {}
-
+/// Wraps any writer and counts bytes written.
 pub struct CountingWriter<W> {
     wtr: W,
     cnt: u64,
 }
 
 impl<W: io::Write> CountingWriter<W> {
+    /// Wrap the given writer with a counter.
     pub fn new(wtr: W) -> CountingWriter<W> {
         CountingWriter {
             wtr: wtr,
@@ -31,10 +15,15 @@ impl<W: io::Write> CountingWriter<W> {
         }
     }
 
+    /// Return the total number of bytes written to the underlying writer.
+    ///
+    /// The count returned is the sum of all counts resulting from a call
+    /// to `write`.
     pub fn count(&self) -> u64 {
         self.cnt
     }
 
+    /// Unwrap the counting writer and return the inner writer.
     pub fn into_inner(self) -> W {
         self.wtr
     }
@@ -49,5 +38,18 @@ impl<W: io::Write> io::Write for CountingWriter<W> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.wtr.flush()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+    use super::CountingWriter;
+
+    #[test]
+    fn counts_bytes() {
+        let mut wtr = CountingWriter::new(vec![]);
+        wtr.write_all(b"foobar").unwrap();
+        assert_eq!(wtr.count(), 6);
     }
 }

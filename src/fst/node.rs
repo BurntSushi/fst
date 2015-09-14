@@ -5,37 +5,10 @@ use std::ops::Range;
 
 use byteorder::WriteBytesExt;
 
-use pack::{self, Packer};
-use {CompiledAddr, Output, BuilderNode, Transition};
-
-const COMMON_INPUTS: [u8; 256] = [
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 0
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 16
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 32
-    27, 28, 29, 30, 31, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,       // 48
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 64
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 80
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,      // 96
-    16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 0, 0, 0, 0, 0, // 112
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 128
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 144
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 160
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 176
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 192
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 208
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 224
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,            // 240
-];
-
-const COMMON_INPUTS_INV: [u8; 31] = [
-    b'a', b'b', b'c', b'd', b'e',
-    b'f', b'g', b'h', b'i', b'j',
-    b'k', b'l', b'm', b'n', b'o',
-    b'p', b'q', b'r', b's', b't',
-    b'u', b'v', b'w', b'x', b'y',
-    b'z',
-    b'0', b'1', b'2', b'3', b'4',
-];
+use fst::{CompiledAddr, Output, Transition};
+use fst::build::BuilderNode;
+use fst::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
+use fst::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
 
 #[derive(Clone)]
 pub struct Node<'b> {
@@ -289,7 +262,7 @@ impl StateOneTransNextOutput {
         mut wtr: W, addr: CompiledAddr, input: u8, output: Output,
     ) -> io::Result<()> {
         let mut state = StateOneTransNextOutput::new();
-        let pack_size = try!(pack::pack_uint(&mut wtr, output.encode()));
+        let pack_size = try!(pack_uint(&mut wtr, output.encode()));
         try!(wtr.write_u8(input));
         state.set_output_pack_size(pack_size);
         wtr.write_u8(state.0).map_err(From::from)
@@ -320,7 +293,7 @@ impl StateOneTransNextOutput {
         let i = node.start_addr()
                 - 1 // input
                 - osize;
-        Output::decode(pack::unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
@@ -351,18 +324,12 @@ impl StateOneTransNext {
 
     #[inline]
     fn set_common_input(&mut self, input: u8) {
-        let val = COMMON_INPUTS[input as usize];
-        self.0 = (self.0 & 0b110_00000) | val;
+        self.0 = (self.0 & 0b110_00000) | common_idx(input, 0b11111);
     }
 
     #[inline]
     fn common_input(&self) -> Option<u8> {
-        let val = self.0 & 0b000_11111;
-        if val == 0 {
-            None
-        } else {
-            COMMON_INPUTS_INV.get(val as usize - 1).map(|v| *v)
-        }
+        common_input(self.0 & 0b000_11111)
     }
 
     fn input_len(&self) -> usize {
@@ -395,19 +362,17 @@ impl StateOneTransFinal {
     ) -> io::Result<()> {
         let final_output = final_output.encode();
         let trans_output = trans.out.encode();
-        let packer = Packer::for_range(
-            cmp::min(final_output, trans_output),
-            cmp::max(final_output, trans_output));
-        try!(packer.write(&mut wtr, final_output));
-        try!(packer.write(&mut wtr, trans_output));
+        let osize = pack_size(cmp::max(final_output, trans_output));
+        try!(pack_uint_in(&mut wtr, final_output, osize));
+        try!(pack_uint_in(&mut wtr, trans_output, osize));
 
         let delta_addr = addr - trans.addr;
-        let trans_pack_size = try!(pack::pack_uint(&mut wtr, delta_addr));
+        let tsize = try!(pack_uint(&mut wtr, delta_addr));
 
         let mut pack_sizes = PackSizes::new();
-        pack_sizes.set_output_pack_size(packer.bytes_needed());
-        pack_sizes.set_transition_pack_size(trans_pack_size);
-        try!(wtr.write_u8(pack_sizes.0));
+        pack_sizes.set_output_pack_size(osize);
+        pack_sizes.set_transition_pack_size(tsize);
+        try!(wtr.write_u8(pack_sizes.encode()));
 
         let mut state = StateOneTransFinal::new();
         state.set_common_input(trans.inp);
@@ -424,20 +389,12 @@ impl StateOneTransFinal {
 
     #[inline]
     fn set_common_input(&mut self, input: u8) {
-        let val = COMMON_INPUTS[input as usize];
-        if val <= 31 {
-            self.0 = (self.0 & 0b101_00000) | val;
-        }
+        self.0 = (self.0 & 0b101_00000) | common_idx(input, 0b11111);
     }
 
     #[inline]
     fn common_input(&self) -> Option<u8> {
-        let val = self.0 & 0b000_11111;
-        if val == 0 {
-            None
-        } else {
-            COMMON_INPUTS_INV.get(val as usize - 1).map(|v| *v)
-        }
+        common_input(self.0 & 0b000_11111)
     }
 
     fn input_len(&self) -> usize {
@@ -446,7 +403,7 @@ impl StateOneTransFinal {
 
     fn sizes(&self, node: &Node) -> PackSizes {
         let i = node.start_addr() - self.input_len() - 1;
-        PackSizes::from_u8(node.data[i])
+        PackSizes::decode(node.data[i])
     }
 
     fn input(&self, node: &Node) -> u8 {
@@ -464,7 +421,7 @@ impl StateOneTransFinal {
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize;
-        Output::decode(pack::unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn final_output(&self, node: &Node) -> Output {
@@ -474,7 +431,7 @@ impl StateOneTransFinal {
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize - osize;
-        Output::decode(pack::unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
@@ -484,7 +441,7 @@ impl StateOneTransFinal {
                 - self.input_len()
                 - 1 // pack size
                 - tsize;
-        let delta = pack::unpack_uint(&node.data[i..], tsize as u8).unwrap();
+        let delta = unpack_uint(&node.data[i..], tsize as u8).unwrap();
         self.end_addr(node) as CompiledAddr - delta
     }
 
@@ -503,15 +460,15 @@ impl StateOneTrans {
         mut wtr: W, addr: CompiledAddr, trans: Transition,
     ) -> io::Result<()> {
         let out = trans.out.encode();
-        let output_pack_size = try!(pack::pack_uint(&mut wtr, out));
+        let output_pack_size = try!(pack_uint(&mut wtr, out));
 
         let delta_addr = addr - trans.addr;
-        let trans_pack_size = try!(pack::pack_uint(&mut wtr, delta_addr));
+        let trans_pack_size = try!(pack_uint(&mut wtr, delta_addr));
 
         let mut pack_sizes = PackSizes::new();
         pack_sizes.set_output_pack_size(output_pack_size);
         pack_sizes.set_transition_pack_size(trans_pack_size);
-        try!(wtr.write_u8(pack_sizes.0));
+        try!(wtr.write_u8(pack_sizes.encode()));
 
         let mut state = StateOneTrans::new();
         state.set_common_input(trans.inp);
@@ -528,20 +485,12 @@ impl StateOneTrans {
 
     #[inline]
     fn set_common_input(&mut self, input: u8) {
-        let val = COMMON_INPUTS[input as usize];
-        if val <= 31 {
-            self.0 = (self.0 & 0b100_00000) | val;
-        }
+        self.0 = (self.0 & 0b100_00000) | common_idx(input, 0b11111);
     }
 
     #[inline]
     fn common_input(&self) -> Option<u8> {
-        let val = self.0 & 0b000_11111;
-        if val == 0 {
-            None
-        } else {
-            COMMON_INPUTS_INV.get(val as usize - 1).map(|v| *v)
-        }
+        common_input(self.0 & 0b000_11111)
     }
 
     fn input_len(&self) -> usize {
@@ -550,7 +499,7 @@ impl StateOneTrans {
 
     fn sizes(&self, node: &Node) -> PackSizes {
         let i = node.start_addr() - self.input_len() - 1;
-        PackSizes::from_u8(node.data[i])
+        PackSizes::decode(node.data[i])
     }
 
     fn input(&self, node: &Node) -> u8 {
@@ -568,7 +517,7 @@ impl StateOneTrans {
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize;
-        Output::decode(pack::unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
@@ -578,7 +527,7 @@ impl StateOneTrans {
                 - self.input_len()
                 - 1 // pack size
                 - tsize;
-        let delta = pack::unpack_uint(&node.data[i..], tsize as u8).unwrap();
+        let delta = unpack_uint(&node.data[i..], tsize as u8).unwrap();
         self.end_addr(node) as CompiledAddr - delta
     }
 
@@ -598,45 +547,40 @@ impl StateAnyTrans {
     ) -> io::Result<()> {
         assert!(node.trans.len() <= ::std::u8::MAX as usize);
 
-        let (mut min_addr, mut max_addr) = (::std::u64::MAX, 0);
-        let mut min_out = node.final_output.encode();
-        let mut max_out = node.final_output.encode();
+        let mut tsize = 0;
+        let mut osize = pack_size(node.final_output.encode());
         let mut any_outs = node.final_output.is_some();
         for t in &node.trans {
-            min_addr = cmp::min(min_addr, addr - t.addr);
-            max_addr = cmp::max(max_addr, addr - t.addr);
-            min_out = cmp::min(min_out, t.out.encode());
-            max_out = cmp::max(max_out, t.out.encode());
+            tsize = cmp::max(tsize, pack_size(addr - t.addr));
+            osize = cmp::max(osize, pack_size(t.out.encode()));
             any_outs = any_outs || t.out.is_some();
         }
-        let trans_packer = Packer::for_range(min_addr, max_addr);
-        let out_packer = Packer::for_range(min_out, max_out);
 
         let mut pack_sizes = PackSizes::new();
         if any_outs {
-            pack_sizes.set_output_pack_size(out_packer.bytes_needed());
+            pack_sizes.set_output_pack_size(osize);
         } else {
             pack_sizes.set_output_pack_size(0);
         }
-        pack_sizes.set_transition_pack_size(trans_packer.bytes_needed());
+        pack_sizes.set_transition_pack_size(tsize);
 
         let mut state = StateAnyTrans::new();
         state.set_final_state(node.is_final);
         state.set_state_ntrans(node.trans.len() as u8);
 
         if any_outs {
-            try!(out_packer.write(&mut wtr, node.final_output.encode()));
+            try!(pack_uint_in(&mut wtr, node.final_output.encode(), osize));
             for t in node.trans.iter().rev() {
-                try!(out_packer.write(&mut wtr, t.out.encode()));
+                try!(pack_uint_in(&mut wtr, t.out.encode(), osize));
             }
         }
         for t in node.trans.iter().rev() {
-            try!(trans_packer.write(&mut wtr, addr - t.addr));
+            try!(pack_uint_in(&mut wtr, addr - t.addr, tsize));
         }
         for t in node.trans.iter().rev() {
             try!(wtr.write_u8(t.inp));
         }
-        try!(wtr.write_u8(pack_sizes.0));
+        try!(wtr.write_u8(pack_sizes.encode()));
         if state.state_ntrans().is_none() {
             try!(wtr.write_u8(node.trans.len() as u8));
         }
@@ -679,7 +623,7 @@ impl StateAnyTrans {
 
     fn sizes(&self, node: &Node) -> PackSizes {
         let i = node.start_addr() - self.ntrans_len() - 1;
-        PackSizes::from_u8(node.data[i])
+        PackSizes::decode(node.data[i])
     }
 
     fn ntrans_len(&self) -> usize {
@@ -717,7 +661,7 @@ impl StateAnyTrans {
                  - (ntrans * tsize) // transition addresses
                  - (i * osize) // the previous outputs
                  - osize; // the desired output value
-        Output::decode(pack::unpack_uint(&node.data[at..], osize as u8).unwrap())
+        Output::decode(unpack_uint(&node.data[at..], osize as u8).unwrap())
     }
 
     fn final_output(&self, node: &Node) -> Output {
@@ -734,7 +678,7 @@ impl StateAnyTrans {
                  - (ntrans * tsize) // transition addresses
                  - (ntrans * osize) // output values
                  - osize; // the desired output value
-        Output::decode(pack::unpack_uint(&node.data[at..], osize as u8).unwrap())
+        Output::decode(unpack_uint(&node.data[at..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node, i: usize) -> CompiledAddr {
@@ -747,7 +691,7 @@ impl StateAnyTrans {
                  - ntrans // inputs
                  - (i * tsize) // the previous transition addresses
                  - tsize; // the desired transition address
-        let delta = pack::unpack_uint(&node.data[at..], tsize as u8).unwrap();
+        let delta = unpack_uint(&node.data[at..], tsize as u8).unwrap();
         self.end_addr(node) as CompiledAddr - delta
     }
 
@@ -778,8 +722,12 @@ impl PackSizes {
         PackSizes(0)
     }
 
-    fn from_u8(v: u8) -> Self {
+    fn decode(v: u8) -> Self {
         PackSizes(v)
+    }
+
+    fn encode(&self) -> u8 {
+        self.0
     }
 
     fn set_transition_pack_size(&mut self, size: u8) {
@@ -814,12 +762,30 @@ impl<'b, 'n> Iterator for Transitions<'b, 'n> {
     }
 }
 
+fn common_idx(input: u8, max: u8) -> u8 {
+    let val = ((COMMON_INPUTS[input as usize] as u32 + 1) % 256) as u8;
+    if val > max {
+        0
+    } else {
+        val
+    }
+}
+
+fn common_input(idx: u8) -> Option<u8> {
+    if idx == 0 {
+        None
+    } else {
+        Some(COMMON_INPUTS_INV[(idx - 1) as usize])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use quickcheck::{TestResult, quickcheck};
 
-    use node::Node;
-    use {Builder, BuilderNode, Transition, CompiledAddr, Fst, Output};
+    use fst::{Builder, Transition, CompiledAddr, Fst, Output};
+    use fst::build::BuilderNode;
+    use fst::node::Node;
 
     const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
 

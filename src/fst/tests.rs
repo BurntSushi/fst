@@ -1,4 +1,6 @@
-use {Builder, Error, Fst, Output};
+use fst::{Builder, Error, Fst, Output};
+
+const TEXT: &'static str = include_str!("./../../data/words-100000");
 
 fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
@@ -80,8 +82,7 @@ test_set_fail!(fst_set_order_2, "a", "b", "c", "a");
 
 #[test]
 fn fst_set_100000() {
-    let text = include_str!("./../data/words-100000");
-    let words: Vec<Vec<u8>> = text.lines()
+    let words: Vec<Vec<u8>> = TEXT.lines()
                                   .map(|s| s.as_bytes().to_vec())
                                   .collect();
     let fst = fst_set(words.clone());
@@ -119,9 +120,8 @@ test_map!(
 
 #[test]
 fn fst_map_100000_increments() {
-    let text = include_str!("./../data/words-100000");
     let words: Vec<(Vec<u8>, u64)> =
-        text.lines()
+        TEXT.lines()
             .enumerate()
             .map(|(i, s)| (s.as_bytes().to_vec(), i as u64))
             .collect();
@@ -131,9 +131,8 @@ fn fst_map_100000_increments() {
 
 #[test]
 fn fst_map_100000_lengths() {
-    let text = include_str!("./../data/words-100000");
     let words: Vec<(Vec<u8>, u64)> =
-        text.lines()
+        TEXT.lines()
             .map(|s| (s.as_bytes().to_vec(), s.len() as u64))
             .collect();
     let fst = fst_map(words.clone());

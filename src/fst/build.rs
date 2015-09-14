@@ -2,13 +2,10 @@ use std::io::{self, Write};
 
 use byteorder::{WriteBytesExt, LittleEndian};
 
-use ioutil::CountingWriter;
-use registry::{Registry, RegistryEntry};
-use {
-    VERSION, NONE_STATE,
-    Error, Result,
-    BuilderNode, CompiledAddr, Output, Transition,
-};
+use error::{Error, Result};
+use fst::{VERSION, NONE_STATE, CompiledAddr, Output, Transition};
+use fst::counting_writer::CountingWriter;
+use fst::registry::{Registry, RegistryEntry};
 
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
@@ -51,6 +48,13 @@ struct BuilderNodeUnfinished {
     last: Option<LastTransition>,
 }
 
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+pub struct BuilderNode {
+    pub is_final: bool,
+    pub final_output: Output,
+    pub trans: Vec<Transition>,
+}
+
 #[derive(Debug)]
 struct LastTransition {
     inp: u8,
@@ -74,14 +78,13 @@ impl<W: io::Write> Builder<W> {
         // special markers. e.g., `0` means "final state with no transitions."
         // We also use the first 8 bytes to encode the API version.
         try!(wtr.write_u64::<LittleEndian>(VERSION));
-        let b = Builder {
+        Ok(Builder {
             wtr: wtr,
             unfinished: UnfinishedNodes::new(),
             registry: Registry::new(50_000, 5),
             last: None,
             last_addr: NONE_STATE,
-        };
-        Ok(b)
+        })
     }
 
     pub fn into_inner(mut self) -> Result<W> {

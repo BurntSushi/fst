@@ -1,6 +1,7 @@
 use std::ptr;
 
-use {NONE_STATE, BuilderNode, CompiledAddr, Output};
+use fst::{NONE_STATE, CompiledAddr, Output};
+use fst::build::BuilderNode;
 
 #[derive(Debug)]
 pub struct Registry {
@@ -164,7 +165,8 @@ impl RegistryNode {
 
 #[cfg(test)]
 mod tests {
-    use {BuilderNode, Output, Transition};
+    use fst::{Output, Transition};
+    use fst::build::BuilderNode;
     use super::{Registry, RegistryEntry};
 
     fn assert_rejected(entry: RegistryEntry) {

@@ -2,7 +2,6 @@ extern crate bit_set;
 extern crate csv;
 extern crate docopt;
 extern crate fst;
-extern crate memmap;
 extern crate rustc_serialize;
 
 use std::env;

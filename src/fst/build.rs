@@ -98,11 +98,13 @@ impl<W: io::Write> Builder<W> {
 
     pub fn add<B>(&mut self, bs: B) -> Result<()>
             where B: AsRef<[u8]> {
+        try!(self.check_last_key(bs.as_ref(), false));
         self.insert_output(bs, Output::none())
     }
 
     pub fn insert<B>(&mut self, bs: B, val: u64) -> Result<()>
             where B: AsRef<[u8]> {
+        try!(self.check_last_key(bs.as_ref(), true));
         let out = match Output::some(val) {
             None => return Err(Error::Value { got: val }),
             Some(out) => out,
@@ -113,14 +115,19 @@ impl<W: io::Write> Builder<W> {
     fn insert_output<B>(&mut self, bs: B, out: Output) -> Result<()>
             where B: AsRef<[u8]> {
         let bs = bs.as_ref();
-        try!(self.check_last_key(bs));
         if bs.is_empty() {
             self.unfinished.set_root_output(out);
             return Ok(());
         }
         let (prefix_len, out) =
             self.unfinished.find_common_prefix_and_set_output(bs, out);
-        assert!(prefix_len != bs.len());
+        if prefix_len == bs.len() {
+            // If the prefix found consumes the entire set of bytes, then
+            // the prefix *equals* the bytes given. This means it is a
+            // duplicate value with no output. So we can give up here.
+            assert!(out.is_none());
+            return Ok(());
+        }
         try!(self.compile_from(prefix_len));
         self.unfinished.add_suffix(&bs[prefix_len..], out);
         Ok(())
@@ -163,13 +170,16 @@ impl<W: io::Write> Builder<W> {
         })
     }
 
-    fn check_last_key(&mut self, bs: &[u8]) -> Result<()> {
+    fn check_last_key(&mut self, bs: &[u8], check_dupe: bool) -> Result<()> {
         if let Some(ref mut last) = self.last {
-            if bs == &**last {
+            if check_dupe && bs == &**last {
                 return Err(Error::DuplicateKey { got: bs.to_vec() });
             }
             if bs < &**last {
-                return Err(Error::OutOfOrder { got: bs.to_vec() });
+                return Err(Error::OutOfOrder {
+                    previous: last.to_vec(),
+                    got: bs.to_vec(),
+                });
             }
             last.clear();
             for &b in bs {

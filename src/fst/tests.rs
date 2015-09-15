@@ -1,21 +1,21 @@
-use fst::{Builder, Error, Fst, Output};
+use error::Error;
+use fst::{Builder, Fst, Output};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
-fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
+pub fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<Vec<u8>> =
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
     ss.sort();
-    ss.dedup();
     for s in ss.into_iter() {
         bfst.add(s).unwrap();
     }
     Fst::new(bfst.into_inner().unwrap()).unwrap()
 }
 
-fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
+pub fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
         where I: IntoIterator<Item=(S, u64)>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<(Vec<u8>, u64)> =
@@ -28,7 +28,7 @@ fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
     Fst::new(bfst.into_inner().unwrap()).unwrap()
 }
 
-fn fst_words<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
+pub fn fst_inputs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
     let mut words = vec![];
     let mut rdr = fst.reader();
     while let Some((word, _)) = rdr.next() {
@@ -37,7 +37,8 @@ fn fst_words<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
     words
 }
 
-fn fst_words_outputs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<(Vec<u8>, u64)> {
+pub fn fst_inputs_outputs<B: AsRef<[u8]>>(fst: &Fst<B>)
+                                         -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
     let mut rdr = fst.reader();
     while let Some((word, out)) = rdr.next() {
@@ -50,9 +51,14 @@ macro_rules! test_set {
     ($name:ident, $($s:expr),+) => {
         #[test]
         fn $name() {
-            let fst = fst_set(vec![$($s),*]);
+            let mut items = vec![$($s),*];
+            let fst = fst_set(&items);
             let mut rdr = fst.reader();
-            $(assert_eq!(rdr.next().unwrap().0, $s.as_bytes());)*
+            items.sort();
+            items.dedup();
+            for item in items {
+                assert_eq!(rdr.next().unwrap().0, item.as_bytes());
+            }
             assert_eq!(rdr.next(), None);
         }
     }
@@ -71,14 +77,15 @@ macro_rules! test_set_fail {
 
 test_set!(fst_set_only_empty, "");
 test_set!(fst_set_one, "a");
+test_set!(fst_set_dupe_empty, "", "");
+test_set!(fst_set_dupe1, "a", "a");
+test_set!(fst_set_dupe2, "a", "b", "b");
 test_set!(fst_set_two1, "a", "b");
 test_set!(fst_set_two2, "a", "ab");
 test_set!(fst_set_jan, "jam", "jbm", "jcm", "jdm", "jem", "jfm", "jgm");
 
-test_set_fail!(fst_set_dupe_empty, "", "");
-test_set_fail!(fst_set_dupe, "a", "a");
-test_set_fail!(fst_set_order, "b", "a");
-test_set_fail!(fst_set_order_2, "a", "b", "c", "a");
+test_set_fail!(fst_set_order1, "b", "a");
+test_set_fail!(fst_set_order2, "a", "b", "c", "a");
 
 #[test]
 fn fst_set_100000() {
@@ -86,7 +93,7 @@ fn fst_set_100000() {
                                   .map(|s| s.as_bytes().to_vec())
                                   .collect();
     let fst = fst_set(words.clone());
-    assert_eq!(words, fst_words(&fst));
+    assert_eq!(words, fst_inputs(&fst));
 }
 
 macro_rules! test_map {
@@ -100,6 +107,17 @@ macro_rules! test_map {
                 assert_eq!((s, o.into_option().unwrap()), ($s.as_bytes(), $o));
             })*
             assert_eq!(rdr.next(), None);
+        }
+    }
+}
+
+macro_rules! test_map_fail {
+    ($name:ident, $($s:expr, $o:expr),+) => {
+        #[test]
+        #[should_panic]
+        fn $name() {
+            let mut bfst = Builder::memory();
+            $(bfst.insert($s, $o).unwrap();)*
         }
     }
 }
@@ -118,6 +136,12 @@ test_map!(
     "z", 58, "zabc", 6798
 );
 
+test_map_fail!(fst_map_dupe_empty, "", 0, "", 0);
+test_map_fail!(fst_map_dupe1, "a", 0, "a", 0);
+test_map_fail!(fst_map_dupe2, "a", 0, "b", 0, "b", 0);
+test_map_fail!(fst_map_order1, "b", 0, "a", 0);
+test_map_fail!(fst_map_order2, "a", 0, "b", 0, "c", 0, "a", 0);
+
 #[test]
 fn fst_map_100000_increments() {
     let words: Vec<(Vec<u8>, u64)> =
@@ -126,7 +150,7 @@ fn fst_map_100000_increments() {
             .map(|(i, s)| (s.as_bytes().to_vec(), i as u64))
             .collect();
     let fst = fst_map(words.clone());
-    assert_eq!(words, fst_words_outputs(&fst));
+    assert_eq!(words, fst_inputs_outputs(&fst));
 }
 
 #[test]
@@ -136,7 +160,7 @@ fn fst_map_100000_lengths() {
             .map(|s| (s.as_bytes().to_vec(), s.len() as u64))
             .collect();
     let fst = fst_map(words.clone());
-    assert_eq!(words, fst_words_outputs(&fst));
+    assert_eq!(words, fst_inputs_outputs(&fst));
 }
 
 #[test]

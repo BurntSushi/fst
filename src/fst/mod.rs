@@ -5,12 +5,14 @@ use byteorder::{ReadBytesExt, LittleEndian};
 use memmap::{Mmap, Protection};
 
 use error::{Error, Result};
-pub use fst::build::Builder;
-pub use fst::node::Node;
+pub use self::build::Builder;
+pub use self::merge::union_ignore_outputs;
+pub use self::node::Node;
 
 mod build;
 mod common_inputs;
 mod counting_writer;
+mod merge;
 mod node;
 mod pack;
 mod registry;

@@ -14,7 +14,7 @@ pub enum Error {
     Format,
     Value { got: u64 },
     DuplicateKey { got: Vec<u8> },
-    OutOfOrder { got: Vec<u8> },
+    OutOfOrder { previous: Vec<u8>, got: Vec<u8> },
 }
 
 impl From<io::Error> for Error {
@@ -49,9 +49,10 @@ Invalid value for FST map: {}. The maximum value is `2^64 - 2`. Said
 differently, the only invalid value is `2^64 - 1`.", got),
             DuplicateKey { ref got } => write!(f, "\
 Error inserting duplicate key: {}.", format_bytes(&*got)),
-            OutOfOrder { ref got } => write!(f, "\
-Error inserting out-of-order key: {}. Keys must be inserted in lexicographic
-order.", format_bytes(&*got)),
+            OutOfOrder { ref previous, ref got } => write!(f, "\
+Error inserting out-of-order key: {}. (Previous key was {}.) Keys must be
+inserted in lexicographic order.",
+format_bytes(&*got), format_bytes(&*previous)),
         }
     }
 }

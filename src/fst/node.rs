@@ -31,14 +31,20 @@ impl<'b> fmt::Debug for Node<'b> {
     }
 }
 
-impl<'b> Node<'b> {
-    pub fn new(addr: CompiledAddr, data: &'b [u8]) -> Node<'b> {
-        Node {
-            data: &data[..addr as usize + 1],
-            state: State::from_u8(data[addr as usize]),
-        }
+/// Creates a new note at the address given.
+///
+/// `data` should be a slice to an entire FST.
+///
+/// This is a free function so that we can export it to parent modules, but
+/// not to consumers of this crate.
+pub fn node_new(addr: CompiledAddr, data: &[u8]) -> Node {
+    Node {
+        data: &data[..addr as usize + 1],
+        state: State::from_u8(data[addr as usize]),
     }
+}
 
+impl<'b> Node<'b> {
     pub fn addr(&self) -> CompiledAddr {
         self.start_addr() as CompiledAddr
     }
@@ -91,10 +97,12 @@ impl<'b> Node<'b> {
         self.state.end_addr(self)
     }
 
-    pub fn bytes(&self) -> &[u8] {
+    #[doc(hidden)]
+    pub fn as_slice(&self) -> &[u8] {
         &self.data[self.end_addr()..]
     }
 
+    #[doc(hidden)]
     pub fn state(&self) -> &'static str {
         use self::State::*;
         match self.state {
@@ -163,7 +171,7 @@ impl State {
             StateAnyTrans::compile(wtr, addr, node)
         } else {
             if !node.is_final && node.trans[0].addr == last_addr {
-                if node.trans[0].out.is_none() {
+                if node.trans[0].out.is_zero() {
                     StateOneTransNext::compile(
                         wtr, addr, node.trans[0].inp)
                 } else {
@@ -216,7 +224,7 @@ impl State {
         use self::State::*;
         match *self {
             OneTransNextOutput(s) => { assert!(i == 0); s.output(node) }
-            OneTransNext(s) => { assert!(i == 0); Output::none() }
+            OneTransNext(s) => { assert!(i == 0); Output::zero() }
             OneTransFinal(s) => { assert!(i == 0); s.output(node) }
             OneTrans(s) => { assert!(i == 0); s.output(node) }
             AnyTrans(s) => s.output(node, i),
@@ -228,7 +236,7 @@ impl State {
         match *self {
             OneTransNextOutput(_)
             | OneTransNext(_)
-            | OneTrans(_) => Output::none(),
+            | OneTrans(_) => Output::zero(),
             OneTransFinal(s) => s.final_output(node),
             AnyTrans(s) => s.final_output(node),
         }
@@ -549,11 +557,11 @@ impl StateAnyTrans {
 
         let mut tsize = 0;
         let mut osize = pack_size(node.final_output.encode());
-        let mut any_outs = node.final_output.is_some();
+        let mut any_outs = !node.final_output.is_zero();
         for t in &node.trans {
             tsize = cmp::max(tsize, pack_size(addr - t.addr));
             osize = cmp::max(osize, pack_size(t.out.encode()));
-            any_outs = any_outs || t.out.is_some();
+            any_outs = any_outs || !t.out.is_zero();
         }
 
         let mut pack_sizes = PackSizes::new();
@@ -650,7 +658,7 @@ impl StateAnyTrans {
     fn output(&self, node: &Node, i: usize) -> Output {
         let osize = self.sizes(node).output_pack_size();
         if osize == 0 {
-            return Output::none();
+            return Output::zero();
         }
         let tsize = self.sizes(node).transition_pack_size();
         let ntrans = self.ntrans(node);
@@ -667,7 +675,7 @@ impl StateAnyTrans {
     fn final_output(&self, node: &Node) -> Output {
         let osize = self.sizes(node).output_pack_size();
         if osize == 0 {
-            return Output::none();
+            return Output::zero();
         }
         let tsize = self.sizes(node).transition_pack_size();
         let ntrans = self.ntrans(node);
@@ -785,7 +793,7 @@ mod tests {
 
     use fst::{Builder, Transition, CompiledAddr, Fst, Output};
     use fst::build::BuilderNode;
-    use fst::node::Node;
+    use fst::node::{Node, node_new};
 
     const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
 
@@ -832,24 +840,24 @@ mod tests {
 
     fn roundtrip(bnode: &BuilderNode) -> bool {
         let (addr, bytes) = compile(bnode);
-        let node = Node::new(addr, &bytes);
+        let node = node_new(addr, &bytes);
         nodes_equal(&node, &bnode)
     }
 
     fn trans(addr: CompiledAddr, inp: u8) -> Transition {
-        Transition { inp: inp, out: Output::none(), addr: addr }
+        Transition { inp: inp, out: Output::zero(), addr: addr }
     }
 
     #[test]
     fn bin_no_trans() {
         let bnode = BuilderNode {
             is_final: false,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![],
         };
         let (addr, buf) = compile(&bnode);
-        let node = Node::new(addr, &buf);
-        assert_eq!(node.bytes().len(), 3);
+        let node = node_new(addr, &buf);
+        assert_eq!(node.as_slice().len(), 3);
         roundtrip(&bnode);
     }
 
@@ -857,12 +865,12 @@ mod tests {
     fn bin_one_trans_common() {
         let bnode = BuilderNode {
             is_final: false,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![trans(20, b'a')],
         };
         let (addr, buf) = compile(&bnode);
-        let node = Node::new(addr, &buf);
-        assert_eq!(node.bytes().len(), 4);
+        let node = node_new(addr, &buf);
+        assert_eq!(node.as_slice().len(), 4);
         roundtrip(&bnode);
     }
 
@@ -870,12 +878,12 @@ mod tests {
     fn bin_one_trans_not_common() {
         let bnode = BuilderNode {
             is_final: false,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![trans(2, b'~')],
         };
         let (addr, buf) = compile(&bnode);
-        let node = Node::new(addr, &buf);
-        assert_eq!(node.bytes().len(), 5);
+        let node = node_new(addr, &buf);
+        assert_eq!(node.as_slice().len(), 5);
         roundtrip(&bnode);
     }
 
@@ -883,7 +891,7 @@ mod tests {
     fn bin_many_trans() {
         let bnode = BuilderNode {
             is_final: false,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![
                 trans(2, b'a'), trans(3, b'b'),
                 trans(4, b'c'), trans(5, b'd'),
@@ -891,8 +899,8 @@ mod tests {
             ],
         };
         let (addr, buf) = compile(&bnode);
-        let node = Node::new(addr, &buf);
-        assert_eq!(node.bytes().len(), 14);
+        let node = node_new(addr, &buf);
+        assert_eq!(node.as_slice().len(), 14);
         roundtrip(&bnode);
     }
 }

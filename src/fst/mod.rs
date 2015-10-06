@@ -6,8 +6,9 @@ use memmap::{Mmap, Protection};
 
 use error::{Error, Result};
 pub use self::build::Builder;
-pub use self::merge::union_ignore_outputs;
-pub use self::node::Node;
+pub use self::merge::{union_ignore_outputs, union_with_outputs};
+pub use self::node::{Node, Transitions};
+use self::node::node_new;
 
 mod build;
 mod common_inputs;
@@ -80,7 +81,7 @@ impl<B: AsRef<[u8]>> Fst<B> {
             stack: vec![FstReaderState {
                 addr: self.root_addr,
                 trans: 0,
-                out: Output::none(),
+                out: Output::zero(),
             }],
         }
     }
@@ -94,7 +95,7 @@ impl<B: AsRef<[u8]>> Fst<B> {
     }
 
     pub fn node(&self, addr: CompiledAddr) -> Node {
-        Node::new(addr, &self.data.as_ref())
+        node_new(addr, &self.data.as_ref())
     }
 
     fn empty_output(&self) -> Option<Output> {
@@ -208,20 +209,16 @@ impl<'a, B: AsRef<[u8]>> FstReader<'a, B> {
 pub struct Output(u64);
 
 impl Output {
-    fn some(v: u64) -> Option<Output> {
-        if v == ::std::u64::MAX {
-            None
-        } else {
-            Some(Output(v + 1))
-        }
+    fn new(v: u64) -> Output {
+        Output(v)
     }
 
-    fn none() -> Output {
+    fn zero() -> Output {
         Output(0)
     }
 
-    pub fn into_option(self) -> Option<u64> {
-        if self.is_none() { None } else { Some(self.0 - 1) }
+    pub fn value(self) -> u64 {
+        self.0
     }
 
     fn encode(self) -> u64 {
@@ -232,23 +229,19 @@ impl Output {
         Output(v)
     }
 
-    fn is_some(self) -> bool {
-        self.0 > 0
+    pub fn is_zero(self) -> bool {
+        self.0 == 0
     }
 
-    fn is_none(self) -> bool {
-        !self.is_some()
-    }
-
-    fn prefix(self, o: Output) -> Output {
+    pub fn prefix(self, o: Output) -> Output {
         Output(cmp::min(self.0, o.0))
     }
 
-    fn cat(self, o: Output) -> Output {
+    pub fn cat(self, o: Output) -> Output {
         Output(self.0 + o.0)
     }
 
-    fn sub(self, o: Output) -> Output {
+    pub fn sub(self, o: Output) -> Output {
         Output(self.0.checked_sub(o.0)
                      .expect("BUG: underflow subtraction not allowed"))
     }

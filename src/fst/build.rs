@@ -87,6 +87,11 @@ impl<W: io::Write> Builder<W> {
         })
     }
 
+    pub fn finish(self) -> Result<()> {
+        try!(self.into_inner());
+        Ok(())
+    }
+
     pub fn into_inner(mut self) -> Result<W> {
         try!(self.compile_from(0));
         let mut root_node = self.unfinished.pop_root();
@@ -99,17 +104,13 @@ impl<W: io::Write> Builder<W> {
     pub fn add<B>(&mut self, bs: B) -> Result<()>
             where B: AsRef<[u8]> {
         try!(self.check_last_key(bs.as_ref(), false));
-        self.insert_output(bs, Output::none())
+        self.insert_output(bs, Output::zero())
     }
 
     pub fn insert<B>(&mut self, bs: B, val: u64) -> Result<()>
             where B: AsRef<[u8]> {
         try!(self.check_last_key(bs.as_ref(), true));
-        let out = match Output::some(val) {
-            None => return Err(Error::Value { got: val }),
-            Some(out) => out,
-        };
-        self.insert_output(bs, out)
+        self.insert_output(bs, Output::new(val))
     }
 
     fn insert_output<B>(&mut self, bs: B, out: Output) -> Result<()>
@@ -125,7 +126,10 @@ impl<W: io::Write> Builder<W> {
             // If the prefix found consumes the entire set of bytes, then
             // the prefix *equals* the bytes given. This means it is a
             // duplicate value with no output. So we can give up here.
-            assert!(out.is_none());
+            //
+            // If the below assert fails, then that means we let a duplicate
+            // value through even when inserting outputs.
+            assert!(out.is_zero());
             return Ok(());
         }
         try!(self.compile_from(prefix_len));
@@ -207,7 +211,7 @@ impl UnfinishedNodes {
         self.stack.push(BuilderNodeUnfinished {
             node: BuilderNode {
                 is_final: is_final,
-                final_output: Output::none(),
+                final_output: Output::zero(),
                 trans: vec![],
             },
             last: None,
@@ -253,10 +257,10 @@ impl UnfinishedNodes {
             self.stack.push(BuilderNodeUnfinished {
                 node: BuilderNode {
                     is_final: false,
-                    final_output: Output::none(),
+                    final_output: Output::zero(),
                     trans: vec![],
                 },
-                last: Some(LastTransition { inp: b, out: Output::none() }),
+                last: Some(LastTransition { inp: b, out: Output::zero() }),
             });
         }
         self.push_empty(true);

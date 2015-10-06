@@ -128,14 +128,14 @@ impl RegistryNode {
                 final_output: node.final_output,
                 trans: [NONE_STATE, NONE_STATE],
                 inputs: [0, 0],
-                outputs: [Output::none(), Output::none()],
+                outputs: [Output::zero(), Output::zero()],
             }),
             1 => Some(RegistryNode {
                 is_final: node.is_final,
                 final_output: node.final_output,
                 trans: [node.trans[0].addr, 0],
                 inputs: [node.trans[0].inp, 0],
-                outputs: [node.trans[0].out, Output::none()],
+                outputs: [node.trans[0].out, Output::zero()],
             }),
             2 => Some(RegistryNode {
                 is_final: node.is_final,
@@ -151,10 +151,10 @@ impl RegistryNode {
     fn none() -> RegistryNode {
         RegistryNode {
             is_final: false,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: [NONE_STATE, NONE_STATE],
             inputs: [0, 0],
-            outputs: [Output::none(), Output::none()],
+            outputs: [Output::zero(), Output::zero()],
         }
     }
 
@@ -199,7 +199,7 @@ mod tests {
         let mut reg = Registry::new(0, 0);
         let bnode = BuilderNode {
             is_final: false,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![],
         };
         assert_rejected(reg.entry(&bnode));
@@ -210,7 +210,7 @@ mod tests {
         let mut reg = Registry::new(1, 1);
         let bnode = BuilderNode {
             is_final: true,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![],
         };
         assert_insert_and_found(&mut reg, &bnode);
@@ -223,9 +223,9 @@ mod tests {
         let mut reg = Registry::new(1, 1);
         let bnode = BuilderNode {
             is_final: false,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![Transition {
-                addr: 0, inp: b'a', out: Output::none(),
+                addr: 0, inp: b'a', out: Output::zero(),
             }],
         };
         assert_insert_and_found(&mut reg, &bnode);
@@ -233,13 +233,13 @@ mod tests {
             reg.entry(&BuilderNode { is_final: true, .. bnode.clone() }));
         assert_not_found(reg.entry(&BuilderNode {
             trans: vec![Transition {
-                addr: 0, inp: b'b', out: Output::none(),
+                addr: 0, inp: b'b', out: Output::zero(),
             }],
             .. bnode.clone()
         }));
         assert_not_found(reg.entry(&BuilderNode {
             trans: vec![Transition {
-                addr: 0, inp: b'a', out: Output::some(1).unwrap(),
+                addr: 0, inp: b'a', out: Output::new(1),
             }],
             .. bnode.clone()
         }));
@@ -251,14 +251,14 @@ mod tests {
 
         let bnode1 = BuilderNode {
             is_final: true,
-            final_output: Output::none(),
+            final_output: Output::zero(),
             trans: vec![],
         };
         assert_insert_and_found(&mut reg, &bnode1);
 
         let bnode2 = BuilderNode {
             is_final: true,
-            final_output: Output::some(1).unwrap(),
+            final_output: Output::new(1),
             trans: vec![],
         };
         assert_insert_and_found(&mut reg, &bnode2);

@@ -37,12 +37,32 @@ pub fn fst_inputs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
     words
 }
 
+pub fn fst_input_strs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<String> {
+    let mut words = vec![];
+    let mut rdr = fst.reader();
+    while let Some((word, _)) = rdr.next() {
+        words.push(::std::str::from_utf8(word).unwrap().to_owned());
+    }
+    words
+}
+
 pub fn fst_inputs_outputs<B: AsRef<[u8]>>(fst: &Fst<B>)
                                          -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
     let mut rdr = fst.reader();
     while let Some((word, out)) = rdr.next() {
-        words.push((word.to_vec(), out.into_option().unwrap()));
+        words.push((word.to_vec(), out.value()));
+    }
+    words
+}
+
+pub fn fst_inputstrs_outputs<B: AsRef<[u8]>>(fst: &Fst<B>)
+                                            -> Vec<(String, u64)> {
+    let mut words = vec![];
+    let mut rdr = fst.reader();
+    while let Some((word, out)) = rdr.next() {
+        let word = ::std::str::from_utf8(word).unwrap().to_owned();
+        words.push((word, out.value()));
     }
     words
 }
@@ -104,7 +124,7 @@ macro_rules! test_map {
             let mut rdr = fst.reader();
             $({
                 let (s, o) = rdr.next().unwrap();
-                assert_eq!((s, o.into_option().unwrap()), ($s.as_bytes(), $o));
+                assert_eq!((s, o.value()), ($s.as_bytes(), $o));
             })*
             assert_eq!(rdr.next(), None);
         }
@@ -182,15 +202,6 @@ fn invalid_format() {
 }
 
 #[test]
-fn invalid_value() {
-    let mut bfst = Builder::memory();
-    match bfst.insert("abc", ::std::u64::MAX) {
-        Err(Error::Value { got }) => assert_eq!(got, ::std::u64::MAX),
-        other => panic!("expected value error, got {:?}", other),
-    }
-}
-
-#[test]
 fn scratch() {
     let mut bfst = Builder::memory();
     bfst.insert(b"", 10).unwrap();
@@ -200,10 +211,10 @@ fn scratch() {
 
     let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
     let mut rdr = fst.reader();
-    assert_eq!(rdr.next().unwrap(), (&b""[..], Output::some(10).unwrap()));
-    assert_eq!(rdr.next().unwrap(), (&b"abc"[..], Output::some(5).unwrap()));
-    assert_eq!(rdr.next().unwrap(), (&b"abcd"[..], Output::some(6).unwrap()));
+    assert_eq!(rdr.next().unwrap(), (&b""[..], Output::new(10)));
+    assert_eq!(rdr.next().unwrap(), (&b"abc"[..], Output::new(5)));
+    assert_eq!(rdr.next().unwrap(), (&b"abcd"[..], Output::new(6)));
     assert_eq!(rdr.next().unwrap(),
-               (&b"azzzzz"[..], Output::some(1).unwrap()));
+               (&b"azzzzz"[..], Output::new(1)));
     assert_eq!(rdr.next(), None);
 }

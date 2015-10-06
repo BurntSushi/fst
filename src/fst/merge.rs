@@ -19,6 +19,28 @@ where B: AsRef<[u8]>, W: io::Write {
     Ok(())
 }
 
+pub fn union_with_outputs<B, W, F>(
+    bfst: &mut Builder<W>,
+    fsts: &[Fst<B>],
+    mut merge: F,
+) -> Result<()>
+where B: AsRef<[u8]>,
+      W: io::Write,
+      F: FnMut(&[u8], u64, u64) -> u64 {
+    let mut union = Union::new(fsts);
+    while let Some(slot) = union.pop() {
+        let mut o = slot.output().value();
+        while union.peek_is_duplicate(slot.input()) {
+            let slot2 = union.pop().unwrap();
+            o = merge(slot.input(), o, slot2.output().value());
+            union.refill(slot2);
+        }
+        try!(bfst.insert(slot.input(), o));
+        union.refill(slot);
+    }
+    Ok(())
+}
+
 struct Union<'a, B: 'a> {
     rdrs: Vec<FstReader<'a, B>>,
     heap: BinaryHeap<Slot>,
@@ -38,6 +60,10 @@ impl<'a, B: AsRef<[u8]>> Union<'a, B> {
 
     fn pop(&mut self) -> Option<Slot> {
         self.heap.pop()
+    }
+
+    fn peek_is_duplicate(&self, key: &[u8]) -> bool {
+        self.heap.peek().map(|s| s.input() == key).unwrap_or(false)
     }
 
     fn refill(&mut self, mut slot: Slot) {
@@ -61,7 +87,7 @@ impl Slot {
         Slot {
             idx: rdr_idx,
             input: Vec::with_capacity(64),
-            output: Output::none(),
+            output: Output::zero(),
         }
     }
 
@@ -104,18 +130,71 @@ impl Ord for Slot {
 #[cfg(test)]
 mod tests {
     use fst::build::Builder;
-    use fst::tests::{fst_set, fst_inputs};
+    use fst::tests::{fst_map, fst_set, fst_inputstrs_outputs, fst_input_strs};
     use fst::Fst;
-    use super::union_ignore_outputs;
+    use super::{union_ignore_outputs, union_with_outputs};
+
+    fn s(string: &str) -> String { string.to_owned() }
 
     #[test]
-    fn basic() {
-        let set1 = fst_set(&[b"a", b"b", b"c"]);
-        let set2 = fst_set(&[b"x", b"y", b"z"]);
+    fn basic_set() {
+        let set1 = fst_set(&["a", "b", "c"]);
+        let set2 = fst_set(&["x", "y", "z"]);
 
         let mut bfst = Builder::memory();
         union_ignore_outputs(&mut bfst, &[set1, set2]).unwrap();
         let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
-        assert_eq!(fst_inputs(&fst), vec![b"a", b"b", b"c", b"x", b"y", b"z"]);
+        assert_eq!(fst_input_strs(&fst), vec!["a", "b", "c", "x", "y", "z"]);
+    }
+
+    #[test]
+    fn basic_set_dupes() {
+        let set1 = fst_set(&["aa", "b", "cc"]);
+        let set2 = fst_set(&["b", "cc", "z"]);
+
+        let mut bfst = Builder::memory();
+        union_ignore_outputs(&mut bfst, &[set1, set2]).unwrap();
+        let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+        assert_eq!(fst_input_strs(&fst), vec!["aa", "b", "cc", "z"]);
+    }
+
+    #[test]
+    fn basic_map() {
+        let map1 = fst_map(vec![("a", 1), ("b", 2), ("c", 3)]);
+        let map2 = fst_map(vec![("x", 1), ("y", 2), ("z", 3)]);
+
+        let mut bfst = Builder::memory();
+        union_with_outputs(
+            &mut bfst,
+            &[map1, map2],
+            |_, o1, o2| o1 + o2,
+        ).unwrap();
+        let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+        assert_eq!(
+            fst_inputstrs_outputs(&fst),
+            vec![
+                (s("a"), 1), (s("b"), 2), (s("c"), 3),
+                (s("x"), 1), (s("y"), 2), (s("z"), 3),
+            ]);
+    }
+
+    #[test]
+    fn basic_map_dupes() {
+        let map1 = fst_map(vec![("aa", 1), ("b", 2), ("cc", 3)]);
+        let map2 = fst_map(vec![("b", 1), ("cc", 2), ("z", 3)]);
+        let map3 = fst_map(vec![("b", 1)]);
+
+        let mut bfst = Builder::memory();
+        union_with_outputs(
+            &mut bfst,
+            &[map1, map2, map3],
+            |_, o1, o2| o1 + o2,
+        ).unwrap();
+        let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+        assert_eq!(
+            fst_inputstrs_outputs(&fst),
+            vec![
+                (s("aa"), 1), (s("b"), 4), (s("cc"), 5), (s("z"), 3),
+            ]);
     }
 }

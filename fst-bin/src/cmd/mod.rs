@@ -44,7 +44,7 @@ Usage: fst csv edges <input> [<output>]
                 for t in fst.node(addr).transitions() {
                     stack.push(t.addr);
                     try!(wtr.encode((
-                        addr, t.addr, t.inp as char, t.out.into_option(),
+                        addr, t.addr, t.inp as char, t.out.value(),
                     )));
                 }
             }
@@ -64,8 +64,9 @@ Usage: fst csv edges <input> [<output>]
                     stack.push(t.addr);
                 }
                 try!(wtr.encode((
-                    node.addr(), node.state(), node.bytes().len(), node.len(),
-                    node.is_final(), node.final_output().into_option(),
+                    node.addr(), node.state(),
+                    node.as_slice().len(), node.len(),
+                    node.is_final(), node.final_output().value(),
                 )));
             }
         }

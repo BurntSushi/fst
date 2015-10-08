@@ -11,6 +11,10 @@ use std::io::{self, Write};
 
 use docopt::Docopt;
 
+macro_rules! w {
+    ($($tt:tt)*) => {{ let _ = writeln!($($tt)*); }}
+}
+
 mod cmd;
 mod util;
 
@@ -24,6 +28,7 @@ Usage:
 
 Commands:
     csv     Emit statistics about nodes or edges.
+    dot     Emit a dot representation of an FST.
     mkset   Create a new set of words.
     words   Emit all words in given set/map.
 ";
@@ -36,6 +41,8 @@ struct Args {
 #[derive(Debug, RustcDecodable)]
 enum Command {
     Csv,
+    Dot,
+    Dupes,
     MkSet,
     Words,
 }
@@ -45,6 +52,8 @@ impl Command {
         let argv: Vec<String> = env::args().collect();
         match self {
             Command::Csv => cmd::csv::run(argv),
+            Command::Dot => cmd::dot::run(argv),
+            Command::Dupes => cmd::dupes::run(argv),
             Command::MkSet => cmd::mkset::run(argv),
             Command::Words => cmd::words::run(argv),
         }

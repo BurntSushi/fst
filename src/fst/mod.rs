@@ -1,4 +1,5 @@
 use std::cmp;
+use std::fmt;
 use std::path::Path;
 
 use byteorder::{ReadBytesExt, LittleEndian};
@@ -17,6 +18,8 @@ mod merge;
 mod node;
 mod pack;
 mod registry;
+mod registry_any;
+mod registry_minimal;
 #[cfg(test)] mod tests;
 
 const VERSION: u64 = 1;
@@ -29,11 +32,22 @@ pub struct Fst<B> {
     root_addr: CompiledAddr,
 }
 
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct Transition {
     pub inp: u8,
     pub out: Output,
     pub addr: CompiledAddr,
+}
+
+impl fmt::Debug for Transition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.out.is_zero() {
+            write!(f, "{} -> {}", self.inp as char, self.addr)
+        } else {
+            write!(f, "({}, {}) -> {}",
+                   self.inp as char, self.out.value(), self.addr)
+        }
+    }
 }
 
 impl Fst<MmapSlice> {
@@ -105,54 +119,6 @@ impl<B: AsRef<[u8]>> Fst<B> {
         } else {
             None
         }
-    }
-
-    #[doc(hidden)]
-    pub fn dot(&self) -> String {
-        use std::collections::HashSet;
-        use std::fmt::Write;
-
-        let mut out = String::new();
-        macro_rules! w {
-            ($w:expr, $($tt:tt)*) => { {write!($w, $($tt)*)}.unwrap() }
-        }
-
-        fn word(b: u8) -> String {
-            if b == b'\'' {
-                "\"'\"".into()
-            } else {
-                (b as char).to_string()
-            }
-        }
-
-        w!(out, r#"
-digraph automaton {{
-    label=<<FONT POINT-SIZE="20">minimal acyclic DFA</FONT>>;
-    labelloc="l";
-    labeljust="l";
-    rankdir="LR";
-"#);
-        let mut stack = vec![self.root_addr];
-        let mut seen = HashSet::new();
-        while let Some(addr) = stack.pop() {
-            let node = self.node(addr);
-            if node.is_final() {
-                w!(out, "    {} [peripheries=2];\n", addr);
-            } else {
-                w!(out, "    {};\n", addr);
-            }
-            for t in node.transitions() {
-                let edge = (addr, t.addr, t.inp);
-                if !seen.contains(&edge) {
-                    seen.insert(edge);
-                    w!(out, "    {} -> {} [label={}];\n",
-                       addr, t.addr, word(t.inp));
-                }
-                stack.push(t.addr);
-            }
-        }
-        w!(out, "}}");
-        out
     }
 }
 

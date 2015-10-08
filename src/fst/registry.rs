@@ -7,11 +7,11 @@ use fst::build::BuilderNode;
 pub struct Registry {
     table: Vec<RegistryCell>,
     table_size: usize, // number of rows
-    lru_size: usize, // number of columns
+    mru_size: usize, // number of columns
 }
 
 #[derive(Debug)]
-struct RegistryLru<'a> {
+struct RegistryMru<'a> {
     cells: &'a mut [RegistryCell],
 }
 
@@ -38,13 +38,13 @@ pub enum RegistryEntry<'a> {
 }
 
 impl Registry {
-    pub fn new(table_size: usize, lru_size: usize) -> Registry {
+    pub fn new(table_size: usize, mru_size: usize) -> Registry {
         let empty_cell = RegistryCell::none();
-        let ncells = table_size.checked_mul(lru_size).unwrap();
+        let ncells = table_size.checked_mul(mru_size).unwrap();
         Registry {
             table: vec![empty_cell; ncells],
             table_size: table_size,
-            lru_size: lru_size,
+            mru_size: mru_size,
         }
     }
 
@@ -57,9 +57,9 @@ impl Registry {
             Some(node) => node,
         };
         let bucket = self.hash(&node);
-        let start = self.lru_size * bucket;
-        let end = start + self.lru_size;
-        RegistryLru { cells: &mut self.table[start..end] }.entry(node)
+        let start = self.mru_size * bucket;
+        let end = start + self.mru_size;
+        RegistryMru { cells: &mut self.table[start..end] }.entry(node)
     }
 
     fn hash(&self, node: &RegistryNode) -> usize {
@@ -80,16 +80,13 @@ impl Registry {
     }
 }
 
-impl<'a> RegistryLru<'a> {
+impl<'a> RegistryMru<'a> {
     fn entry(mut self, node: RegistryNode) -> RegistryEntry<'a> {
         if let Some(i) = self.cells.iter().position(|c| c.node == node) {
-            let addr = self.cells[i].addr;
-            self.promote(i);
-            RegistryEntry::Found(addr)
+            self.promote(i); // most recently used
+            RegistryEntry::Found(self.cells[i].addr)
         } else {
-            let last = self.cells.len() - 1;
-            self.cells[last].node = node;
-            self.promote(last);
+            self.cells[0].node = node; // discard MRU
             RegistryEntry::NotFound(&mut self.cells[0])
         }
     }
@@ -167,7 +164,9 @@ impl RegistryNode {
 mod tests {
     use fst::{Output, Transition};
     use fst::build::BuilderNode;
-    use super::{Registry, RegistryEntry};
+    use super::{
+        Registry, RegistryCell, RegistryEntry, RegistryMru, RegistryNode,
+    };
 
     fn assert_rejected(entry: RegistryEntry) {
         match entry {
@@ -246,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    fn lru_works() {
+    fn mru_works() {
         let mut reg = Registry::new(1, 1);
 
         let bnode1 = BuilderNode {
@@ -263,5 +262,47 @@ mod tests {
         };
         assert_insert_and_found(&mut reg, &bnode2);
         assert_not_found(reg.entry(&bnode1));
+    }
+
+    #[test]
+    fn promote() {
+        let rn = RegistryNode {
+            is_final: false,
+            final_output: Output::zero(),
+            trans: [0, 0],
+            inputs: [0, 0],
+            outputs: [Output::zero(), Output::zero()],
+        };
+        let mut bnodes = vec![
+            RegistryCell { addr: 1, node: rn },
+            RegistryCell { addr: 2, node: rn },
+            RegistryCell { addr: 3, node: rn },
+            RegistryCell { addr: 4, node: rn },
+        ];
+        let mut mru = RegistryMru { cells: &mut bnodes };
+
+        mru.promote(0);
+        assert_eq!(mru.cells[0].addr, 1);
+        assert_eq!(mru.cells[1].addr, 2);
+        assert_eq!(mru.cells[2].addr, 3);
+        assert_eq!(mru.cells[3].addr, 4);
+
+        mru.promote(1);
+        assert_eq!(mru.cells[0].addr, 2);
+        assert_eq!(mru.cells[1].addr, 1);
+        assert_eq!(mru.cells[2].addr, 3);
+        assert_eq!(mru.cells[3].addr, 4);
+
+        mru.promote(3);
+        assert_eq!(mru.cells[0].addr, 4);
+        assert_eq!(mru.cells[1].addr, 2);
+        assert_eq!(mru.cells[2].addr, 1);
+        assert_eq!(mru.cells[3].addr, 3);
+
+        mru.promote(2);
+        assert_eq!(mru.cells[0].addr, 1);
+        assert_eq!(mru.cells[1].addr, 4);
+        assert_eq!(mru.cells[2].addr, 2);
+        assert_eq!(mru.cells[3].addr, 3);
     }
 }

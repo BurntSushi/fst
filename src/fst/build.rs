@@ -6,6 +6,8 @@ use error::{Error, Result};
 use fst::{VERSION, NONE_STATE, CompiledAddr, Output, Transition};
 use fst::counting_writer::CountingWriter;
 use fst::registry::{Registry, RegistryEntry};
+// use fst::registry_any::{Registry, RegistryEntry};
+// use fst::registry_minimal::{Registry, RegistryEntry};
 
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
@@ -74,14 +76,13 @@ impl Builder<io::Cursor<Vec<u8>>> {
 impl<W: io::Write> Builder<W> {
     pub fn new(wtr: W) -> Result<Builder<W>> {
         let mut wtr = CountingWriter::new(wtr);
-        // Don't allow any nodes to have address 0-7. We use these as
-        // special markers. e.g., `0` means "final state with no transitions."
-        // We also use the first 8 bytes to encode the API version.
+        // Don't allow any nodes to have address 0-7. We use these to encode
+        // the API version.
         try!(wtr.write_u64::<LittleEndian>(VERSION));
         Ok(Builder {
             wtr: wtr,
             unfinished: UnfinishedNodes::new(),
-            registry: Registry::new(50_000, 5),
+            registry: Registry::new(10_000, 5),
             last: None,
             last_addr: NONE_STATE,
         })

@@ -3,9 +3,10 @@
 extern crate fst;
 extern crate test;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use fst::{Builder, Fst};
+
+use fst::fst::{Builder, Fst};
 use test::Bencher;
 
 const WORDS: &'static str = include_str!("./../data/words-10000");
@@ -52,6 +53,18 @@ fn build_hash_set(b: &mut Bencher) {
         let mut set = HashSet::new();
         for word in &words {
             set.insert(word);
+        }
+    });
+}
+
+#[bench]
+fn build_hash_map(b: &mut Bencher) {
+    let words = get_words_outputs();
+    b.bytes = WORDS.len() as u64;
+    b.iter(|| {
+        let mut set = HashMap::new();
+        for &(ref word, len) in &words {
+            set.insert(word, len);
         }
     });
 }

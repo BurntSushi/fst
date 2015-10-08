@@ -29,3 +29,7 @@ rand = "0.3"
 
 [profile.release]
 debug = true
+
+[profile.bench]
+opt-level = 3
+debug = true

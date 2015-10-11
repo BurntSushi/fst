@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_mut, unused_variables)]
 
 extern crate byteorder;
+extern crate memchr;
 extern crate memmap;
 #[cfg(test)] extern crate quickcheck;
 #[cfg(test)] extern crate rand;

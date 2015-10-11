@@ -3,7 +3,7 @@ use fst::{Builder, Fst, Output};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
-pub fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
+pub fn fst_set<I, S>(ss: I) -> Fst
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<Vec<u8>> =
@@ -12,10 +12,10 @@ pub fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
     for s in ss.into_iter() {
         bfst.add(s).unwrap();
     }
-    Fst::new(bfst.into_inner().unwrap()).unwrap()
+    Fst::from_bytes(bfst.into_inner().unwrap()).unwrap()
 }
 
-pub fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
+pub fn fst_map<I, S>(ss: I) -> Fst
         where I: IntoIterator<Item=(S, u64)>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<(Vec<u8>, u64)> =
@@ -25,10 +25,10 @@ pub fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
     for (s, o) in ss.into_iter() {
         bfst.insert(s, o).unwrap();
     }
-    Fst::new(bfst.into_inner().unwrap()).unwrap()
+    Fst::from_bytes(bfst.into_inner().unwrap()).unwrap()
 }
 
-pub fn fst_inputs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
+pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
     let mut words = vec![];
     let mut rdr = fst.reader();
     while let Some((word, _)) = rdr.next() {
@@ -37,7 +37,7 @@ pub fn fst_inputs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<Vec<u8>> {
     words
 }
 
-pub fn fst_input_strs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<String> {
+pub fn fst_input_strs(fst: &Fst) -> Vec<String> {
     let mut words = vec![];
     let mut rdr = fst.reader();
     while let Some((word, _)) = rdr.next() {
@@ -46,8 +46,7 @@ pub fn fst_input_strs<B: AsRef<[u8]>>(fst: &Fst<B>) -> Vec<String> {
     words
 }
 
-pub fn fst_inputs_outputs<B: AsRef<[u8]>>(fst: &Fst<B>)
-                                         -> Vec<(Vec<u8>, u64)> {
+pub fn fst_inputs_outputs(fst: &Fst) -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
     let mut rdr = fst.reader();
     while let Some((word, out)) = rdr.next() {
@@ -56,8 +55,7 @@ pub fn fst_inputs_outputs<B: AsRef<[u8]>>(fst: &Fst<B>)
     words
 }
 
-pub fn fst_inputstrs_outputs<B: AsRef<[u8]>>(fst: &Fst<B>)
-                                            -> Vec<(String, u64)> {
+pub fn fst_inputstrs_outputs(fst: &Fst) -> Vec<(String, u64)> {
     let mut words = vec![];
     let mut rdr = fst.reader();
     while let Some((word, out)) = rdr.next() {
@@ -76,10 +74,13 @@ macro_rules! test_set {
             let mut rdr = fst.reader();
             items.sort();
             items.dedup();
-            for item in items {
+            for item in &items {
                 assert_eq!(rdr.next().unwrap().0, item.as_bytes());
             }
             assert_eq!(rdr.next(), None);
+            for item in &items {
+                assert!(fst.find(item).is_some());
+            }
         }
     }
 }
@@ -114,6 +115,11 @@ fn fst_set_100000() {
                                   .collect();
     let fst = fst_set(words.clone());
     assert_eq!(words, fst_inputs(&fst));
+    for word in &words {
+        assert!(fst.find(word).is_some(),
+                "failed to find word: {}",
+                ::std::str::from_utf8(word).unwrap());
+    }
 }
 
 macro_rules! test_map {
@@ -127,6 +133,9 @@ macro_rules! test_map {
                 assert_eq!((s, o.value()), ($s.as_bytes(), $o));
             })*
             assert_eq!(rdr.next(), None);
+            $({
+                assert_eq!(fst.find($s.as_bytes()), Some(Output::new($o)));
+            })*
         }
     }
 }
@@ -171,6 +180,9 @@ fn fst_map_100000_increments() {
             .collect();
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
+    for &(ref word, out) in &words {
+        assert_eq!(fst.find(word), Some(Output::new(out)));
+    }
 }
 
 #[test]
@@ -181,11 +193,14 @@ fn fst_map_100000_lengths() {
             .collect();
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
+    for &(ref word, out) in &words {
+        assert_eq!(fst.find(word), Some(Output::new(out)));
+    }
 }
 
 #[test]
 fn invalid_version() {
-    match Fst::new(vec![0; 16]) {
+    match Fst::from_bytes(vec![0; 16]) {
         Err(Error::Version { expected, got }) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
@@ -194,11 +209,18 @@ fn invalid_version() {
 
 #[test]
 fn invalid_format() {
-    match Fst::new(vec![0; 0]) {
+    match Fst::from_bytes(vec![0; 0]) {
         Err(Error::Format) => {}
         Err(err) => panic!("expected format error, got {:?}", err),
         Ok(_) => panic!("expected format error, got FST"),
     }
+}
+
+#[test]
+fn fst_set_zero() {
+    let fst = fst_set::<_, String>(vec![]);
+    let mut rdr = fst.reader();
+    assert_eq!(rdr.next(), None);
 }
 
 #[test]
@@ -209,7 +231,7 @@ fn scratch() {
     bfst.insert(b"abcd", 6).unwrap();
     bfst.insert(b"azzzzz", 1).unwrap();
 
-    let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+    let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
     let mut rdr = fst.reader();
     assert_eq!(rdr.next().unwrap(), (&b""[..], Output::new(10)));
     assert_eq!(rdr.next().unwrap(), (&b"abc"[..], Output::new(5)));

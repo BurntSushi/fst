@@ -29,6 +29,8 @@ Usage:
 Commands:
     csv     Emit statistics about nodes or edges.
     dot     Emit a dot representation of an FST.
+    dupes   Emit info about frequency of duplicate nodes.
+    find    Search an FST.
     mkset   Create a new set of words.
     words   Emit all words in given set/map.
 ";
@@ -43,6 +45,7 @@ enum Command {
     Csv,
     Dot,
     Dupes,
+    Find,
     MkSet,
     Words,
 }
@@ -54,6 +57,7 @@ impl Command {
             Command::Csv => cmd::csv::run(argv),
             Command::Dot => cmd::dot::run(argv),
             Command::Dupes => cmd::dupes::run(argv),
+            Command::Find => cmd::find::run(argv),
             Command::MkSet => cmd::mkset::run(argv),
             Command::Words => cmd::words::run(argv),
         }

@@ -18,7 +18,6 @@ mod merge;
 mod node;
 mod pack;
 mod registry;
-mod registry_any;
 mod registry_minimal;
 #[cfg(test)] mod tests;
 
@@ -27,38 +26,24 @@ const NONE_STATE: CompiledAddr = 1;
 
 pub type CompiledAddr = u64;
 
-pub struct Fst<B> {
-    data: B,
+pub struct Fst {
+    data: FstData,
     root_addr: CompiledAddr,
 }
 
-#[derive(Copy, Clone, Hash, Eq, PartialEq)]
-pub struct Transition {
-    pub inp: u8,
-    pub out: Output,
-    pub addr: CompiledAddr,
-}
+impl Fst {
+    pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Fst::new(FstData::Mmap(try!(Mmap::open_path(path, Protection::Read))))
+    }
 
-impl fmt::Debug for Transition {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.out.is_zero() {
-            write!(f, "{} -> {}", self.inp as char, self.addr)
-        } else {
-            write!(f, "({}, {}) -> {}",
-                   self.inp as char, self.out.value(), self.addr)
-        }
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Fst::new(FstData::Owned(bytes))
     }
 }
 
-impl Fst<MmapSlice> {
-    pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Fst<MmapSlice>> {
-        Fst::new(MmapSlice(try!(Mmap::open_path(path, Protection::Read))))
-    }
-}
-
-impl<B: AsRef<[u8]>> Fst<B> {
-    pub fn new(data: B) -> Result<Fst<B>> {
-        if data.as_ref().len() < 16 {
+impl Fst {
+    fn new(data: FstData) -> Result<Self> {
+        if data.as_slice().len() < 16 {
             return Err(Error::Format);
         }
         // The read_u64 unwraps below are OK because they can never fail.
@@ -66,7 +51,7 @@ impl<B: AsRef<[u8]>> Fst<B> {
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
         // 16 bytes (no unexpected EOF).
-        let version = data.as_ref().read_u64::<LittleEndian>().unwrap();
+        let version = data.as_slice().read_u64::<LittleEndian>().unwrap();
         if version != VERSION {
             return Err(Error::Version {
                 expected: VERSION,
@@ -74,7 +59,7 @@ impl<B: AsRef<[u8]>> Fst<B> {
             });
         }
         let root_addr = {
-            let mut last = &data.as_ref()[data.as_ref().len() - 8..];
+            let mut last = &data.as_slice()[data.as_slice().len() - 8..];
             last.read_u64::<LittleEndian>().unwrap()
         };
         Ok(Fst {
@@ -83,15 +68,18 @@ impl<B: AsRef<[u8]>> Fst<B> {
         })
     }
 
-    pub fn into_inner(self) -> B {
-        self.data
-    }
-
-    pub fn reader(&self) -> FstReader<B> {
+    pub fn reader(&self) -> FstReader {
+        let root = self.root();
+        let empty_output =
+            if root.is_final() {
+                Some(root.final_output())
+            } else {
+                None
+            };
         FstReader {
             fst: self,
             inp: Vec::with_capacity(64),
-            empty_output: self.empty_output(),
+            empty_output: empty_output,
             stack: vec![FstReaderState {
                 addr: self.root_addr,
                 trans: 0,
@@ -101,7 +89,7 @@ impl<B: AsRef<[u8]>> Fst<B> {
     }
 
     pub fn as_slice(&self) -> &[u8] {
-        self.data.as_ref()
+        self.data.as_slice()
     }
 
     pub fn root(&self) -> Node {
@@ -109,21 +97,32 @@ impl<B: AsRef<[u8]>> Fst<B> {
     }
 
     pub fn node(&self, addr: CompiledAddr) -> Node {
-        node_new(addr, &self.data.as_ref())
+        node_new(addr, &self.data.as_slice())
     }
 
-    fn empty_output(&self) -> Option<Output> {
-        let root = self.root();
-        if root.is_final() {
-            Some(root.final_output())
-        } else {
+    pub fn find<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
+        let mut node = self.root();
+        let mut out = Output::zero();
+        for &b in key.as_ref() {
+            node = match node.find_input(b) {
+                None => return None,
+                Some(i) => {
+                    let t = node.transition(i);
+                    out = out.cat(t.out);
+                    self.node(t.addr)
+                }
+            }
+        }
+        if !node.is_final() {
             None
+        } else {
+            Some(out.cat(node.final_output()))
         }
     }
 }
 
-pub struct FstReader<'a, B: 'a> {
-    fst: &'a Fst<B>,
+pub struct FstReader<'f> {
+    fst: &'f Fst,
     inp: Vec<u8>,
     empty_output: Option<Output>,
     stack: Vec<FstReaderState>,
@@ -136,7 +135,7 @@ struct FstReaderState {
     out: Output,
 }
 
-impl<'a, B: AsRef<[u8]>> FstReader<'a, B> {
+impl<'f> FstReader<'f> {
     pub fn next(&mut self) -> Option<(&[u8], Output)> {
         if let Some(out) = self.empty_output.take() {
             return Some((&[], out));
@@ -213,18 +212,53 @@ impl Output {
     }
 }
 
-pub struct MmapSlice(Mmap);
+enum FstData {
+    Owned(Vec<u8>),
+    Mmap(Mmap),
+}
 
-impl AsRef<[u8]> for MmapSlice {
-    fn as_ref(&self) -> &[u8] {
-        // I find it slightly difficult to articulate an argument for safety
-        // here. My understanding is that `as_slice` is unsafe because there
-        // could be some other *process* modifying the underlying data?
-        // In particular, the mmap is opened in shared mode, so if some other
-        // process modifies the underlying data, is it observable from this
-        // slice? And if so, does that imply unsafety?
-        //
-        // If this is *not* safe to do, then what is the alternative?
-        unsafe { self.0.as_slice() }
+impl FstData {
+    fn as_slice(&self) -> &[u8] {
+        match *self {
+            FstData::Owned(ref v) => &**v,
+            // I find it slightly difficult to articulate an argument for
+            // safety here. My understanding is that `as_slice` is unsafe
+            // because there could be some other *process* modifying the
+            // underlying data? In particular, the mmap is opened in shared
+            // mode, so if some other process modifies the underlying data,
+            // is it observable from this slice? And if so, does that imply
+            // unsafety?
+            //
+            // If this is *not* safe to do, then what is the alternative?
+            FstData::Mmap(ref v) => unsafe { v.as_slice() }
+        }
+    }
+}
+
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
+pub struct Transition {
+    pub inp: u8,
+    pub out: Output,
+    pub addr: CompiledAddr,
+}
+
+impl Default for Transition {
+    fn default() -> Self {
+        Transition {
+            inp: 0,
+            out: Output::zero(),
+            addr: NONE_STATE,
+        }
+    }
+}
+
+impl fmt::Debug for Transition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.out.is_zero() {
+            write!(f, "{} -> {}", self.inp as char, self.addr)
+        } else {
+            write!(f, "({}, {}) -> {}",
+                   self.inp as char, self.out.value(), self.addr)
+        }
     }
 }

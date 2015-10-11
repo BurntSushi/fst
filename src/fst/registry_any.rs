@@ -83,31 +83,15 @@ impl Registry {
 impl<'a> RegistryLru<'a> {
     fn entry(mut self, node: RegistryNode) -> RegistryEntry<'a> {
         if let Some(i) = self.cells.iter().position(|c| c.node == node) {
-            // The lack of promotion here is odd given the name "LRU."
-            // Initially, a cell was promoted on access, but this turned out
-            // to not work so well in practice. Namely, it made it too easy for
-            // very frequently occurring nodes to drop out of the cache.
-            //
-            // We do however continue to promote below, when we are trying
-            // to compile a node that isn't in the cache. This means that
-            // for a frequently occurring node to drop out of the cache, there
-            // must have been K=lru_size cache misses. Any number of cache hits
-            // can occur.
-            //
-            // If we promoted on access, then K=lru_size cache hits that
-            // didn't involve the most frequently occurring node could push
-            // that node to the bottom of this row of cells. The next cache
-            // miss will then evict that node.
-            //
-            // My experience has been that this has a profound effect when
-            // there are many keys that share the same prefix (i.e., URLs).
-            // Namely, promoting on access makes it to easy for nodes
-            // associated with the prefix (e.g., http://) to be evicted.
-            RegistryEntry::Found(self.cells[i].addr)
+            let addr = self.cells[i].addr;
+            self.promote(i); // most recently used
+            RegistryEntry::Found(addr)
         } else {
-            let last = self.cells.len() - 1;
-            self.cells[last].node = node;
-            self.promote(last);
+            if self.cells[self.cells.len()-1].is_none() {
+                let p = self.cells.as_mut_ptr();
+                unsafe { ptr::copy(p, p.offset(1), self.cells.len()-1); }
+            }
+            self.cells[0].node = node; // discard MRU
             RegistryEntry::NotFound(&mut self.cells[0])
         }
     }
@@ -140,6 +124,10 @@ impl RegistryCell {
 
     pub fn insert(&mut self, addr: CompiledAddr) {
         self.addr = addr;
+    }
+
+    fn is_none(&self) -> bool {
+        self.addr == NONE_STATE
     }
 }
 

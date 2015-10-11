@@ -6,8 +6,6 @@ use error::{Error, Result};
 use fst::{VERSION, NONE_STATE, CompiledAddr, Output, Transition};
 use fst::counting_writer::CountingWriter;
 use fst::registry::{Registry, RegistryEntry};
-// use fst::registry_any::{Registry, RegistryEntry};
-// use fst::registry_minimal::{Registry, RegistryEntry};
 
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
@@ -50,7 +48,7 @@ struct BuilderNodeUnfinished {
     last: Option<LastTransition>,
 }
 
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub struct BuilderNode {
     pub is_final: bool,
     pub final_output: Output,
@@ -63,13 +61,9 @@ struct LastTransition {
     out: Output,
 }
 
-impl Builder<io::Cursor<Vec<u8>>> {
-    pub fn memory() -> Builder<Vec<u8>> {
-        Builder::from_bytes(Vec::with_capacity(10 * (1 << 10)))
-    }
-
-    pub fn from_bytes(buf: Vec<u8>) -> Builder<Vec<u8>> {
-        Builder::new(buf).unwrap()
+impl Builder<Vec<u8>> {
+    pub fn memory() -> Self {
+        Builder::new(Vec::with_capacity(10 * (1 << 10))).unwrap()
     }
 }
 
@@ -155,24 +149,17 @@ impl<W: io::Write> Builder<W> {
     }
 
     fn compile(&mut self, node: &BuilderNode) -> Result<CompiledAddr> {
-        Ok(match self.registry.entry(&node) {
-            RegistryEntry::Rejected => {
-                let start_addr = self.wtr.count() as CompiledAddr;
-                try!(node.compile_to(
-                    &mut self.wtr, self.last_addr, start_addr));
-                self.last_addr = self.wtr.count() as CompiledAddr - 1;
-                self.last_addr
-            }
-            RegistryEntry::NotFound(mut cell) => {
-                let start_addr = self.wtr.count() as CompiledAddr;
-                try!(node.compile_to(
-                    &mut self.wtr, self.last_addr, start_addr));
-                self.last_addr = self.wtr.count() as CompiledAddr - 1;
-                cell.insert(self.last_addr);
-                self.last_addr
-            }
-            RegistryEntry::Found(addr) => addr,
-        })
+        let entry = self.registry.entry(&node);
+        if let RegistryEntry::Found(ref addr) = entry {
+            return Ok(*addr);
+        }
+        let start_addr = self.wtr.count() as CompiledAddr;
+        try!(node.compile_to(&mut self.wtr, self.last_addr, start_addr));
+        self.last_addr = self.wtr.count() as CompiledAddr - 1;
+        if let RegistryEntry::NotFound(mut cell) = entry {
+            cell.insert(self.last_addr);
+        }
+        Ok(self.last_addr)
     }
 
     fn check_last_key(&mut self, bs: &[u8], check_dupe: bool) -> Result<()> {
@@ -210,11 +197,7 @@ impl UnfinishedNodes {
 
     fn push_empty(&mut self, is_final: bool) {
         self.stack.push(BuilderNodeUnfinished {
-            node: BuilderNode {
-                is_final: is_final,
-                final_output: Output::zero(),
-                trans: vec![],
-            },
+            node: BuilderNode { is_final: is_final, ..BuilderNode::default() },
             last: None,
         });
     }
@@ -256,11 +239,7 @@ impl UnfinishedNodes {
         self.stack[last].last = Some(LastTransition { inp: bs[0], out: out });
         for &b in &bs[1..] {
             self.stack.push(BuilderNodeUnfinished {
-                node: BuilderNode {
-                    is_final: false,
-                    final_output: Output::zero(),
-                    trans: vec![],
-                },
+                node: BuilderNode::default(),
                 last: Some(LastTransition { inp: b, out: Output::zero() }),
             });
         }
@@ -312,6 +291,33 @@ impl BuilderNodeUnfinished {
         }
         if let Some(ref mut t) = self.last {
             t.out = prefix.cat(t.out);
+        }
+    }
+}
+
+impl Clone for BuilderNode {
+    fn clone(&self) -> Self {
+        BuilderNode {
+            is_final: self.is_final,
+            final_output: self.final_output,
+            trans: self.trans.clone(),
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.is_final = source.is_final;
+        self.final_output = source.final_output;
+        self.trans.clear();
+        self.trans.extend(source.trans.iter());
+    }
+}
+
+impl Default for BuilderNode {
+    fn default() -> Self {
+        BuilderNode {
+            is_final: false,
+            final_output: Output::zero(),
+            trans: vec![],
         }
     }
 }

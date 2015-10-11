@@ -4,6 +4,7 @@ use std::io;
 use std::ops::Range;
 
 use byteorder::WriteBytesExt;
+use memchr::memchr;
 
 use fst::{CompiledAddr, Output, Transition};
 use fst::build::BuilderNode;
@@ -69,16 +70,20 @@ impl<'b> Node<'b> {
         self.state.output(self, i)
     }
 
-    pub fn final_output(&self) -> Output {
-        self.state.final_output(self)
-    }
-
     pub fn transition_addr(&self, i: usize) -> CompiledAddr {
         self.state.trans_addr(self, i)
     }
 
+    pub fn final_output(&self) -> Output {
+        self.state.final_output(self)
+    }
+
     pub fn is_final(&self) -> bool {
         self.state.is_final()
+    }
+
+    pub fn find_input(&self, b: u8) -> Option<usize> {
+        self.state.find_input(self, b)
     }
 
     pub fn len(&self) -> usize {
@@ -217,6 +222,21 @@ impl State {
             OneTransFinal(s) => { assert!(i == 0); s.input(node) }
             OneTrans(s) => { assert!(i == 0); s.input(node) }
             AnyTrans(s) => s.input(node, i),
+        }
+    }
+
+    fn find_input(&self, node: &Node, b: u8) -> Option<usize> {
+        use self::State::*;
+        match *self {
+            OneTransNextOutput(s) if s.input(node) == b => Some(0),
+            OneTransNextOutput(_) => None,
+            OneTransNext(s) if s.input(node) == b => Some(0),
+            OneTransNext(_) => None,
+            OneTransFinal(s) if s.input(node) == b => Some(0),
+            OneTransFinal(_) => None,
+            OneTrans(s) if s.input(node) == b => Some(0),
+            OneTrans(_) => None,
+            AnyTrans(s) => s.find_input(node, b),
         }
     }
 
@@ -655,6 +675,16 @@ impl StateAnyTrans {
         node.data[at]
     }
 
+    fn find_input(&self, node: &Node, b: u8) -> Option<usize> {
+        let ntrans = self.ntrans(node);
+        let start = node.start_addr()
+                    - self.ntrans_len()
+                    - 1 // pack size
+                    - ntrans; // inputs
+        let end = start + ntrans;
+        memchr(b, &node.data[start..end]).map(|i| ntrans - i - 1)
+    }
+
     fn output(&self, node: &Node, i: usize) -> Output {
         let osize = self.sizes(node).output_pack_size();
         if osize == 0 {
@@ -807,7 +837,7 @@ mod tests {
             for word in &bs {
                 bfst.add(word).unwrap();
             }
-            let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+            let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
             let mut rdr = fst.reader();
             let mut words = vec![];
             while let Some(w) = rdr.next() {

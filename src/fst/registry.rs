@@ -1,6 +1,4 @@
-use std::ptr;
-
-use fst::{NONE_STATE, CompiledAddr, Output};
+use fst::{NONE_STATE, CompiledAddr};
 use fst::build::BuilderNode;
 
 #[derive(Debug)]
@@ -15,19 +13,10 @@ struct RegistryMru<'a> {
     cells: &'a mut [RegistryCell],
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct RegistryCell {
     addr: CompiledAddr,
-    node: RegistryNode,
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-struct RegistryNode {
-    is_final: bool,
-    final_output: Output,
-    trans: [CompiledAddr; 2],
-    inputs: [u8; 2],
-    outputs: [Output; 2],
+    node: BuilderNode,
 }
 
 #[derive(Debug)]
@@ -48,55 +37,58 @@ impl Registry {
         }
     }
 
-    pub fn entry<'a>(&'a mut self, bnode: &BuilderNode) -> RegistryEntry<'a> {
+    pub fn entry<'a>(&'a mut self, node: &BuilderNode) -> RegistryEntry<'a> {
         if self.table.is_empty() {
             return RegistryEntry::Rejected;
         }
-        let node = match RegistryNode::from_builder_node(bnode) {
-            None => return RegistryEntry::Rejected,
-            Some(node) => node,
-        };
-        let bucket = self.hash(&node);
+        let bucket = self.hash(node);
         let start = self.mru_size * bucket;
         let end = start + self.mru_size;
         RegistryMru { cells: &mut self.table[start..end] }.entry(node)
     }
 
-    fn hash(&self, node: &RegistryNode) -> usize {
-        // The overhead of std's SipHasher is just so not worth it.
-        // (In my unscientific tests, this dumb hash function has no
-        // observable impact on compression ratio, but results in a perf
-        // boost of ~38%.)
-        let mut n: usize = 0;
-        n = n.wrapping_add(2 * node.is_final as usize);
-        n = n.wrapping_add(7 * node.trans[0] as usize);
-        n = n.wrapping_add(11 * node.trans[1] as usize);
-        n = n.wrapping_add(3 * node.inputs[0] as usize);
-        n = n.wrapping_add(5 * node.inputs[1] as usize);
-        n = n.wrapping_add(13 * node.outputs[0].encode() as usize);
-        n = n.wrapping_add(17 * node.outputs[1].encode() as usize);
-        n = n.wrapping_add(19 * node.final_output.encode() as usize);
-        n % self.table_size
+    fn hash(&self, node: &BuilderNode) -> usize {
+        // Basic FNV-1a hash as described:
+        // https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+        //
+        // In unscientific experiments, this provides the same compression
+        // as `std::hash::SipHasher` but is much much faster.
+        const FNV_PRIME: usize = 1099511628211;
+        let mut h = 14695981039346656037;
+        h = (h ^ (node.is_final as usize)).wrapping_mul(FNV_PRIME);
+        h = (h ^ (node.final_output.value() as usize)).wrapping_mul(FNV_PRIME);
+        for t in &node.trans {
+            h = (h ^ (t.inp as usize)).wrapping_mul(FNV_PRIME);
+            h = (h ^ (t.out.value() as usize)).wrapping_mul(FNV_PRIME);
+            h = (h ^ (t.addr as usize)).wrapping_mul(FNV_PRIME);
+        }
+        h % self.table_size
     }
 }
 
 impl<'a> RegistryMru<'a> {
-    fn entry(mut self, node: RegistryNode) -> RegistryEntry<'a> {
-        if let Some(i) = self.cells.iter().position(|c| c.node == node) {
+    fn entry(mut self, node: &BuilderNode) -> RegistryEntry<'a> {
+        let find = |c: &RegistryCell| !c.is_none() && &c.node == node;
+        if let Some(i) = self.cells.iter().position(find) {
+            let addr = self.cells[i].addr;
             self.promote(i); // most recently used
-            RegistryEntry::Found(self.cells[i].addr)
+            RegistryEntry::Found(addr)
         } else {
-            self.cells[0].node = node; // discard MRU
+            let last = self.cells.len() - 1;
+            if self.cells[last].is_none() {
+                self.promote(last);
+            }
+            self.cells[0].node.clone_from(node); // discard MRU
             RegistryEntry::NotFound(&mut self.cells[0])
         }
     }
 
-    fn promote(&mut self, i: usize) {
+    fn promote(&mut self, mut i: usize) {
         assert!(i < self.cells.len());
-        let cell = self.cells[i];
-        let p = self.cells.as_mut_ptr();
-        unsafe { ptr::copy(p, p.offset(1), i); }
-        self.cells[0] = cell;
+        while i > 0 {
+            self.cells.swap(i-1, i);
+            i -= 1;
+        }
     }
 }
 
@@ -104,7 +96,7 @@ impl RegistryCell {
     fn none() -> RegistryCell {
         RegistryCell {
             addr: NONE_STATE,
-            node: RegistryNode::none(),
+            node: BuilderNode::default(),
         }
     }
 
@@ -117,55 +109,12 @@ impl RegistryCell {
     }
 }
 
-impl RegistryNode {
-    fn from_builder_node(node: &BuilderNode) -> Option<RegistryNode> {
-        match node.trans.len() {
-            0 if node.is_final => Some(RegistryNode {
-                is_final: true,
-                final_output: node.final_output,
-                trans: [NONE_STATE, NONE_STATE],
-                inputs: [0, 0],
-                outputs: [Output::zero(), Output::zero()],
-            }),
-            1 => Some(RegistryNode {
-                is_final: node.is_final,
-                final_output: node.final_output,
-                trans: [node.trans[0].addr, 0],
-                inputs: [node.trans[0].inp, 0],
-                outputs: [node.trans[0].out, Output::zero()],
-            }),
-            2 => Some(RegistryNode {
-                is_final: node.is_final,
-                final_output: node.final_output,
-                trans: [node.trans[0].addr, node.trans[1].addr],
-                inputs: [node.trans[0].inp, node.trans[1].inp],
-                outputs: [node.trans[0].out, node.trans[1].out],
-            }),
-            _ => None,
-        }
-    }
-
-    fn none() -> RegistryNode {
-        RegistryNode {
-            is_final: false,
-            final_output: Output::zero(),
-            trans: [NONE_STATE, NONE_STATE],
-            inputs: [0, 0],
-            outputs: [Output::zero(), Output::zero()],
-        }
-    }
-
-    fn is_none(&self) -> bool {
-        !self.is_final && self.trans == [NONE_STATE, NONE_STATE]
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use fst::{Output, Transition};
     use fst::build::BuilderNode;
     use super::{
-        Registry, RegistryCell, RegistryEntry, RegistryMru, RegistryNode,
+        Registry, RegistryCell, RegistryEntry, RegistryMru,
     };
 
     fn assert_rejected(entry: RegistryEntry) {
@@ -213,8 +162,6 @@ mod tests {
             trans: vec![],
         };
         assert_insert_and_found(&mut reg, &bnode);
-        assert_rejected(
-            reg.entry(&BuilderNode { is_final: false, .. bnode.clone() }));
     }
 
     #[test]
@@ -248,17 +195,11 @@ mod tests {
     fn mru_works() {
         let mut reg = Registry::new(1, 1);
 
-        let bnode1 = BuilderNode {
-            is_final: true,
-            final_output: Output::zero(),
-            trans: vec![],
-        };
+        let bnode1 = BuilderNode { is_final: true, ..BuilderNode::default() };
         assert_insert_and_found(&mut reg, &bnode1);
 
         let bnode2 = BuilderNode {
-            is_final: true,
-            final_output: Output::new(1),
-            trans: vec![],
+            final_output: Output::new(1), ..bnode1.clone()
         };
         assert_insert_and_found(&mut reg, &bnode2);
         assert_not_found(reg.entry(&bnode1));
@@ -266,18 +207,12 @@ mod tests {
 
     #[test]
     fn promote() {
-        let rn = RegistryNode {
-            is_final: false,
-            final_output: Output::zero(),
-            trans: [0, 0],
-            inputs: [0, 0],
-            outputs: [Output::zero(), Output::zero()],
-        };
+        let bn = BuilderNode::default();
         let mut bnodes = vec![
-            RegistryCell { addr: 1, node: rn },
-            RegistryCell { addr: 2, node: rn },
-            RegistryCell { addr: 3, node: rn },
-            RegistryCell { addr: 4, node: rn },
+            RegistryCell { addr: 1, node: bn.clone() },
+            RegistryCell { addr: 2, node: bn.clone() },
+            RegistryCell { addr: 3, node: bn.clone() },
+            RegistryCell { addr: 4, node: bn.clone() },
         ];
         let mut mru = RegistryMru { cells: &mut bnodes };
 

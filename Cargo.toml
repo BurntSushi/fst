@@ -19,8 +19,15 @@ path = "./benches/build.rs"
 test = false
 bench = true
 
+[[bench]]
+name = "search"
+path = "./benches/search.rs"
+test = false
+bench = true
+
 [dependencies]
 byteorder = "*"
+memchr = "0.1"
 memmap = "0.2"
 
 [dev-dependencies]

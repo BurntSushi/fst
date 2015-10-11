@@ -6,11 +6,12 @@ use fst::build::Builder;
 use fst::{Fst, FstReader, Output};
 use Result;
 
-pub fn union_ignore_outputs<B, W>(
+pub fn union_ignore_outputs<'f, W, I>(
     bfst: &mut Builder<W>,
-    fsts: &[Fst<B>],
+    fsts: I,
 ) -> Result<()>
-where B: AsRef<[u8]>, W: io::Write {
+where W: io::Write,
+      I: IntoIterator<Item=&'f Fst> {
     let mut union = Union::new(fsts);
     while let Some(slot) = union.pop() {
         try!(bfst.add(slot.input()));
@@ -19,38 +20,40 @@ where B: AsRef<[u8]>, W: io::Write {
     Ok(())
 }
 
-pub fn union_with_outputs<B, W, F>(
+pub fn union_with_outputs<'f, W, F, I>(
     bfst: &mut Builder<W>,
-    fsts: &[Fst<B>],
+    fsts: I,
     mut merge: F,
 ) -> Result<()>
-where B: AsRef<[u8]>,
-      W: io::Write,
-      F: FnMut(&[u8], u64, u64) -> u64 {
+where W: io::Write,
+      F: FnMut(&[u8], &[u64]) -> u64,
+      I: IntoIterator<Item=&'f Fst> {
     let mut union = Union::new(fsts);
+    let mut outs = vec![];
     while let Some(slot) = union.pop() {
-        let mut o = slot.output().value();
+        unsafe { outs.set_len(0); }
+        outs.push(slot.output().value());
         while union.peek_is_duplicate(slot.input()) {
             let slot2 = union.pop().unwrap();
-            o = merge(slot.input(), o, slot2.output().value());
+            outs.push(slot2.output().value());
             union.refill(slot2);
         }
-        try!(bfst.insert(slot.input(), o));
+        try!(bfst.insert(slot.input(), merge(slot.input(), &outs)));
         union.refill(slot);
     }
     Ok(())
 }
 
-struct Union<'a, B: 'a> {
-    rdrs: Vec<FstReader<'a, B>>,
+struct Union<'f> {
+    rdrs: Vec<FstReader<'f>>,
     heap: BinaryHeap<Slot>,
 }
 
-impl<'a, B: AsRef<[u8]>> Union<'a, B> {
-    fn new(fsts: &'a [Fst<B>]) -> Union<'a, B> {
+impl<'f> Union<'f> {
+    fn new<I: IntoIterator<Item=&'f Fst>>(fsts: I) -> Union<'f> {
         let mut u = Union {
-            rdrs: fsts.iter().map(Fst::reader).collect(),
-            heap: BinaryHeap::with_capacity(fsts.len()),
+            rdrs: fsts.into_iter().map(Fst::reader).collect(),
+            heap: BinaryHeap::new(),
         };
         for i in 0..u.rdrs.len() {
             u.refill(Slot::new(i));
@@ -143,7 +146,7 @@ mod tests {
 
         let mut bfst = Builder::memory();
         union_ignore_outputs(&mut bfst, &[set1, set2]).unwrap();
-        let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+        let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
         assert_eq!(fst_input_strs(&fst), vec!["a", "b", "c", "x", "y", "z"]);
     }
 
@@ -154,7 +157,7 @@ mod tests {
 
         let mut bfst = Builder::memory();
         union_ignore_outputs(&mut bfst, &[set1, set2]).unwrap();
-        let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+        let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
         assert_eq!(fst_input_strs(&fst), vec!["aa", "b", "cc", "z"]);
     }
 
@@ -167,9 +170,9 @@ mod tests {
         union_with_outputs(
             &mut bfst,
             &[map1, map2],
-            |_, o1, o2| o1 + o2,
+            |_, os| os.iter().fold(0, |a, &b| a + b),
         ).unwrap();
-        let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+        let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
         assert_eq!(
             fst_inputstrs_outputs(&fst),
             vec![
@@ -188,9 +191,9 @@ mod tests {
         union_with_outputs(
             &mut bfst,
             &[map1, map2, map3],
-            |_, o1, o2| o1 + o2,
+            |_, os| os.iter().fold(0, |a, &b| a + b),
         ).unwrap();
-        let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
+        let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
         assert_eq!(
             fst_inputstrs_outputs(&fst),
             vec![

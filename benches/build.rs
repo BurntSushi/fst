@@ -5,7 +5,6 @@ extern crate test;
 
 use std::collections::{HashMap, HashSet};
 
-
 use fst::fst::{Builder, Fst};
 use test::Bencher;
 
@@ -28,7 +27,7 @@ fn build_fst_set(b: &mut Bencher) {
         for word in &words {
             bfst.add(word).unwrap();
         }
-        Fst::new(bfst.into_inner().unwrap()).unwrap();
+        Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
     });
 }
 
@@ -41,7 +40,7 @@ fn build_fst_map(b: &mut Bencher) {
         for &(ref word, len) in &words {
             bfst.insert(word, len).unwrap();
         }
-        Fst::new(bfst.into_inner().unwrap()).unwrap();
+        Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
     });
 }
 

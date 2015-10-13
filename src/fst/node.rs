@@ -11,7 +11,7 @@ use fst::build::BuilderNode;
 use fst::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
 use fst::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Node<'b> {
     data: &'b [u8],
     state: State,

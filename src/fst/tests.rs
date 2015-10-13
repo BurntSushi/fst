@@ -1,5 +1,5 @@
 use error::Error;
-use fst::{Builder, Fst, Output};
+use fst::{Builder, Bound, Fst, Output};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -223,20 +223,265 @@ fn fst_set_zero() {
     assert_eq!(rdr.next(), None);
 }
 
+macro_rules! test_range {
+    (
+        $name:ident,
+        min: $min:expr,
+        max: $max:expr,
+        imin: $imin:expr,
+        imax: $imax:expr,
+        $($s:expr),*
+    ) => {
+        #[test]
+        fn $name() {
+            let items: Vec<&'static str> = vec![$($s),*];
+            let items: Vec<_> =
+                items.into_iter().enumerate()
+                     .map(|(i, k)| (k, i as u64)).collect();
+            let fst = fst_map(items.clone());
+            let mut rdr = fst.range::<&'static str>($min, $max);
+            for i in $imin..$imax {
+                assert_eq!(rdr.next().unwrap(),
+                           (items[i].0.as_bytes(), Output::new(items[i].1)));
+            }
+            assert_eq!(rdr.next(), None);
+        }
+    }
+}
+
+test_range! {
+    fst_range_empty_1,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 0,
+}
+
+test_range! {
+    fst_range_empty_2,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 1,
+    ""
+}
+
+test_range! {
+    fst_range_empty_3,
+    min: Bound::Included(""), max: Bound::Unbounded,
+    imin: 0, imax: 1,
+    ""
+}
+
+test_range! {
+    fst_range_empty_4,
+    min: Bound::Excluded(""), max: Bound::Unbounded,
+    imin: 0, imax: 0,
+    ""
+}
+
+test_range! {
+    fst_range_empty_5,
+    min: Bound::Included(""), max: Bound::Unbounded,
+    imin: 0, imax: 2,
+    "", "a"
+}
+
+test_range! {
+    fst_range_empty_6,
+    min: Bound::Excluded(""), max: Bound::Unbounded,
+    imin: 1, imax: 2,
+    "", "a"
+}
+
+test_range! {
+    fst_range_empty_7,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 2,
+    "", "a"
+}
+
+test_range! {
+    fst_range_empty_8,
+    min: Bound::Unbounded, max: Bound::Included(""),
+    imin: 0, imax: 1,
+    ""
+}
+
+test_range! {
+    fst_range_empty_9,
+    min: Bound::Unbounded, max: Bound::Excluded(""),
+    imin: 0, imax: 0,
+    ""
+}
+
+test_range! {
+    fst_range_empty_10,
+    min: Bound::Unbounded, max: Bound::Included(""),
+    imin: 0, imax: 1,
+    "", "a"
+}
+
+test_range! {
+    fst_range_empty_11,
+    min: Bound::Included(""), max: Bound::Included(""),
+    imin: 0, imax: 1,
+    ""
+}
+
+test_range! {
+    fst_range_1,
+    min: Bound::Included("a"), max: Bound::Included("z"),
+    imin: 0, imax: 4,
+    "a", "b", "y", "z"
+}
+
+test_range! {
+    fst_range_2,
+    min: Bound::Excluded("a"), max: Bound::Included("y"),
+    imin: 1, imax: 3,
+    "a", "b", "y", "z"
+}
+
+test_range! {
+    fst_range_3,
+    min: Bound::Excluded("a"), max: Bound::Excluded("y"),
+    imin: 1, imax: 2,
+    "a", "b", "y", "z"
+}
+
+test_range! {
+    fst_range_4,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 4,
+    "a", "b", "y", "z"
+}
+
+test_range! {
+    fst_range_5,
+    min: Bound::Included("abd"), max: Bound::Unbounded,
+    imin: 0, imax: 0,
+    "a", "ab", "abc", "abcd", "abcde"
+}
+
+test_range! {
+    fst_range_6,
+    min: Bound::Included("abd"), max: Bound::Unbounded,
+    imin: 5, imax: 6,
+    "a", "ab", "abc", "abcd", "abcde", "abe"
+}
+
+test_range! {
+    fst_range_7,
+    min: Bound::Excluded("abd"), max: Bound::Unbounded,
+    imin: 5, imax: 6,
+    "a", "ab", "abc", "abcd", "abcde", "abe"
+}
+
+test_range! {
+    fst_range_8,
+    min: Bound::Included("abd"), max: Bound::Unbounded,
+    imin: 5, imax: 6,
+    "a", "ab", "abc", "abcd", "abcde", "xyz"
+}
+
+test_range! {
+    fst_range_9,
+    min: Bound::Unbounded, max: Bound::Included("abd"),
+    imin: 0, imax: 5,
+    "a", "ab", "abc", "abcd", "abcde", "abe"
+}
+
+test_range! {
+    fst_range_10,
+    min: Bound::Unbounded, max: Bound::Included("abd"),
+    imin: 0, imax: 6,
+    "a", "ab", "abc", "abcd", "abcde", "abd"
+}
+
+test_range! {
+    fst_range_11,
+    min: Bound::Unbounded, max: Bound::Included("abd"),
+    imin: 0, imax: 6,
+    "a", "ab", "abc", "abcd", "abcde", "abd", "abdx"
+}
+
+test_range! {
+    fst_range_12,
+    min: Bound::Unbounded, max: Bound::Excluded("abd"),
+    imin: 0, imax: 5,
+    "a", "ab", "abc", "abcd", "abcde", "abe"
+}
+
+test_range! {
+    fst_range_13,
+    min: Bound::Unbounded, max: Bound::Excluded("abd"),
+    imin: 0, imax: 5,
+    "a", "ab", "abc", "abcd", "abcde", "abd"
+}
+
+test_range! {
+    fst_range_14,
+    min: Bound::Unbounded, max: Bound::Excluded("abd"),
+    imin: 0, imax: 5,
+    "a", "ab", "abc", "abcd", "abcde", "abd", "abdx"
+}
+
+test_range! {
+    fst_range_15,
+    min: Bound::Included("d"), max: Bound::Included("c"),
+    imin: 0, imax: 0,
+    "a", "b", "c", "d", "e", "f"
+}
+
+test_range! {
+    fst_range_16,
+    min: Bound::Included("c"), max: Bound::Included("c"),
+    imin: 2, imax: 3,
+    "a", "b", "c", "d", "e", "f"
+}
+
+test_range! {
+    fst_range_17,
+    min: Bound::Excluded("c"), max: Bound::Excluded("c"),
+    imin: 0, imax: 0,
+    "a", "b", "c", "d", "e", "f"
+}
+
+test_range! {
+    fst_range_18,
+    min: Bound::Included("c"), max: Bound::Excluded("c"),
+    imin: 0, imax: 0,
+    "a", "b", "c", "d", "e", "f"
+}
+
+test_range! {
+    fst_range_19,
+    min: Bound::Included("c"), max: Bound::Excluded("d"),
+    imin: 2, imax: 3,
+    "a", "b", "c", "d", "e", "f"
+}
+
 #[test]
 fn scratch() {
     let mut bfst = Builder::memory();
-    bfst.insert(b"", 10).unwrap();
-    bfst.insert(b"abc", 5).unwrap();
-    bfst.insert(b"abcd", 6).unwrap();
-    bfst.insert(b"azzzzz", 1).unwrap();
+
+    // bfst.add("").unwrap();
+    bfst.add("a").unwrap();
+    // bfst.add("b").unwrap();
+    // bfst.add("c").unwrap();
+    // bfst.add("d").unwrap();
+    // bfst.add("e").unwrap();
+    bfst.add("ab").unwrap();
+    bfst.add("abc").unwrap();
+    bfst.add("abcd").unwrap();
+    bfst.add("abcde").unwrap();
+    bfst.add("abd").unwrap();
+    // bfst.add("abdxyz").unwrap();
+    // bfst.add("abe").unwrap();
 
     let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
-    let mut rdr = fst.reader();
-    assert_eq!(rdr.next().unwrap(), (&b""[..], Output::new(10)));
-    assert_eq!(rdr.next().unwrap(), (&b"abc"[..], Output::new(5)));
-    assert_eq!(rdr.next().unwrap(), (&b"abcd"[..], Output::new(6)));
-    assert_eq!(rdr.next().unwrap(),
-               (&b"azzzzz"[..], Output::new(1)));
-    assert_eq!(rdr.next(), None);
+    let mut rdr = fst.range(Bound::Included("a"), Bound::Excluded("abd"));
+
+    println!("-------------------------");
+    while let Some((k, _)) = rdr.next() {
+        println!("{}", ::std::str::from_utf8(k).unwrap());
+    }
+    println!("-------------------------");
 }

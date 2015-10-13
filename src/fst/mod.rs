@@ -68,26 +68,6 @@ impl Fst {
         })
     }
 
-    pub fn reader(&self) -> FstReader {
-        let root = self.root();
-        let empty_output =
-            if root.is_final() {
-                Some(root.final_output())
-            } else {
-                None
-            };
-        FstReader {
-            fst: self,
-            inp: Vec::with_capacity(64),
-            empty_output: empty_output,
-            stack: vec![FstReaderState {
-                addr: self.root_addr,
-                trans: 0,
-                out: Output::zero(),
-            }],
-        }
-    }
-
     pub fn as_slice(&self) -> &[u8] {
         self.data.as_slice()
     }
@@ -98,6 +78,15 @@ impl Fst {
 
     pub fn node(&self, addr: CompiledAddr) -> Node {
         node_new(addr, &self.data.as_slice())
+    }
+
+    pub fn empty_final_output(&self) -> Option<Output> {
+        let root = self.root();
+        if root.is_final() {
+            Some(root.final_output())
+        } else {
+            None
+        }
     }
 
     pub fn find<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
@@ -119,6 +108,51 @@ impl Fst {
             Some(out.cat(node.final_output()))
         }
     }
+
+    pub fn reader(&self) -> FstReader {
+        self.range::<&[u8]>(Bound::Unbounded, Bound::Unbounded)
+    }
+
+    pub fn range<T>(
+        &self,
+        min: Bound<T>,
+        max: Bound<T>,
+    ) -> FstReader
+    where T: AsRef<[u8]> {
+        FstReader::new(self, min, max)
+    }
+}
+
+pub enum Bound<T> {
+    Included(T),
+    Excluded(T),
+    Unbounded,
+}
+
+impl<T: AsRef<[u8]>> Bound<T> {
+    fn includes_empty(&self) -> bool {
+        match *self {
+            Bound::Included(ref v) => v.as_ref() == &[],
+            Bound::Excluded(_) => false,
+            Bound::Unbounded => true,
+        }
+    }
+
+    fn into_bytes(self) -> Bound<Vec<u8>> {
+        match self {
+            Bound::Included(v) => Bound::Included(v.as_ref().to_owned()),
+            Bound::Excluded(v) => Bound::Excluded(v.as_ref().to_owned()),
+            Bound::Unbounded => Bound::Unbounded,
+        }
+    }
+
+    fn exceeded_by(&self, inp: &[u8]) -> bool {
+        match *self {
+            Bound::Included(ref v) => inp > v.as_ref(),
+            Bound::Excluded(ref v) => inp >= v.as_ref(),
+            Bound::Unbounded => false,
+        }
+    }
 }
 
 pub struct FstReader<'f> {
@@ -126,6 +160,7 @@ pub struct FstReader<'f> {
     inp: Vec<u8>,
     empty_output: Option<Output>,
     stack: Vec<FstReaderState>,
+    end_at: Bound<Vec<u8>>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -136,8 +171,29 @@ struct FstReaderState {
 }
 
 impl<'f> FstReader<'f> {
+    fn new<T>(
+        fst: &'f Fst,
+        min: Bound<T>,
+        max: Bound<T>,
+    ) -> Self
+    where T: AsRef<[u8]> {
+        let mut rdr = FstReader {
+            fst: fst,
+            inp: Vec::with_capacity(16),
+            empty_output: None,
+            stack: vec![],
+            end_at: max.into_bytes(),
+        };
+        rdr.seek_min(min);
+        rdr
+    }
+
     pub fn next(&mut self) -> Option<(&[u8], Output)> {
         if let Some(out) = self.empty_output.take() {
+            if self.end_at.exceeded_by(&[]) {
+                self.stack.clear();
+                return None;
+            }
             return Some((&[], out));
         }
         while let Some(state) = self.stack.pop() {
@@ -149,7 +205,6 @@ impl<'f> FstReader<'f> {
                 continue;
             }
             let trans = node.transition(state.trans);
-            self.inp.push(trans.inp);
             let out = state.out.cat(trans.out);
             self.stack.push(FstReaderState {
                 addr: state.addr,
@@ -161,12 +216,97 @@ impl<'f> FstReader<'f> {
                 trans: 0,
                 out: out,
             });
+            self.inp.push(trans.inp);
+            if self.end_at.exceeded_by(&self.inp) {
+                return None;
+            }
             let next_node = self.fst.node(trans.addr);
             if next_node.is_final() {
                 return Some((&self.inp, out.cat(next_node.final_output())));
             }
         }
         None
+    }
+
+    fn seek_min<T: AsRef<[u8]>>(&mut self, min: Bound<T>) {
+        let (key, inclusive) = match min {
+            Bound::Excluded(ref min) if min.as_ref().is_empty() => {
+                self.stack = vec![FstReaderState {
+                    addr: self.fst.root_addr,
+                    trans: 0,
+                    out: Output::zero(),
+                }];
+                return;
+            }
+            Bound::Excluded(ref min) => {
+                (min.as_ref(), false)
+            }
+            Bound::Included(ref min) if !min.as_ref().is_empty() => {
+                (min.as_ref(), true)
+            }
+            _ => {
+                self.empty_output = self.fst.empty_final_output();
+                self.stack = vec![FstReaderState {
+                    addr: self.fst.root_addr,
+                    trans: 0,
+                    out: Output::zero(),
+                }];
+                return;
+            }
+        };
+        // At this point, we need to find the starting location of `min` in
+        // the FST. However, as we search, we need to maintain a stack of
+        // reader states so that the reader can pick up where we left off.
+        // N.B. We do not necessarily need to stop in a final state, unlike
+        // the one-off `find` method. For the example, the given bound might
+        // not actually exist in the FST.
+        let mut node = self.fst.root();
+        let mut out = Output::zero();
+        for &b in key {
+            match node.find_input(b) {
+                Some(i) => {
+                    let t = node.transition(i);
+                    self.stack.push(FstReaderState {
+                        addr: node.addr(),
+                        trans: i+1,
+                        out: out,
+                    });
+                    out = out.cat(t.out);
+                    self.inp.push(b);
+                    node = self.fst.node(t.addr);
+                }
+                None => {
+                    // This is a little tricky. We're in this case if the
+                    // given bound is not a prefix of any key in the FST.
+                    // Since this is a minimum bound, we need to find the
+                    // first transition in this node that proceeds the current
+                    // input byte.
+                    self.stack.push(FstReaderState {
+                        addr: node.addr(),
+                        trans: node.transitions()
+                                   .position(|t| t.inp > b)
+                                   .unwrap_or(node.len()),
+                        out: out,
+                    });
+                    return;
+                }
+            }
+        }
+        if !self.stack.is_empty() {
+            let last = self.stack.len() - 1;
+            if inclusive {
+                self.stack[last].trans -= 1;
+                self.inp.pop();
+            } else {
+                let state = self.stack[last];
+                let node = self.fst.node(state.addr);
+                self.stack.push(FstReaderState {
+                    addr: node.transition_addr(state.trans - 1),
+                    trans: 0,
+                    out: out,
+                });
+            }
+        }
     }
 }
 

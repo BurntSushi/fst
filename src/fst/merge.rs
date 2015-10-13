@@ -26,16 +26,16 @@ pub fn union_with_outputs<'f, W, F, I>(
     mut merge: F,
 ) -> Result<()>
 where W: io::Write,
-      F: FnMut(&[u8], &[u64]) -> u64,
+      F: FnMut(&[u8], &[(usize, u64)]) -> u64,
       I: IntoIterator<Item=&'f Fst> {
     let mut union = Union::new(fsts);
     let mut outs = vec![];
     while let Some(slot) = union.pop() {
         unsafe { outs.set_len(0); }
-        outs.push(slot.output().value());
+        outs.push((slot.index(), slot.output().value()));
         while union.peek_is_duplicate(slot.input()) {
             let slot2 = union.pop().unwrap();
-            outs.push(slot2.output().value());
+            outs.push((slot2.index(), slot2.output().value()));
             union.refill(slot2);
         }
         try!(bfst.insert(slot.input(), merge(slot.input(), &outs)));
@@ -92,6 +92,10 @@ impl Slot {
             input: Vec::with_capacity(64),
             output: Output::zero(),
         }
+    }
+
+    fn index(&self) -> usize {
+        self.idx
     }
 
     fn input(&self) -> &[u8] {
@@ -170,7 +174,7 @@ mod tests {
         union_with_outputs(
             &mut bfst,
             &[map1, map2],
-            |_, os| os.iter().fold(0, |a, &b| a + b),
+            |_, os| os.iter().fold(0, |a, &(_, b)| a + b),
         ).unwrap();
         let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
         assert_eq!(
@@ -191,7 +195,7 @@ mod tests {
         union_with_outputs(
             &mut bfst,
             &[map1, map2, map3],
-            |_, os| os.iter().fold(0, |a, &b| a + b),
+            |_, os| os.iter().fold(0, |a, &(_, b)| a + b),
         ).unwrap();
         let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
         assert_eq!(

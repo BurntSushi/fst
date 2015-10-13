@@ -1,5 +1,5 @@
 use error::Error;
-use fst::{Builder, Bound, Fst, Output};
+use fst::{Builder, Bound, Fst, FstStream, Output};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -239,7 +239,7 @@ macro_rules! test_range {
                 items.into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
             let fst = fst_map(items.clone());
-            let mut rdr = fst.range_stream::<&'static str>($min, $max);
+            let mut rdr = FstStream::new(&fst, $min, $max);
             for i in $imin..$imax {
                 assert_eq!(rdr.next().unwrap(),
                            (items[i].0.as_bytes(), Output::new(items[i].1)));
@@ -264,28 +264,28 @@ test_range! {
 
 test_range! {
     fst_range_empty_3,
-    min: Bound::Included(""), max: Bound::Unbounded,
+    min: Bound::Included(vec![]), max: Bound::Unbounded,
     imin: 0, imax: 1,
     ""
 }
 
 test_range! {
     fst_range_empty_4,
-    min: Bound::Excluded(""), max: Bound::Unbounded,
+    min: Bound::Excluded(vec![]), max: Bound::Unbounded,
     imin: 0, imax: 0,
     ""
 }
 
 test_range! {
     fst_range_empty_5,
-    min: Bound::Included(""), max: Bound::Unbounded,
+    min: Bound::Included(vec![]), max: Bound::Unbounded,
     imin: 0, imax: 2,
     "", "a"
 }
 
 test_range! {
     fst_range_empty_6,
-    min: Bound::Excluded(""), max: Bound::Unbounded,
+    min: Bound::Excluded(vec![]), max: Bound::Unbounded,
     imin: 1, imax: 2,
     "", "a"
 }
@@ -299,49 +299,49 @@ test_range! {
 
 test_range! {
     fst_range_empty_8,
-    min: Bound::Unbounded, max: Bound::Included(""),
+    min: Bound::Unbounded, max: Bound::Included(vec![]),
     imin: 0, imax: 1,
     ""
 }
 
 test_range! {
     fst_range_empty_9,
-    min: Bound::Unbounded, max: Bound::Excluded(""),
+    min: Bound::Unbounded, max: Bound::Excluded(vec![]),
     imin: 0, imax: 0,
     ""
 }
 
 test_range! {
     fst_range_empty_10,
-    min: Bound::Unbounded, max: Bound::Included(""),
+    min: Bound::Unbounded, max: Bound::Included(vec![]),
     imin: 0, imax: 1,
     "", "a"
 }
 
 test_range! {
     fst_range_empty_11,
-    min: Bound::Included(""), max: Bound::Included(""),
+    min: Bound::Included(vec![]), max: Bound::Included(vec![]),
     imin: 0, imax: 1,
     ""
 }
 
 test_range! {
     fst_range_1,
-    min: Bound::Included("a"), max: Bound::Included("z"),
+    min: Bound::Included(vec![b'a']), max: Bound::Included(vec![b'z']),
     imin: 0, imax: 4,
     "a", "b", "y", "z"
 }
 
 test_range! {
     fst_range_2,
-    min: Bound::Excluded("a"), max: Bound::Included("y"),
+    min: Bound::Excluded(vec![b'a']), max: Bound::Included(vec![b'y']),
     imin: 1, imax: 3,
     "a", "b", "y", "z"
 }
 
 test_range! {
     fst_range_3,
-    min: Bound::Excluded("a"), max: Bound::Excluded("y"),
+    min: Bound::Excluded(vec![b'a']), max: Bound::Excluded(vec![b'y']),
     imin: 1, imax: 2,
     "a", "b", "y", "z"
 }
@@ -355,105 +355,105 @@ test_range! {
 
 test_range! {
     fst_range_5,
-    min: Bound::Included("abd"), max: Bound::Unbounded,
+    min: Bound::Included(b"abd".to_vec()), max: Bound::Unbounded,
     imin: 0, imax: 0,
     "a", "ab", "abc", "abcd", "abcde"
 }
 
 test_range! {
     fst_range_6,
-    min: Bound::Included("abd"), max: Bound::Unbounded,
+    min: Bound::Included(b"abd".to_vec()), max: Bound::Unbounded,
     imin: 5, imax: 6,
     "a", "ab", "abc", "abcd", "abcde", "abe"
 }
 
 test_range! {
     fst_range_7,
-    min: Bound::Excluded("abd"), max: Bound::Unbounded,
+    min: Bound::Excluded(b"abd".to_vec()), max: Bound::Unbounded,
     imin: 5, imax: 6,
     "a", "ab", "abc", "abcd", "abcde", "abe"
 }
 
 test_range! {
     fst_range_8,
-    min: Bound::Included("abd"), max: Bound::Unbounded,
+    min: Bound::Included(b"abd".to_vec()), max: Bound::Unbounded,
     imin: 5, imax: 6,
     "a", "ab", "abc", "abcd", "abcde", "xyz"
 }
 
 test_range! {
     fst_range_9,
-    min: Bound::Unbounded, max: Bound::Included("abd"),
+    min: Bound::Unbounded, max: Bound::Included(b"abd".to_vec()),
     imin: 0, imax: 5,
     "a", "ab", "abc", "abcd", "abcde", "abe"
 }
 
 test_range! {
     fst_range_10,
-    min: Bound::Unbounded, max: Bound::Included("abd"),
+    min: Bound::Unbounded, max: Bound::Included(b"abd".to_vec()),
     imin: 0, imax: 6,
     "a", "ab", "abc", "abcd", "abcde", "abd"
 }
 
 test_range! {
     fst_range_11,
-    min: Bound::Unbounded, max: Bound::Included("abd"),
+    min: Bound::Unbounded, max: Bound::Included(b"abd".to_vec()),
     imin: 0, imax: 6,
     "a", "ab", "abc", "abcd", "abcde", "abd", "abdx"
 }
 
 test_range! {
     fst_range_12,
-    min: Bound::Unbounded, max: Bound::Excluded("abd"),
+    min: Bound::Unbounded, max: Bound::Excluded(b"abd".to_vec()),
     imin: 0, imax: 5,
     "a", "ab", "abc", "abcd", "abcde", "abe"
 }
 
 test_range! {
     fst_range_13,
-    min: Bound::Unbounded, max: Bound::Excluded("abd"),
+    min: Bound::Unbounded, max: Bound::Excluded(b"abd".to_vec()),
     imin: 0, imax: 5,
     "a", "ab", "abc", "abcd", "abcde", "abd"
 }
 
 test_range! {
     fst_range_14,
-    min: Bound::Unbounded, max: Bound::Excluded("abd"),
+    min: Bound::Unbounded, max: Bound::Excluded(b"abd".to_vec()),
     imin: 0, imax: 5,
     "a", "ab", "abc", "abcd", "abcde", "abd", "abdx"
 }
 
 test_range! {
     fst_range_15,
-    min: Bound::Included("d"), max: Bound::Included("c"),
+    min: Bound::Included(vec![b'd']), max: Bound::Included(vec![b'c']),
     imin: 0, imax: 0,
     "a", "b", "c", "d", "e", "f"
 }
 
 test_range! {
     fst_range_16,
-    min: Bound::Included("c"), max: Bound::Included("c"),
+    min: Bound::Included(vec![b'c']), max: Bound::Included(vec![b'c']),
     imin: 2, imax: 3,
     "a", "b", "c", "d", "e", "f"
 }
 
 test_range! {
     fst_range_17,
-    min: Bound::Excluded("c"), max: Bound::Excluded("c"),
+    min: Bound::Excluded(vec![b'c']), max: Bound::Excluded(vec![b'c']),
     imin: 0, imax: 0,
     "a", "b", "c", "d", "e", "f"
 }
 
 test_range! {
     fst_range_18,
-    min: Bound::Included("c"), max: Bound::Excluded("c"),
+    min: Bound::Included(vec![b'c']), max: Bound::Excluded(vec![b'c']),
     imin: 0, imax: 0,
     "a", "b", "c", "d", "e", "f"
 }
 
 test_range! {
     fst_range_19,
-    min: Bound::Included("c"), max: Bound::Excluded("d"),
+    min: Bound::Included(vec![b'c']), max: Bound::Excluded(vec![b'd']),
     imin: 2, imax: 3,
     "a", "b", "c", "d", "e", "f"
 }
@@ -477,8 +477,7 @@ fn scratch() {
     // bfst.add("abe").unwrap();
 
     let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
-    let mut rdr = fst.range_stream(
-        Bound::Included("a"), Bound::Excluded("abd"));
+    let mut rdr = fst.range().ge("a").lt("abd").into_stream();
 
     println!("-------------------------");
     while let Some((k, _)) = rdr.next() {

@@ -3,7 +3,7 @@ use std::collections::BinaryHeap;
 use std::io;
 
 use fst::build::Builder;
-use fst::{Fst, FstReader, Output};
+use fst::{Fst, FstStream, Output};
 use Result;
 
 pub fn union_ignore_outputs<'f, W, I>(
@@ -21,19 +21,19 @@ where W: io::Write,
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct FstOutput {
+pub struct UnionOutput {
     pub index: usize,
     pub output: u64,
 }
 
-pub fn union_with_outputs<'f, W, F, I>(
+pub fn union_with_outputs<'f, W, I, F>(
     bfst: &mut Builder<W>,
     fsts: I,
     mut merge: F,
 ) -> Result<()>
 where W: io::Write,
-      F: FnMut(&[u8], &[FstOutput]) -> u64,
-      I: IntoIterator<Item=&'f Fst> {
+      I: IntoIterator<Item=&'f Fst>,
+      F: FnMut(&[u8], &[UnionOutput]) -> u64 {
     let mut union = Union::new(fsts);
     let mut outs = vec![];
     while let Some(slot) = union.pop() {
@@ -51,7 +51,7 @@ where W: io::Write,
 }
 
 struct Union<'f> {
-    rdrs: Vec<FstReader<'f>>,
+    rdrs: Vec<FstStream<'f>>,
     heap: BinaryHeap<Slot>,
 }
 
@@ -100,8 +100,8 @@ impl Slot {
         }
     }
 
-    fn fst_output(&self) -> FstOutput {
-        FstOutput { index: self.idx, output: self.output.value() }
+    fn fst_output(&self) -> UnionOutput {
+        UnionOutput { index: self.idx, output: self.output.value() }
     }
 
     fn input(&self) -> &[u8] {

@@ -7,7 +7,7 @@ use memmap::{Mmap, Protection};
 
 use error::{Error, Result};
 pub use self::build::Builder;
-pub use self::merge::{union_ignore_outputs, union_with_outputs};
+pub use self::merge::{UnionOutput, union_ignore_outputs, union_with_outputs};
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
 
@@ -68,27 +68,6 @@ impl Fst {
         })
     }
 
-    pub fn as_slice(&self) -> &[u8] {
-        self.data.as_slice()
-    }
-
-    pub fn root(&self) -> Node {
-        self.node(self.root_addr)
-    }
-
-    pub fn node(&self, addr: CompiledAddr) -> Node {
-        node_new(addr, &self.data.as_slice())
-    }
-
-    pub fn empty_final_output(&self) -> Option<Output> {
-        let root = self.root();
-        if root.is_final() {
-            Some(root.final_output())
-        } else {
-            None
-        }
-    }
-
     pub fn find<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
         let mut node = self.root();
         let mut out = Output::zero();
@@ -109,81 +88,124 @@ impl Fst {
         }
     }
 
-    pub fn stream(&self) -> FstReader {
-        self.range_stream::<&[u8]>(Bound::Unbounded, Bound::Unbounded)
+    pub fn stream(&self) -> FstStream {
+        FstStreamBuilder::new(self).into_stream()
     }
 
-    pub fn range_stream<T>(
-        &self,
-        min: Bound<T>,
-        max: Bound<T>,
-    ) -> FstReader
-    where T: AsRef<[u8]> {
-        FstReader::new(self, min, max)
+    pub fn range<'a>(&'a self) -> FstStreamBuilder<'a> {
+        FstStreamBuilder::new(self)
+    }
+
+    pub fn root(&self) -> Node {
+        self.node(self.root_addr)
+    }
+
+    pub fn node(&self, addr: CompiledAddr) -> Node {
+        node_new(addr, &self.data.as_slice())
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        self.data.as_slice()
+    }
+
+    fn empty_final_output(&self) -> Option<Output> {
+        let root = self.root();
+        if root.is_final() {
+            Some(root.final_output())
+        } else {
+            None
+        }
+    }
+}
+
+pub struct FstStreamBuilder<'a> {
+    fst: &'a Fst,
+    min: Bound,
+    max: Bound,
+}
+
+impl<'a> FstStreamBuilder<'a> {
+    fn new(fst: &'a Fst) -> Self {
+        FstStreamBuilder {
+            fst: fst,
+            min: Bound::Unbounded,
+            max: Bound::Unbounded,
+        }
+    }
+
+    pub fn into_stream(self) -> FstStream<'a> {
+        FstStream::new(self.fst, self.min, self.max)
+    }
+
+    pub fn ge<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+        self.min = Bound::Included(bound.as_ref().to_owned());
+        self
+    }
+
+    pub fn gt<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+        self.min = Bound::Excluded(bound.as_ref().to_owned());
+        self
+    }
+
+    pub fn le<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+        self.max = Bound::Included(bound.as_ref().to_owned());
+        self
+    }
+
+    pub fn lt<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+        self.max = Bound::Excluded(bound.as_ref().to_owned());
+        self
     }
 }
 
 #[derive(Debug)]
-pub enum Bound<T> {
-    Included(T),
-    Excluded(T),
+enum Bound {
+    Included(Vec<u8>),
+    Excluded(Vec<u8>),
     Unbounded,
 }
 
-impl<T: AsRef<[u8]>> Bound<T> {
+impl Bound {
     fn includes_empty(&self) -> bool {
         match *self {
-            Bound::Included(ref v) => v.as_ref() == &[],
+            Bound::Included(ref v) => v == &[],
             Bound::Excluded(_) => false,
             Bound::Unbounded => true,
         }
     }
 
-    fn into_bytes(self) -> Bound<Vec<u8>> {
-        match self {
-            Bound::Included(v) => Bound::Included(v.as_ref().to_owned()),
-            Bound::Excluded(v) => Bound::Excluded(v.as_ref().to_owned()),
-            Bound::Unbounded => Bound::Unbounded,
-        }
-    }
-
     fn exceeded_by(&self, inp: &[u8]) -> bool {
         match *self {
-            Bound::Included(ref v) => inp > v.as_ref(),
-            Bound::Excluded(ref v) => inp >= v.as_ref(),
+            Bound::Included(ref v) => inp > v,
+            Bound::Excluded(ref v) => inp >= v,
             Bound::Unbounded => false,
         }
     }
 }
 
-pub struct FstReader<'f> {
+pub struct FstStream<'f> {
     fst: &'f Fst,
     inp: Vec<u8>,
     empty_output: Option<Output>,
-    stack: Vec<FstReaderState>,
-    end_at: Bound<Vec<u8>>,
+    stack: Vec<FstStreamState>,
+    end_at: Bound,
 }
 
 #[derive(Clone, Copy, Debug)]
-struct FstReaderState {
+struct FstStreamState {
     addr: CompiledAddr,
     trans: usize,
     out: Output,
 }
 
-impl<'f> FstReader<'f> {
-    fn new<T>(
-        fst: &'f Fst,
-        min: Bound<T>,
-        max: Bound<T>,
-    ) -> Self
-    where T: AsRef<[u8]> {
-        let mut rdr = FstReader {
+impl<'f> FstStream<'f> {
+    fn new(fst: &'f Fst, min: Bound, max: Bound) -> Self {
+        let mut rdr = FstStream {
             fst: fst,
             inp: Vec::with_capacity(16),
             empty_output: None,
             stack: vec![],
-            end_at: max.into_bytes(),
+            end_at: max,
         };
         rdr.seek_min(min);
         rdr
@@ -207,12 +229,12 @@ impl<'f> FstReader<'f> {
             }
             let trans = node.transition(state.trans);
             let out = state.out.cat(trans.out);
-            self.stack.push(FstReaderState {
+            self.stack.push(FstStreamState {
                 addr: state.addr,
                 trans: state.trans + 1,
                 out: state.out,
             });
-            self.stack.push(FstReaderState {
+            self.stack.push(FstStreamState {
                 addr: trans.addr,
                 trans: 0,
                 out: out,
@@ -229,10 +251,10 @@ impl<'f> FstReader<'f> {
         None
     }
 
-    fn seek_min<T: AsRef<[u8]>>(&mut self, min: Bound<T>) {
+    fn seek_min(&mut self, min: Bound) {
         let (key, inclusive) = match min {
-            Bound::Excluded(ref min) if min.as_ref().is_empty() => {
-                self.stack = vec![FstReaderState {
+            Bound::Excluded(ref min) if min.is_empty() => {
+                self.stack = vec![FstStreamState {
                     addr: self.fst.root_addr,
                     trans: 0,
                     out: Output::zero(),
@@ -240,14 +262,14 @@ impl<'f> FstReader<'f> {
                 return;
             }
             Bound::Excluded(ref min) => {
-                (min.as_ref(), false)
+                (min, false)
             }
-            Bound::Included(ref min) if !min.as_ref().is_empty() => {
-                (min.as_ref(), true)
+            Bound::Included(ref min) if !min.is_empty() => {
+                (min, true)
             }
             _ => {
                 self.empty_output = self.fst.empty_final_output();
-                self.stack = vec![FstReaderState {
+                self.stack = vec![FstStreamState {
                     addr: self.fst.root_addr,
                     trans: 0,
                     out: Output::zero(),
@@ -267,7 +289,7 @@ impl<'f> FstReader<'f> {
             match node.find_input(b) {
                 Some(i) => {
                     let t = node.transition(i);
-                    self.stack.push(FstReaderState {
+                    self.stack.push(FstStreamState {
                         addr: node.addr(),
                         trans: i+1,
                         out: out,
@@ -282,7 +304,7 @@ impl<'f> FstReader<'f> {
                     // Since this is a minimum bound, we need to find the
                     // first transition in this node that proceeds the current
                     // input byte.
-                    self.stack.push(FstReaderState {
+                    self.stack.push(FstStreamState {
                         addr: node.addr(),
                         trans: node.transitions()
                                    .position(|t| t.inp > b)
@@ -301,7 +323,7 @@ impl<'f> FstReader<'f> {
             } else {
                 let state = self.stack[last];
                 let node = self.fst.node(state.addr);
-                self.stack.push(FstReaderState {
+                self.stack.push(FstStreamState {
                     addr: node.transition_addr(state.trans - 1),
                     trans: 0,
                     out: out,

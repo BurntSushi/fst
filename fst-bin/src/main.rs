@@ -32,7 +32,12 @@ Commands:
     dupes   Emit info about frequency of duplicate nodes.
     find    Search an FST.
     mkset   Create a new set of words.
+    union   Union two or more FSTs.
     words   Emit all words in given set/map.
+
+Options:
+    -h, --help     Show this help message.
+    -v, --version  Show version.
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -47,6 +52,7 @@ enum Command {
     Dupes,
     Find,
     MkSet,
+    Union,
     Words,
 }
 
@@ -59,6 +65,7 @@ impl Command {
             Command::Dupes => cmd::dupes::run(argv),
             Command::Find => cmd::find::run(argv),
             Command::MkSet => cmd::mkset::run(argv),
+            Command::Union => cmd::union::run(argv),
             Command::Words => cmd::words::run(argv),
         }
     }

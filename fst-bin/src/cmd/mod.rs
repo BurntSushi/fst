@@ -77,7 +77,7 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
-    use fst::fst::{self, Bound};
+    use fst::fst;
 
     use util;
     use Error;
@@ -87,11 +87,11 @@ Usage: fst find [options] <fst> [<query>]
        fst find --help
 
 Options:
-    -h, --help       Show this help message.
-    -f ARG           File containing queries, one per line, no ranges.
-    -c, --count      Only show a count of hits instead of printing them.
-    -s, --start ARG  Start of range query.
-    -e, --end ARG    Start of range query.
+    -h, --help          Show this help message.
+    -f ARG, --file ARG  File containing queries, one per line, no ranges.
+    -c, --count         Only show a count of hits instead of printing them.
+    -s, --start ARG     Start of range query.
+    -e, --end ARG       Start of range query.
 ";
 
     #[derive(Debug, RustcDecodable)]
@@ -131,19 +131,14 @@ Options:
                 }
             }
         } else {
-            let min =
-                if let Some(ref min) = args.flag_start {
-                    Bound::Included(min)
-                } else {
-                    Bound::Unbounded
-                };
-            let max =
-                if let Some(ref max) = args.flag_end {
-                    Bound::Included(max)
-                } else {
-                    Bound::Unbounded
-                };
-            let mut it = fst.range_stream(min, max);
+            let mut range = fst.range();
+            if let Some(ref min) = args.flag_start {
+                range = range.ge(min);
+            }
+            if let Some(ref max) = args.flag_end {
+                range = range.le(max);
+            }
+            let mut it = range.into_stream();
             while let Some((term, _)) = it.next() {
                 hits += 1;
                 if !args.flag_count {
@@ -155,6 +150,48 @@ Options:
         if args.flag_count {
             try!(writeln!(wtr, "{}", hits));
         }
+        Ok(())
+    }
+}
+
+pub mod union {
+    use std::io::Write;
+
+    use docopt::Docopt;
+    use fst::fst;
+
+    use util;
+    use Error;
+
+    const USAGE: &'static str = "
+Usage: fst union [options] <input>...
+       fst union --help
+
+Options:
+    -h, --help              Show this help message.
+    -o PATH, --output PATH  Write merged FST to given path.
+";
+
+    #[derive(Debug, RustcDecodable)]
+    struct Args {
+        arg_input: Vec<String>,
+        flag_output: Option<String>,
+    }
+
+    pub fn run(argv: Vec<String>) -> Result<(), Error> {
+        let args: Args = Docopt::new(USAGE)
+                                .and_then(|d| d.argv(&argv).decode())
+                                .unwrap_or_else(|e| e.exit());
+
+        let wtr = try!(util::get_buf_writer(args.flag_output));
+        let mut merged = try!(fst::Builder::new(wtr));
+
+        let mut fsts = vec![];
+        for fst_path in &args.arg_input {
+            fsts.push(try!(fst::Fst::from_file_path(fst_path)));
+        }
+        try!(fst::union_ignore_outputs(&mut merged, &fsts));
+        try!(try!(merged.into_inner()).flush());
         Ok(())
     }
 }

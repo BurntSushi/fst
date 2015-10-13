@@ -62,7 +62,7 @@ Usage: fst words [options] <input> [<output>]
 
         let mut wtr = try!(util::get_buf_writer(args.arg_output));
         let fst = try!(fst::Fst::from_file_path(args.arg_input));
-        let mut rdr = fst.reader();
+        let mut rdr = fst.stream();
         while let Some((word, _)) = rdr.next() {
             try!(wtr.write_all(word));
             try!(wtr.write_all(b"\n"));
@@ -77,16 +77,21 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
-    use fst::fst;
+    use fst::fst::{self, Bound};
 
     use util;
     use Error;
 
     const USAGE: &'static str = "
 Usage: fst find [options] <fst> [<query>]
+       fst find --help
 
 Options:
-    -f ARG   File containing queries, one per line.
+    -h, --help       Show this help message.
+    -f ARG           File containing queries, one per line, no ranges.
+    -c, --count      Only show a count of hits instead of printing them.
+    -s, --start ARG  Start of range query.
+    -e, --end ARG    Start of range query.
 ";
 
     #[derive(Debug, RustcDecodable)]
@@ -94,6 +99,9 @@ Options:
         arg_fst: String,
         arg_query: Option<String>,
         flag_f: Option<String>,
+        flag_count: bool,
+        flag_start: Option<String>,
+        flag_end: Option<String>,
     }
 
     pub fn run(argv: Vec<String>) -> Result<(), Error> {
@@ -103,17 +111,50 @@ Options:
 
         let mut wtr = try!(util::get_buf_writer(None));
         let fst = try!(fst::Fst::from_file_path(args.arg_fst));
-        let qpath = args.flag_f.clone().expect("-f is required for now");
-        let qrdr = io::BufReader::new(fs::File::open(qpath).unwrap());
-
         let mut hits = 0;
-        for query in qrdr.lines().map(|line| line.unwrap()) {
+
+        if let Some(ref qpath) = args.flag_f {
+            let qrdr = io::BufReader::new(fs::File::open(qpath).unwrap());
+            for query in qrdr.lines().map(|line| line.unwrap()) {
+                if fst.find(&query).is_some() {
+                    hits += 1;
+                    if !args.flag_count {
+                        try!(writeln!(wtr, "{}", query));
+                    }
+                }
+            }
+        } else if let Some(ref query) = args.arg_query {
             if fst.find(query).is_some() {
                 hits += 1;
+                if !args.flag_count {
+                    try!(writeln!(wtr, "{}", query));
+                }
+            }
+        } else {
+            let min =
+                if let Some(ref min) = args.flag_start {
+                    Bound::Included(min)
+                } else {
+                    Bound::Unbounded
+                };
+            let max =
+                if let Some(ref max) = args.flag_end {
+                    Bound::Included(max)
+                } else {
+                    Bound::Unbounded
+                };
+            let mut it = fst.range_stream(min, max);
+            while let Some((term, _)) = it.next() {
+                hits += 1;
+                if !args.flag_count {
+                    try!(wtr.write_all(term));
+                    try!(wtr.write_all(b"\n"));
+                }
             }
         }
-
-        try!(writeln!(wtr, "found: {}", hits));
+        if args.flag_count {
+            try!(writeln!(wtr, "{}", hits));
+        }
         Ok(())
     }
 }

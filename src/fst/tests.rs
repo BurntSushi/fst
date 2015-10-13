@@ -30,7 +30,7 @@ pub fn fst_map<I, S>(ss: I) -> Fst
 
 pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
     let mut words = vec![];
-    let mut rdr = fst.reader();
+    let mut rdr = fst.stream();
     while let Some((word, _)) = rdr.next() {
         words.push(word.to_vec());
     }
@@ -39,7 +39,7 @@ pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
 
 pub fn fst_input_strs(fst: &Fst) -> Vec<String> {
     let mut words = vec![];
-    let mut rdr = fst.reader();
+    let mut rdr = fst.stream();
     while let Some((word, _)) = rdr.next() {
         words.push(::std::str::from_utf8(word).unwrap().to_owned());
     }
@@ -48,7 +48,7 @@ pub fn fst_input_strs(fst: &Fst) -> Vec<String> {
 
 pub fn fst_inputs_outputs(fst: &Fst) -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
-    let mut rdr = fst.reader();
+    let mut rdr = fst.stream();
     while let Some((word, out)) = rdr.next() {
         words.push((word.to_vec(), out.value()));
     }
@@ -57,7 +57,7 @@ pub fn fst_inputs_outputs(fst: &Fst) -> Vec<(Vec<u8>, u64)> {
 
 pub fn fst_inputstrs_outputs(fst: &Fst) -> Vec<(String, u64)> {
     let mut words = vec![];
-    let mut rdr = fst.reader();
+    let mut rdr = fst.stream();
     while let Some((word, out)) = rdr.next() {
         let word = ::std::str::from_utf8(word).unwrap().to_owned();
         words.push((word, out.value()));
@@ -71,7 +71,7 @@ macro_rules! test_set {
         fn $name() {
             let mut items = vec![$($s),*];
             let fst = fst_set(&items);
-            let mut rdr = fst.reader();
+            let mut rdr = fst.stream();
             items.sort();
             items.dedup();
             for item in &items {
@@ -127,7 +127,7 @@ macro_rules! test_map {
         #[test]
         fn $name() {
             let fst = fst_map(vec![$(($s, $o)),*]);
-            let mut rdr = fst.reader();
+            let mut rdr = fst.stream();
             $({
                 let (s, o) = rdr.next().unwrap();
                 assert_eq!((s, o.value()), ($s.as_bytes(), $o));
@@ -219,7 +219,7 @@ fn invalid_format() {
 #[test]
 fn fst_set_zero() {
     let fst = fst_set::<_, String>(vec![]);
-    let mut rdr = fst.reader();
+    let mut rdr = fst.stream();
     assert_eq!(rdr.next(), None);
 }
 
@@ -239,7 +239,7 @@ macro_rules! test_range {
                 items.into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
             let fst = fst_map(items.clone());
-            let mut rdr = fst.range::<&'static str>($min, $max);
+            let mut rdr = fst.range_stream::<&'static str>($min, $max);
             for i in $imin..$imax {
                 assert_eq!(rdr.next().unwrap(),
                            (items[i].0.as_bytes(), Output::new(items[i].1)));
@@ -477,7 +477,8 @@ fn scratch() {
     // bfst.add("abe").unwrap();
 
     let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
-    let mut rdr = fst.range(Bound::Included("a"), Bound::Excluded("abd"));
+    let mut rdr = fst.range_stream(
+        Bound::Included("a"), Bound::Excluded("abd"));
 
     println!("-------------------------");
     while let Some((k, _)) = rdr.next() {

@@ -58,7 +58,7 @@ struct Union<'f> {
 impl<'f> Union<'f> {
     fn new<I: IntoIterator<Item=&'f Fst>>(fsts: I) -> Union<'f> {
         let mut u = Union {
-            rdrs: fsts.into_iter().map(Fst::reader).collect(),
+            rdrs: fsts.into_iter().map(Fst::stream).collect(),
             heap: BinaryHeap::new(),
         };
         for i in 0..u.rdrs.len() {

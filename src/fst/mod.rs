@@ -109,11 +109,11 @@ impl Fst {
         }
     }
 
-    pub fn reader(&self) -> FstReader {
-        self.range::<&[u8]>(Bound::Unbounded, Bound::Unbounded)
+    pub fn stream(&self) -> FstReader {
+        self.range_stream::<&[u8]>(Bound::Unbounded, Bound::Unbounded)
     }
 
-    pub fn range<T>(
+    pub fn range_stream<T>(
         &self,
         min: Bound<T>,
         max: Bound<T>,
@@ -123,6 +123,7 @@ impl Fst {
     }
 }
 
+#[derive(Debug)]
 pub enum Bound<T> {
     Included(T),
     Excluded(T),

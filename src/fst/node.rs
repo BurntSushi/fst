@@ -838,7 +838,7 @@ mod tests {
                 bfst.add(word).unwrap();
             }
             let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
-            let mut rdr = fst.reader();
+            let mut rdr = fst.stream();
             let mut words = vec![];
             while let Some(w) = rdr.next() {
                 words.push(w.0.to_owned());

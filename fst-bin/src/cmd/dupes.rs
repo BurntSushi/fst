@@ -3,7 +3,7 @@ use std::io::Write;
 
 use bit_set::BitSet;
 use docopt::Docopt;
-use fst::fst;
+use fst::raw as fst;
 
 use util;
 use Error;

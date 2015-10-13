@@ -9,4 +9,4 @@ extern crate memmap;
 pub use error::{Error, Result};
 
 mod error;
-pub mod fst;
+pub mod raw;

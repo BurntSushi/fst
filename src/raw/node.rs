@@ -6,10 +6,10 @@ use std::ops::Range;
 use byteorder::WriteBytesExt;
 use memchr::memchr;
 
-use fst::{CompiledAddr, Output, Transition};
-use fst::build::BuilderNode;
-use fst::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
-use fst::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
+use raw::{CompiledAddr, Output, Transition};
+use raw::build::BuilderNode;
+use raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
+use raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
 
 #[derive(Clone, Copy)]
 pub struct Node<'b> {
@@ -821,9 +821,9 @@ fn common_input(idx: u8) -> Option<u8> {
 mod tests {
     use quickcheck::{TestResult, quickcheck};
 
-    use fst::{Builder, Transition, CompiledAddr, Fst, Output};
-    use fst::build::BuilderNode;
-    use fst::node::{Node, node_new};
+    use raw::{Builder, Transition, CompiledAddr, Fst, Output};
+    use raw::build::BuilderNode;
+    use raw::node::{Node, node_new};
 
     const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
 

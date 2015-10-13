@@ -6,7 +6,7 @@ pub mod mkset {
     use std::io::{BufRead, Write};
 
     use docopt::Docopt;
-    use fst::fst;
+    use fst::raw as fst;
 
     use util;
     use Error;
@@ -40,7 +40,7 @@ pub mod words {
     use std::io::Write;
 
     use docopt::Docopt;
-    use fst::fst;
+    use fst::raw as fst;
 
     use util;
     use Error;
@@ -77,7 +77,7 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
-    use fst::fst;
+    use fst::raw as fst;
 
     use util;
     use Error;
@@ -158,7 +158,7 @@ pub mod union {
     use std::io::Write;
 
     use docopt::Docopt;
-    use fst::fst;
+    use fst::raw as fst;
 
     use util;
     use Error;

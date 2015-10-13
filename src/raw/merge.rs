@@ -2,8 +2,8 @@ use std::cmp;
 use std::collections::BinaryHeap;
 use std::io;
 
-use fst::build::Builder;
-use fst::{Fst, FstStream, Output};
+use raw::build::Builder;
+use raw::{Fst, FstStream, Output};
 use Result;
 
 pub fn union_ignore_outputs<'f, W, I>(
@@ -142,9 +142,9 @@ impl Ord for Slot {
 
 #[cfg(test)]
 mod tests {
-    use fst::build::Builder;
-    use fst::tests::{fst_map, fst_set, fst_inputstrs_outputs, fst_input_strs};
-    use fst::Fst;
+    use raw::build::Builder;
+    use raw::tests::{fst_map, fst_set, fst_inputstrs_outputs, fst_input_strs};
+    use raw::Fst;
     use super::{union_ignore_outputs, union_with_outputs};
 
     fn s(string: &str) -> String { string.to_owned() }

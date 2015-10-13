@@ -3,7 +3,7 @@
 extern crate fst;
 extern crate test;
 
-use fst::fst::{Builder, Fst};
+use fst::raw::{Builder, Fst};
 use test::Bencher;
 
 const WORDS: &'static str = include_str!("./../data/words-10000");

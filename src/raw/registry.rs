@@ -1,5 +1,5 @@
-use fst::{NONE_STATE, CompiledAddr};
-use fst::build::BuilderNode;
+use raw::{NONE_STATE, CompiledAddr};
+use raw::build::BuilderNode;
 
 #[derive(Debug)]
 pub struct Registry {
@@ -111,8 +111,8 @@ impl RegistryCell {
 
 #[cfg(test)]
 mod tests {
-    use fst::{Output, Transition};
-    use fst::build::BuilderNode;
+    use raw::{Output, Transition};
+    use raw::build::BuilderNode;
     use super::{
         Registry, RegistryCell, RegistryEntry, RegistryMru,
     };

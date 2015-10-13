@@ -1,5 +1,5 @@
 use error::Error;
-use fst::{Builder, Bound, Fst, FstStream, Output};
+use raw::{Builder, Bound, Fst, FstStream, Output};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 

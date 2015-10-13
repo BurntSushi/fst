@@ -8,8 +8,8 @@
 
 use std::collections::hash_map::{Entry, HashMap};
 
-use fst::CompiledAddr;
-use fst::build::BuilderNode;
+use raw::CompiledAddr;
+use raw::build::BuilderNode;
 
 #[derive(Debug)]
 pub struct Registry {

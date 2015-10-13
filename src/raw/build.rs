@@ -3,9 +3,9 @@ use std::io::{self, Write};
 use byteorder::{WriteBytesExt, LittleEndian};
 
 use error::{Error, Result};
-use fst::{VERSION, NONE_STATE, CompiledAddr, Output, Transition};
-use fst::counting_writer::CountingWriter;
-use fst::registry::{Registry, RegistryEntry};
+use raw::{VERSION, NONE_STATE, CompiledAddr, Output, Transition};
+use raw::counting_writer::CountingWriter;
+use raw::registry::{Registry, RegistryEntry};
 
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.

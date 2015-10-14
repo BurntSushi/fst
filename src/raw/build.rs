@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use byteorder::{WriteBytesExt, LittleEndian};
 
 use error::{Error, Result};
-use raw::{VERSION, NONE_STATE, CompiledAddr, Output, Transition};
+use raw::{VERSION, NONE_ADDRESS, CompiledAddr, FstType, Output, Transition};
 use raw::counting_writer::CountingWriter;
 use raw::registry::{Registry, RegistryEntry};
 
@@ -69,16 +69,22 @@ impl Builder<Vec<u8>> {
 
 impl<W: io::Write> Builder<W> {
     pub fn new(wtr: W) -> Result<Builder<W>> {
+        Builder::new_type(wtr, 0)
+    }
+
+    pub fn new_type(wtr: W, ty: FstType) -> Result<Builder<W>> {
         let mut wtr = CountingWriter::new(wtr);
         // Don't allow any nodes to have address 0-7. We use these to encode
         // the API version.
         try!(wtr.write_u64::<LittleEndian>(VERSION));
+        // Similarly for 8-15 for the fst type.
+        try!(wtr.write_u64::<LittleEndian>(ty));
         Ok(Builder {
             wtr: wtr,
             unfinished: UnfinishedNodes::new(),
-            registry: Registry::new(10_000, 5),
+            registry: Registry::new(5_000, 1),
             last: None,
-            last_addr: NONE_STATE,
+            last_addr: NONE_ADDRESS,
         })
     }
 
@@ -91,7 +97,7 @@ impl<W: io::Write> Builder<W> {
         try!(self.compile_from(0));
         let mut root_node = self.unfinished.pop_root();
         let root_addr = try!(self.compile(&root_node));
-        try!(self.wtr.write_u64::<LittleEndian>(root_addr));
+        try!(self.wtr.write_u64::<LittleEndian>(root_addr as u64));
         try!(self.wtr.flush());
         Ok(self.wtr.into_inner())
     }
@@ -133,16 +139,16 @@ impl<W: io::Write> Builder<W> {
     }
 
     fn compile_from(&mut self, istate: usize) -> Result<()> {
-        let mut addr = NONE_STATE;
+        let mut addr = NONE_ADDRESS;
         while istate + 1 < self.unfinished.len() {
             let node =
-                if addr == NONE_STATE {
+                if addr == NONE_ADDRESS {
                     self.unfinished.pop_empty()
                 } else {
                     self.unfinished.pop_freeze(addr)
                 };
             addr = try!(self.compile(&node));
-            assert!(addr != NONE_STATE);
+            assert!(addr != NONE_ADDRESS);
         }
         self.unfinished.top_last_freeze(addr);
         Ok(())

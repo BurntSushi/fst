@@ -21,14 +21,24 @@ mod registry;
 mod registry_minimal;
 #[cfg(test)] mod tests;
 
-const VERSION: u64 = 1;
-const NONE_STATE: CompiledAddr = 1;
+pub const VERSION: u64 = 1;
+pub const NONE_ADDRESS: CompiledAddr = 1;
 
-pub type CompiledAddr = u64;
+/// FstType is a convention used to indicate the type of the underlying
+/// transducer.
+///
+/// This crate reserves the range 0-255 (inclusive) but currently leaves the
+/// meaning of 0-255 unspecified.
+pub type FstType = u64;
+
+/// CompiledAddr is the type used to address nodes in a finite state
+/// transducer.
+pub type CompiledAddr = usize;
 
 pub struct Fst {
     data: FstData,
     root_addr: CompiledAddr,
+    ty: FstType,
 }
 
 impl Fst {
@@ -43,14 +53,14 @@ impl Fst {
 
 impl Fst {
     fn new(data: FstData) -> Result<Self> {
-        if data.as_slice().len() < 16 {
+        if data.as_slice().len() < 24 {
             return Err(Error::Format);
         }
         // The read_u64 unwraps below are OK because they can never fail.
         // They can only fail when there is an IO error or if there is an
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
-        // 16 bytes (no unexpected EOF).
+        // 24 bytes (no unexpected EOF).
         let version = data.as_slice().read_u64::<LittleEndian>().unwrap();
         if version != VERSION {
             return Err(Error::Version {
@@ -58,13 +68,15 @@ impl Fst {
                 got: version,
             });
         }
+        let ty = (&data.as_slice()[8..]).read_u64::<LittleEndian>().unwrap();
         let root_addr = {
             let mut last = &data.as_slice()[data.as_slice().len() - 8..];
             last.read_u64::<LittleEndian>().unwrap()
         };
         Ok(Fst {
             data: data,
-            root_addr: root_addr,
+            root_addr: u64_to_usize(root_addr),
+            ty: ty,
         })
     }
 
@@ -92,8 +104,12 @@ impl Fst {
         FstStreamBuilder::new(self).into_stream()
     }
 
-    pub fn range<'a>(&'a self) -> FstStreamBuilder<'a> {
+    pub fn range(&self) -> FstStreamBuilder {
         FstStreamBuilder::new(self)
+    }
+
+    pub fn fst_type(&self) -> FstType {
+        self.ty
     }
 
     pub fn root(&self) -> Node {
@@ -410,7 +426,7 @@ impl Default for Transition {
         Transition {
             inp: 0,
             out: Output::zero(),
-            addr: NONE_STATE,
+            addr: NONE_ADDRESS,
         }
     }
 }
@@ -424,4 +440,23 @@ impl fmt::Debug for Transition {
                    self.inp as char, self.out.value(), self.addr)
         }
     }
+}
+
+#[inline]
+#[cfg(target_pointer_width = "64")]
+fn u64_to_usize(n: u64) -> usize {
+    n as usize
+}
+
+#[inline]
+#[cfg(not(target_pointer_width = "64"))]
+fn u64_to_usize(n: u64) -> usize {
+    if n > ::std::usize::MAX as u64 {
+        panic!("\
+Cannot convert node address {} to a pointer sized variable. If this FST
+is very large and was generated on a system with a larger pointer size
+than this system, then it is not possible to read this FST on this
+system.", n);
+    }
+    n as usize
 }

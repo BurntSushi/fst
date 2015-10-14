@@ -6,7 +6,7 @@ use std::ops::Range;
 use byteorder::WriteBytesExt;
 use memchr::memchr;
 
-use raw::{CompiledAddr, Output, Transition};
+use raw::{CompiledAddr, Output, Transition, u64_to_usize};
 use raw::build::BuilderNode;
 use raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
 use raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
@@ -40,8 +40,8 @@ impl<'b> fmt::Debug for Node<'b> {
 /// not to consumers of this crate.
 pub fn node_new(addr: CompiledAddr, data: &[u8]) -> Node {
     Node {
-        data: &data[..addr as usize + 1],
-        state: State::from_u8(data[addr as usize]),
+        data: &data[..addr + 1],
+        state: State::from_u8(data[addr]),
     }
 }
 
@@ -395,7 +395,7 @@ impl StateOneTransFinal {
         try!(pack_uint_in(&mut wtr, trans_output, osize));
 
         let delta_addr = addr - trans.addr;
-        let tsize = try!(pack_uint(&mut wtr, delta_addr));
+        let tsize = try!(pack_uint(&mut wtr, delta_addr as u64));
 
         let mut pack_sizes = PackSizes::new();
         pack_sizes.set_output_pack_size(osize);
@@ -470,7 +470,7 @@ impl StateOneTransFinal {
                 - 1 // pack size
                 - tsize;
         let delta = unpack_uint(&node.data[i..], tsize as u8).unwrap();
-        self.end_addr(node) as CompiledAddr - delta
+        self.end_addr(node) - u64_to_usize(delta)
     }
 
     fn end_addr(&self, node: &Node) -> usize {
@@ -491,7 +491,7 @@ impl StateOneTrans {
         let output_pack_size = try!(pack_uint(&mut wtr, out));
 
         let delta_addr = addr - trans.addr;
-        let trans_pack_size = try!(pack_uint(&mut wtr, delta_addr));
+        let trans_pack_size = try!(pack_uint(&mut wtr, delta_addr as u64));
 
         let mut pack_sizes = PackSizes::new();
         pack_sizes.set_output_pack_size(output_pack_size);
@@ -556,7 +556,7 @@ impl StateOneTrans {
                 - 1 // pack size
                 - tsize;
         let delta = unpack_uint(&node.data[i..], tsize as u8).unwrap();
-        self.end_addr(node) as CompiledAddr - delta
+        self.end_addr(node) - u64_to_usize(delta)
     }
 
     fn end_addr(&self, node: &Node) -> usize {
@@ -579,7 +579,7 @@ impl StateAnyTrans {
         let mut osize = pack_size(node.final_output.encode());
         let mut any_outs = !node.final_output.is_zero();
         for t in &node.trans {
-            tsize = cmp::max(tsize, pack_size(addr - t.addr));
+            tsize = cmp::max(tsize, pack_size((addr - t.addr) as u64));
             osize = cmp::max(osize, pack_size(t.out.encode()));
             any_outs = any_outs || !t.out.is_zero();
         }
@@ -603,7 +603,7 @@ impl StateAnyTrans {
             }
         }
         for t in node.trans.iter().rev() {
-            try!(pack_uint_in(&mut wtr, addr - t.addr, tsize));
+            try!(pack_uint_in(&mut wtr, (addr - t.addr) as u64, tsize));
         }
         for t in node.trans.iter().rev() {
             try!(wtr.write_u8(t.inp));
@@ -730,7 +730,7 @@ impl StateAnyTrans {
                  - (i * tsize) // the previous transition addresses
                  - tsize; // the desired transition address
         let delta = unpack_uint(&node.data[at..], tsize as u8).unwrap();
-        self.end_addr(node) as CompiledAddr - delta
+        self.end_addr(node) - u64_to_usize(delta)
     }
 
     fn end_addr(&self, node: &Node) -> usize {

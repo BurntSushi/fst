@@ -1,4 +1,4 @@
-use raw::{NONE_STATE, CompiledAddr};
+use raw::{NONE_ADDRESS, CompiledAddr};
 use raw::build::BuilderNode;
 
 #[derive(Debug)]
@@ -68,18 +68,28 @@ impl Registry {
 
 impl<'a> RegistryMru<'a> {
     fn entry(mut self, node: &BuilderNode) -> RegistryEntry<'a> {
-        let find = |c: &RegistryCell| !c.is_none() && &c.node == node;
-        if let Some(i) = self.cells.iter().position(find) {
-            let addr = self.cells[i].addr;
-            self.promote(i); // most recently used
-            RegistryEntry::Found(addr)
-        } else {
-            let last = self.cells.len() - 1;
-            if self.cells[last].is_none() {
-                self.promote(last);
+        if self.cells.len() == 1 {
+            let cell = &mut self.cells[0];
+            if !cell.is_none() && &cell.node == node {
+                RegistryEntry::Found(cell.addr)
+            } else {
+                cell.node.clone_from(node);
+                RegistryEntry::NotFound(cell)
             }
-            self.cells[0].node.clone_from(node); // discard MRU
-            RegistryEntry::NotFound(&mut self.cells[0])
+        } else {
+            let find = |c: &RegistryCell| !c.is_none() && &c.node == node;
+            if let Some(i) = self.cells.iter().position(find) {
+                let addr = self.cells[i].addr;
+                self.promote(i); // most recently used
+                RegistryEntry::Found(addr)
+            } else {
+                let last = self.cells.len() - 1;
+                if self.cells[last].is_none() {
+                    self.promote(last);
+                }
+                self.cells[0].node.clone_from(node); // discard MRU
+                RegistryEntry::NotFound(&mut self.cells[0])
+            }
         }
     }
 
@@ -95,13 +105,13 @@ impl<'a> RegistryMru<'a> {
 impl RegistryCell {
     fn none() -> RegistryCell {
         RegistryCell {
-            addr: NONE_STATE,
+            addr: NONE_ADDRESS,
             node: BuilderNode::default(),
         }
     }
 
     fn is_none(&self) -> bool {
-        self.addr == NONE_STATE
+        self.addr == NONE_ADDRESS
     }
 
     pub fn insert(&mut self, addr: CompiledAddr) {

@@ -5,6 +5,8 @@ use std::str;
 
 use byteorder;
 
+use raw;
+
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 #[derive(Debug)]
@@ -15,6 +17,7 @@ pub enum Error {
     Value { got: u64 },
     DuplicateKey { got: Vec<u8> },
     OutOfOrder { previous: Vec<u8>, got: Vec<u8> },
+    WrongType { expected: raw::FstType, got: raw::FstType },
 }
 
 impl From<io::Error> for Error {
@@ -37,9 +40,10 @@ impl fmt::Display for Error {
             Version { expected, got } => {
                 write!(f, "\
 Error opening FST: expected API version {}, got API version {}.
-It looks like the FST you're trying to open was generated with a different
-version of the 'fst' crate. You'll either need to change the version of the
-'fst' crate you're using, or re-generate the FST.", expected, got)
+It looks like the FST you're trying to open is either not an FST file or it
+was generated with a different version of the 'fst' crate. You'll either need
+to change the version of the 'fst' crate you're using, or re-generate the
+FST.", expected, got)
             }
             Format => write!(f, "\
 Error opening FST: An unknown error occurred. This usually means you're trying
@@ -53,6 +57,8 @@ Error inserting duplicate key: {}.", format_bytes(&*got)),
 Error inserting out-of-order key: {}. (Previous key was {}.) Keys must be
 inserted in lexicographic order.",
 format_bytes(&*got), format_bytes(&*previous)),
+            WrongType { expected, got } => write!(f, "\
+Error opening FST: expected type {}, got type {}.", expected, got),
         }
     }
 }
@@ -67,6 +73,7 @@ impl error::Error for Error {
             Value { .. } => "invalid value",
             DuplicateKey { .. } => "duplicate key insertion",
             OutOfOrder { .. } => "out-of-order key insertion",
+            WrongType { .. } => "incompatible type found when opening FST",
         }
     }
 

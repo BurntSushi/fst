@@ -47,10 +47,10 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     let mut stack = vec![fst.root().addr()];
     while let Some(addr) = stack.pop() {
-        if set.contains(&(addr as usize)) {
+        if set.contains(&addr) {
             continue;
         }
-        set.insert(addr as usize);
+        set.insert(addr);
 
         let full_node = FullNode::from_node(&fst.node(addr));
         for t in &full_node.trans {

@@ -36,10 +36,10 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         try!(wtr.encode(("addr_in", "addr_out", "input", "output")));
         let mut stack = vec![fst.root().addr()];
         while let Some(addr) = stack.pop() {
-            if set.contains(&(addr as usize)) {
+            if set.contains(&addr) {
                 continue;
             }
-            set.insert(addr as usize);
+            set.insert(addr);
             for t in fst.node(addr).transitions() {
                 stack.push(t.addr);
                 try!(wtr.encode((
@@ -54,10 +54,10 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         )));
         let mut stack = vec![fst.root().addr()];
         while let Some(addr) = stack.pop() {
-            if set.contains(&(addr as usize)) {
+            if set.contains(&addr) {
                 continue;
             }
-            set.insert(addr as usize);
+            set.insert(addr);
             let node = fst.node(addr);
             for t in node.transitions() {
                 stack.push(t.addr);

@@ -3,10 +3,10 @@ pub mod dot;
 pub mod dupes;
 
 pub mod mkset {
-    use std::io::{BufRead, Write};
+    use std::io::BufRead;
 
     use docopt::Docopt;
-    use fst::raw as fst;
+    use fst::SetBuilder;
 
     use util;
     use Error;
@@ -27,11 +27,11 @@ Usage: fst mkset [options] [<input>] [<output>]
                                 .unwrap_or_else(|e| e.exit());
         let rdr = try!(util::get_buf_reader(args.arg_input));
         let wtr = try!(util::get_buf_writer(args.arg_output));
-        let mut bfst = try!(fst::Builder::new(wtr));
+        let mut set = try!(SetBuilder::new(wtr));
         for line in rdr.lines() {
-            try!(bfst.add(try!(line)));
+            try!(set.insert(try!(line)));
         }
-        try!(try!(bfst.into_inner()).flush());
+        try!(set.finish());
         Ok(())
     }
 }

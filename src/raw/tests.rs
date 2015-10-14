@@ -200,7 +200,7 @@ fn fst_map_100000_lengths() {
 
 #[test]
 fn invalid_version() {
-    match Fst::from_bytes(vec![0; 16]) {
+    match Fst::from_bytes(vec![0; 24]) {
         Err(Error::Version { expected, got }) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
@@ -456,32 +456,4 @@ test_range! {
     min: Bound::Included(vec![b'c']), max: Bound::Excluded(vec![b'd']),
     imin: 2, imax: 3,
     "a", "b", "c", "d", "e", "f"
-}
-
-#[test]
-fn scratch() {
-    let mut bfst = Builder::memory();
-
-    // bfst.add("").unwrap();
-    bfst.add("a").unwrap();
-    // bfst.add("b").unwrap();
-    // bfst.add("c").unwrap();
-    // bfst.add("d").unwrap();
-    // bfst.add("e").unwrap();
-    bfst.add("ab").unwrap();
-    bfst.add("abc").unwrap();
-    bfst.add("abcd").unwrap();
-    bfst.add("abcde").unwrap();
-    bfst.add("abd").unwrap();
-    // bfst.add("abdxyz").unwrap();
-    // bfst.add("abe").unwrap();
-
-    let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
-    let mut rdr = fst.range().ge("a").lt("abd").into_stream();
-
-    println!("-------------------------");
-    while let Some((k, _)) = rdr.next() {
-        println!("{}", ::std::str::from_utf8(k).unwrap());
-    }
-    println!("-------------------------");
 }

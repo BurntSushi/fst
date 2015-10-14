@@ -36,10 +36,10 @@ digraph automaton {{
     rankdir="LR";
 "#).unwrap();
     while let Some(addr) = stack.pop() {
-        if set.contains(&(addr as usize)) {
+        if set.contains(&addr) {
             continue;
         }
-        set.insert(addr as usize);
+        set.insert(addr);
 
         let node = fst.node(addr);
         if node.is_final() {

@@ -7,15 +7,15 @@ use memmap::{Mmap, Protection};
 
 use error::{Error, Result};
 pub use self::build::Builder;
-pub use self::merge::{UnionOutput, union_ignore_outputs, union_with_outputs};
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
+pub use self::ops::{FstOutput, FstStreamIntersection, FstStreamUnion};
 
 mod build;
 mod common_inputs;
 mod counting_writer;
-mod merge;
 mod node;
+mod ops;
 mod pack;
 mod registry;
 mod registry_minimal;

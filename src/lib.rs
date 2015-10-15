@@ -8,8 +8,10 @@ extern crate memmap;
 
 pub use error::{Error, Result};
 pub use set::{Set, SetBuilder, SetStream, SetStreamBuilder};
+pub use stream::Stream;
 
 mod error;
 mod map;
 pub mod raw;
 mod set;
+mod stream;

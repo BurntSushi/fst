@@ -155,9 +155,8 @@ Options:
 }
 
 pub mod union {
-    use std::io::Write;
-
     use docopt::Docopt;
+    use fst::Stream;
     use fst::raw as fst;
 
     use util;
@@ -190,8 +189,12 @@ Options:
         for fst_path in &args.arg_input {
             fsts.push(try!(fst::Fst::from_file_path(fst_path)));
         }
-        try!(fst::union_ignore_outputs(&mut merged, &fsts));
-        try!(try!(merged.into_inner()).flush());
+
+        let mut union = fst::FstStreamUnion::new(&fsts);
+        while let Some((key, _)) = union.next() {
+            try!(merged.add(key));
+        }
+        try!(merged.finish());
         Ok(())
     }
 }

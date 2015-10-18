@@ -4,14 +4,17 @@ use std::io;
 use std::str;
 
 use byteorder;
+use regex_syntax;
 
 use raw;
+use RegexError;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
+    Regex(RegexError),
     Version { expected: u64, got: u64 },
     Format,
     Value { got: u64 },
@@ -26,6 +29,18 @@ impl From<io::Error> for Error {
     }
 }
 
+impl From<RegexError> for Error {
+    fn from(err: RegexError) -> Error {
+        Error::Regex(err)
+    }
+}
+
+impl From<regex_syntax::Error> for Error {
+    fn from(err: regex_syntax::Error) -> Error {
+        Error::Regex(RegexError::Syntax(err))
+    }
+}
+
 impl From<byteorder::Error> for Error {
     fn from(err: byteorder::Error) -> Error {
         Error::Io(From::from(err))
@@ -37,6 +52,7 @@ impl fmt::Display for Error {
         use self::Error::*;
         match *self {
             Io(ref err) => err.fmt(f),
+            Regex(ref err) => err.fmt(f),
             Version { expected, got } => {
                 write!(f, "\
 Error opening FST: expected API version {}, got API version {}.
@@ -68,6 +84,7 @@ impl error::Error for Error {
         use self::Error::*;
         match *self {
             Io(ref err) => err.description(),
+            Regex(ref err) => err.description(),
             Version { .. } => "incompatible version found when opening FST",
             Format => "unknown invalid format found when opening FST",
             Value { .. } => "invalid value",
@@ -80,6 +97,7 @@ impl error::Error for Error {
     fn cause(&self) -> Option<&error::Error> {
         match *self {
             Error::Io(ref err) => Some(err),
+            Error::Regex(ref err) => Some(err),
             _ => None,
         }
     }

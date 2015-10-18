@@ -29,6 +29,8 @@ bench = true
 byteorder = "0.3"
 memchr = "0.1"
 memmap = "0.2"
+regex-syntax = "0.2"
+utf8-ranges = "0.1"
 
 [dev-dependencies]
 quickcheck = "0.2"

@@ -1,4 +1,5 @@
 use error::Error;
+use automaton::{AlwaysMatch, IntoAutomaton};
 use raw::{Builder, Bound, Fst, FstStream, Output};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
@@ -239,7 +240,7 @@ macro_rules! test_range {
                 items.into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
             let fst = fst_map(items.clone());
-            let mut rdr = FstStream::new(&fst, $min, $max);
+            let mut rdr = FstStream::new(&fst, AlwaysMatch, $min, $max);
             for i in $imin..$imax {
                 assert_eq!(rdr.next().unwrap(),
                            (items[i].0.as_bytes(), Output::new(items[i].1)));
@@ -456,4 +457,17 @@ test_range! {
     min: Bound::Included(vec![b'c']), max: Bound::Excluded(vec![b'd']),
     imin: 2, imax: 3,
     "a", "b", "c", "d", "e", "f"
+}
+
+#[test]
+fn scratch() {
+    use regex::Regex;
+    let set = fst_set(vec!["abc", "abd", "ayz", "za"]);
+    let re = Regex::new("[a-d]+").unwrap();
+    println!("{:?}", re);
+    let mut rdr = FstStream::new(
+        &set, re.into_automaton(), Bound::Unbounded, Bound::Unbounded);
+    while let Some((term, _)) = rdr.next() {
+        println!("{:?}", ::std::str::from_utf8(term).unwrap());
+    }
 }

@@ -7,7 +7,7 @@ use Result;
 
 pub struct DfaBuilder {
     dfa: Dfa,
-    cache: HashMap<u64, usize>,
+    cache: HashMap<Vec<usize>, usize>,
 }
 
 pub struct Dfa {
@@ -68,41 +68,30 @@ impl DfaBuilder {
 
     fn cached_state(&mut self, set: &SparseSet) -> Option<usize> {
         use std::collections::hash_map::Entry;
-        use std::hash::{Hasher, SipHasher};
         use regex::Inst::*;
 
-        let mut hash = SipHasher::new();
+        // There are probably many ways to optimize this routine. ---AG
+
+        let mut insts = vec![];
         let mut any = false;
         let mut is_match = false;
         for i in 0..set.len() {
             let ip = set.get(i);
             match self.dfa.insts[ip] {
                 Jump(_) | Split(_, _) => {}
+                Range(_, _) => insts.push(ip),
                 Match => {
-                    any = true;
                     is_match = true;
-                    hash.write_usize(ip);
-                }
-                Range(_, _) => {
-                    any = true;
-                    hash.write_usize(ip);
+                    insts.push(ip);
                 }
             }
         }
-        if !any {
+        if insts.len() == 0 {
             return None;
         }
-        Some(match self.cache.entry(hash.finish()) {
+        Some(match self.cache.entry(insts.clone()) {
             Entry::Occupied(v) => *v.get(),
             Entry::Vacant(v) => {
-                let mut insts = vec![];
-                for i in 0..set.len() {
-                    let ip = set.get(i);
-                    match self.dfa.insts[ip] {
-                        Jump(_) | Split(_, _) => {}
-                        Match | Range(_, _) => insts.push(ip),
-                    }
-                }
                 self.dfa.states.push(State {
                     insts: insts,
                     next: [None; 256],

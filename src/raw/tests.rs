@@ -460,14 +460,11 @@ test_range! {
 }
 
 #[test]
-fn scratch() {
+fn regex_simple() {
     use regex::Regex;
     let set = fst_set(vec!["abc", "abd", "ayz", "za"]);
     let re = Regex::new("a[a-z]*").unwrap();
-    println!("{:?}", re);
-    // let mut rdr = set.search(re).into_stream();
     let mut rdr = set.search(re).ge("abd").lt("ax").into_stream();
-    while let Some((term, _)) = rdr.next() {
-        println!("{:?}", ::std::str::from_utf8(term).unwrap());
-    }
+    assert_eq!(rdr.next(), Some((&b"abd"[..], Output::zero())));
+    assert!(rdr.next().is_none());
 }

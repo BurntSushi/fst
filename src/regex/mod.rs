@@ -70,14 +70,14 @@ impl fmt::Debug for Inst {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use regex::Regex;
-
-    #[test]
-    fn scratch() {
-        // let re = Regex::new("[\u{0}-\u{10FFFF}]").unwrap();
-        let re = Regex::new(r"[a-z0-9]").unwrap();
-        println!("{:?}", re.dfa);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+    // use regex::Regex;
+//
+    // #[test]
+    // fn scratch() {
+        // // let re = Regex::new("[\u{0}-\u{10FFFF}]").unwrap();
+        // let re = Regex::new(r"[a-z0-9]").unwrap();
+        // println!("{:?}", re.dfa);
+    // }
+// }

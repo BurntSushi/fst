@@ -41,6 +41,7 @@ pub mod words {
 
     use docopt::Docopt;
     use fst::raw as fst;
+    use fst::Stream;
 
     use util;
     use Error;
@@ -77,7 +78,7 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
-    use fst::Regex;
+    use fst::{Regex, Stream};
     use fst::raw as fst;
 
     use util;

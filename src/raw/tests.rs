@@ -1,6 +1,7 @@
-use error::Error;
 use automaton::AlwaysMatch;
+use error::Error;
 use raw::{Builder, Bound, Fst, FstStream, Output};
+use stream::Stream;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 

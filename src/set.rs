@@ -3,6 +3,7 @@ use std::path::Path;
 
 use automaton::{Automaton, AlwaysMatch};
 use raw::{Builder, Fst, FstStream, FstStreamBuilder};
+use stream::Stream;
 use Result;
 
 pub struct Set(Fst);

@@ -7,6 +7,8 @@ use memmap::{Mmap, Protection};
 
 use automaton::{Automaton, AlwaysMatch};
 use error::{Error, Result};
+use stream::Stream;
+
 pub use self::build::Builder;
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
@@ -237,55 +239,6 @@ impl<'f, A: Automaton> FstStream<'f, A> {
         rdr
     }
 
-    pub fn next(&mut self) -> Option<(&[u8], Output)> {
-        if let Some(out) = self.empty_output.take() {
-            if self.end_at.exceeded_by(&[]) {
-                self.stack.clear();
-                return None;
-            }
-            if self.aut.is_match(self.aut.start()) {
-                return Some((&[], out));
-            }
-        }
-        while let Some(state) = self.stack.pop() {
-            let node = self.fst.node(state.addr);
-            if state.trans >= node.len() || state.aut_state.is_none() {
-                if node.addr() != self.fst.root_addr {
-                    self.inp.pop().unwrap();
-                }
-                continue;
-            }
-            let trans = node.transition(state.trans);
-            let out = state.out.cat(trans.out);
-            self.stack.push(FstStreamState {
-                addr: state.addr,
-                trans: state.trans + 1,
-                out: state.out,
-                aut_state: state.aut_state,
-            });
-            let next_state =
-                match self.aut.accept(state.aut_state.unwrap(), trans.inp) {
-                    None => continue,
-                    Some(state) => state,
-                };
-            self.inp.push(trans.inp);
-            self.stack.push(FstStreamState {
-                addr: trans.addr,
-                trans: 0,
-                out: out,
-                aut_state: Some(next_state),
-            });
-            if self.end_at.exceeded_by(&self.inp) {
-                return None;
-            }
-            let next_node = self.fst.node(trans.addr);
-            if next_node.is_final() && self.aut.is_match(next_state) {
-                return Some((&self.inp, out.cat(next_node.final_output())));
-            }
-        }
-        None
-    }
-
     fn seek_min(&mut self, min: Bound) {
         let (key, inclusive) = match min {
             Bound::Excluded(ref min) if min.is_empty() => {
@@ -372,6 +325,59 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                 });
             }
         }
+    }
+}
+
+impl<'f, 'a, A: Automaton> Stream<'a> for FstStream<'f, A> {
+    type Item = (&'a [u8], Output);
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        if let Some(out) = self.empty_output.take() {
+            if self.end_at.exceeded_by(&[]) {
+                self.stack.clear();
+                return None;
+            }
+            if self.aut.is_match(self.aut.start()) {
+                return Some((&[], out));
+            }
+        }
+        while let Some(state) = self.stack.pop() {
+            let node = self.fst.node(state.addr);
+            if state.trans >= node.len() || state.aut_state.is_none() {
+                if node.addr() != self.fst.root_addr {
+                    self.inp.pop().unwrap();
+                }
+                continue;
+            }
+            let trans = node.transition(state.trans);
+            let out = state.out.cat(trans.out);
+            self.stack.push(FstStreamState {
+                addr: state.addr,
+                trans: state.trans + 1,
+                out: state.out,
+                aut_state: state.aut_state,
+            });
+            let next_state =
+                match self.aut.accept(state.aut_state.unwrap(), trans.inp) {
+                    None => continue,
+                    Some(state) => state,
+                };
+            self.inp.push(trans.inp);
+            self.stack.push(FstStreamState {
+                addr: trans.addr,
+                trans: 0,
+                out: out,
+                aut_state: Some(next_state),
+            });
+            if self.end_at.exceeded_by(&self.inp) {
+                return None;
+            }
+            let next_node = self.fst.node(trans.addr);
+            if next_node.is_final() && self.aut.is_match(next_state) {
+                return Some((&self.inp, out.cat(next_node.final_output())));
+            }
+        }
+        None
     }
 }
 

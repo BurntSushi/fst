@@ -1,6 +1,7 @@
 use std::io;
 use std::path::Path;
 
+use automaton::{Automaton, AlwaysMatch};
 use raw::{Builder, Fst, FstStream, FstStreamBuilder};
 use Result;
 
@@ -21,6 +22,10 @@ impl Set {
 
     pub fn stream(&self) -> SetStream {
         SetStream(self.0.stream())
+    }
+
+    pub fn search<A: Automaton>(&self, aut: A) -> SetStreamBuilder<A> {
+        SetStreamBuilder(self.0.search(aut))
     }
 
     pub fn range(&self) -> SetStreamBuilder {
@@ -54,18 +59,18 @@ impl<W: io::Write> SetBuilder<W> {
     }
 }
 
-pub struct SetStream<'s>(FstStream<'s>);
+pub struct SetStream<'s, A=AlwaysMatch>(FstStream<'s, A>) where A: Automaton;
 
-impl<'s> SetStream<'s> {
+impl<'s, A: Automaton> SetStream<'s, A> {
     pub fn next(&mut self) -> Option<&[u8]> {
         self.0.next().map(|(key, _)| key)
     }
 }
 
-pub struct SetStreamBuilder<'s>(FstStreamBuilder<'s>);
+pub struct SetStreamBuilder<'s, A=AlwaysMatch>(FstStreamBuilder<'s, A>);
 
-impl<'s> SetStreamBuilder<'s> {
-    pub fn into_stream(self) -> SetStream<'s> {
+impl<'s, A: Automaton> SetStreamBuilder<'s, A> {
+    pub fn into_stream(self) -> SetStream<'s, A> {
         SetStream(self.0.into_stream())
     }
 

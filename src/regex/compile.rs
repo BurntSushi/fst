@@ -174,20 +174,21 @@ impl Compiler {
     fn compile_class_range(&mut self, char_range: &ClassRange) -> Result<()> {
         let mut it = Utf8Sequences::new(char_range.start, char_range.end)
                                    .peekable();
-        let (mut jmps, mut splits, mut starts) = (vec![], vec![], vec![]);
+        let mut jmps = vec![];
         let mut utf8_ranges = it.next().expect("non-empty char class");
         while it.peek().is_some() {
-            splits.push(self.empty_split());
-            starts.push(self.insts.len());
+            let split = self.empty_split();
+            let j1 = self.insts.len();
             self.compile_utf8_ranges(&utf8_ranges);
             jmps.push(self.empty_jump());
+            let j2 = self.insts.len();
+            self.set_split(split, j1, j2);
             utf8_ranges = it.next().unwrap(); // because peek says so
         }
         self.compile_utf8_ranges(&utf8_ranges);
         let end = self.insts.len();
-        for i in 0..jmps.len() {
-            self.set_jump(jmps[i], end);
-            self.set_split(splits[i], starts[i], end);
+        for jmp in jmps {
+            self.set_jump(jmp, end);
         }
         Ok(())
     }

@@ -77,6 +77,7 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
+    use fst::Regex;
     use fst::raw as fst;
 
     use util;
@@ -92,6 +93,7 @@ Options:
     -c, --count         Only show a count of hits instead of printing them.
     -s, --start ARG     Start of range query.
     -e, --end ARG       Start of range query.
+    --regex             Interpret query as a regex.
 ";
 
     #[derive(Debug, RustcDecodable)]
@@ -102,6 +104,7 @@ Options:
         flag_count: bool,
         flag_start: Option<String>,
         flag_end: Option<String>,
+        flag_regex: bool,
     }
 
     pub fn run(argv: Vec<String>) -> Result<(), Error> {
@@ -123,11 +126,29 @@ Options:
                     }
                 }
             }
-        } else if let Some(ref query) = args.arg_query {
+        } else if !args.flag_regex && args.arg_query.is_some() {
+            let query = args.arg_query.as_ref().unwrap();
             if fst.find(query).is_some() {
                 hits += 1;
                 if !args.flag_count {
                     try!(writeln!(wtr, "{}", query));
+                }
+            }
+        } else if args.flag_regex && args.arg_query.is_some() {
+            let re = try!(Regex::new(args.arg_query.as_ref().unwrap()));
+            let mut range = fst.search(re);
+            if let Some(ref min) = args.flag_start {
+                range = range.ge(min);
+            }
+            if let Some(ref max) = args.flag_end {
+                range = range.le(max);
+            }
+            let mut it = range.into_stream();
+            while let Some((term, _)) = it.next() {
+                hits += 1;
+                if !args.flag_count {
+                    try!(wtr.write_all(term));
+                    try!(wtr.write_all(b"\n"));
                 }
             }
         } else {

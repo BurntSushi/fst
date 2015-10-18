@@ -1,5 +1,5 @@
 use error::Error;
-use automaton::{AlwaysMatch, IntoAutomaton};
+use automaton::AlwaysMatch;
 use raw::{Builder, Bound, Fst, FstStream, Output};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
@@ -463,10 +463,10 @@ test_range! {
 fn scratch() {
     use regex::Regex;
     let set = fst_set(vec!["abc", "abd", "ayz", "za"]);
-    let re = Regex::new("[a-d]+").unwrap();
+    let re = Regex::new("a[a-z]*").unwrap();
     println!("{:?}", re);
-    let mut rdr = FstStream::new(
-        &set, re.into_automaton(), Bound::Unbounded, Bound::Unbounded);
+    // let mut rdr = set.search(re).into_stream();
+    let mut rdr = set.search(re).ge("abd").lt("ax").into_stream();
     while let Some((term, _)) = rdr.next() {
         println!("{:?}", ::std::str::from_utf8(term).unwrap());
     }

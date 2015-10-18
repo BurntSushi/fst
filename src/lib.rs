@@ -8,9 +8,10 @@ extern crate memmap;
 extern crate regex_syntax;
 extern crate utf8_ranges;
 
-pub use automaton::{Automaton, IntoAutomaton};
+pub use automaton::Automaton;
 pub use error::{Error, Result};
 pub use regex::Error as RegexError;
+pub use regex::Regex;
 pub use set::{Set, SetBuilder, SetStream, SetStreamBuilder};
 pub use stream::Stream;
 

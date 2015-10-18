@@ -5,7 +5,7 @@ use std::path::Path;
 use byteorder::{ReadBytesExt, LittleEndian};
 use memmap::{Mmap, Protection};
 
-use automaton::{Automaton, AlwaysMatch, IntoAutomaton};
+use automaton::{Automaton, AlwaysMatch};
 use error::{Error, Result};
 pub use self::build::Builder;
 pub use self::node::{Node, Transitions};
@@ -101,9 +101,9 @@ impl Fst {
         }
     }
 
-    // pub fn search<A: Automaton>(&self, aut: A) -> FstStreamAutomaton<A> {
-        // FstStreamAutomaton
-    // }
+    pub fn search<A: Automaton>(&self, aut: A) -> FstStreamBuilder<A> {
+        FstStreamBuilder::new(self, aut)
+    }
 
     pub fn stream(&self) -> FstStream {
         FstStreamBuilder::new(self, AlwaysMatch).into_stream()
@@ -146,7 +146,7 @@ pub struct FstStreamBuilder<'a, A=AlwaysMatch> {
     max: Bound,
 }
 
-impl<'a, A: IntoAutomaton> FstStreamBuilder<'a, A> {
+impl<'a, A: Automaton> FstStreamBuilder<'a, A> {
     fn new(fst: &'a Fst, aut: A) -> Self {
         FstStreamBuilder {
             fst: fst,
@@ -156,7 +156,7 @@ impl<'a, A: IntoAutomaton> FstStreamBuilder<'a, A> {
         }
     }
 
-    pub fn into_stream(self) -> FstStream<'a, A::IntoAuto> {
+    pub fn into_stream(self) -> FstStream<'a, A> {
         FstStream::new(self.fst, self.aut, self.min, self.max)
     }
 
@@ -220,15 +220,14 @@ struct FstStreamState<S> {
     addr: CompiledAddr,
     trans: usize,
     out: Output,
-    aut_state: S,
+    aut_state: Option<S>,
 }
 
 impl<'f, A: Automaton> FstStream<'f, A> {
-    fn new<I>(fst: &'f Fst, aut: I, min: Bound, max: Bound) -> Self
-            where I: IntoAutomaton<IntoAuto=A> {
+    fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
         let mut rdr = FstStream {
             fst: fst,
-            aut: aut.into_automaton(),
+            aut: aut,
             inp: Vec::with_capacity(16),
             empty_output: None,
             stack: vec![],
@@ -250,7 +249,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
         }
         while let Some(state) = self.stack.pop() {
             let node = self.fst.node(state.addr);
-            if state.trans >= node.len() {
+            if state.trans >= node.len() || state.aut_state.is_none() {
                 if node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
                 }
@@ -264,16 +263,17 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                 out: state.out,
                 aut_state: state.aut_state,
             });
-            let next_state = match self.aut.accept(state.aut_state, trans.inp) {
-                None => continue,
-                Some(state) => state,
-            };
+            let next_state =
+                match self.aut.accept(state.aut_state.unwrap(), trans.inp) {
+                    None => continue,
+                    Some(state) => state,
+                };
             self.inp.push(trans.inp);
             self.stack.push(FstStreamState {
                 addr: trans.addr,
                 trans: 0,
                 out: out,
-                aut_state: next_state,
+                aut_state: Some(next_state),
             });
             if self.end_at.exceeded_by(&self.inp) {
                 return None;
@@ -293,7 +293,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                     addr: self.fst.root_addr,
                     trans: 0,
                     out: Output::zero(),
-                    aut_state: self.aut.start(),
+                    aut_state: Some(self.aut.start()),
                 }];
                 return;
             }
@@ -309,7 +309,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                     addr: self.fst.root_addr,
                     trans: 0,
                     out: Output::zero(),
-                    aut_state: self.aut.start(),
+                    aut_state: Some(self.aut.start()),
                 }];
                 return;
             }
@@ -322,6 +322,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
         // not actually exist in the FST.
         let mut node = self.fst.root();
         let mut out = Output::zero();
+        let mut aut_state = Some(self.aut.start());
         for &b in key {
             match node.find_input(b) {
                 Some(i) => {
@@ -330,8 +331,9 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                         addr: node.addr(),
                         trans: i+1,
                         out: out,
-                        aut_state: self.aut.start(),
+                        aut_state: aut_state,
                     });
+                    aut_state = aut_state.and_then(|s| self.aut.accept(s, b));
                     out = out.cat(t.out);
                     self.inp.push(b);
                     node = self.fst.node(t.addr);
@@ -348,7 +350,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                                    .position(|t| t.inp > b)
                                    .unwrap_or(node.len()),
                         out: out,
-                        aut_state: self.aut.start(),
+                        aut_state: aut_state,
                     });
                     return;
                 }
@@ -366,7 +368,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                     addr: node.transition_addr(state.trans - 1),
                     trans: 0,
                     out: out,
-                    aut_state: self.aut.start(),
+                    aut_state: aut_state,
                 });
             }
         }

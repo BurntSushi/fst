@@ -12,7 +12,7 @@ use stream::Stream;
 pub use self::build::Builder;
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
-pub use self::ops::{FstOutput, FstStreamIntersection, FstStreamUnion};
+pub use self::ops::{FstOutput, StreamOp, StreamIntersection, StreamUnion};
 
 mod build;
 mod common_inputs;
@@ -83,6 +83,14 @@ impl Fst {
         })
     }
 
+    pub fn stream(&self) -> FstStream {
+        FstStreamBuilder::new(self, AlwaysMatch).into_stream()
+    }
+
+    pub fn range(&self) -> FstStreamBuilder {
+        FstStreamBuilder::new(self, AlwaysMatch)
+    }
+
     pub fn find<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
         let mut node = self.root();
         let mut out = Output::zero();
@@ -105,14 +113,6 @@ impl Fst {
 
     pub fn search<A: Automaton>(&self, aut: A) -> FstStreamBuilder<A> {
         FstStreamBuilder::new(self, aut)
-    }
-
-    pub fn stream(&self) -> FstStream {
-        FstStreamBuilder::new(self, AlwaysMatch).into_stream()
-    }
-
-    pub fn range(&self) -> FstStreamBuilder {
-        FstStreamBuilder::new(self, AlwaysMatch)
     }
 
     pub fn fst_type(&self) -> FstType {

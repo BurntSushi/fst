@@ -1,8 +1,10 @@
 use std::cmp;
 use std::collections::BinaryHeap;
 
-use raw::{Fst, FstStream, Output};
+use raw::Output;
 use Stream;
+
+type BoxedStream<'f> = Box<for<'a> Stream<'a, Item=(&'a [u8], Output)> + 'f>;
 
 #[derive(Copy, Clone, Debug)]
 pub struct FstOutput {
@@ -10,24 +12,46 @@ pub struct FstOutput {
     pub output: u64,
 }
 
-pub struct FstStreamUnion<'f> {
-    heap: FstStreamHeap<'f>,
-    outs: Vec<FstOutput>,
-    cur_slot: Option<Slot>,
+pub struct StreamOp<'f> {
+    streams: Vec<BoxedStream<'f>>,
 }
 
-impl<'f> FstStreamUnion<'f> {
-    pub fn new<I>(fsts: I) -> FstStreamUnion<'f>
-            where I: IntoIterator<Item=&'f Fst> {
-        FstStreamUnion {
-            heap: FstStreamHeap::new(fsts),
+impl<'f> StreamOp<'f> {
+    pub fn new() -> Self {
+        StreamOp { streams: vec![] }
+    }
+
+    pub fn add<S>(mut self, stream: S) -> Self
+            where S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+        let s = Box::new(stream);
+        self.streams.push(s);
+        self
+    }
+
+    pub fn union(self) -> StreamUnion<'f> {
+        StreamUnion {
+            heap: StreamHeap::new(self.streams),
+            outs: vec![],
+            cur_slot: None,
+        }
+    }
+
+    pub fn intersection(self) -> StreamIntersection<'f> {
+        StreamIntersection {
+            heap: StreamHeap::new(self.streams),
             outs: vec![],
             cur_slot: None,
         }
     }
 }
 
-impl<'f, 'a> Stream<'a> for FstStreamUnion<'f> {
+pub struct StreamUnion<'f> {
+    heap: StreamHeap<'f>,
+    outs: Vec<FstOutput>,
+    cur_slot: Option<Slot>,
+}
+
+impl<'a, 'f> Stream<'a> for StreamUnion<'f> {
     type Item = (&'a [u8], &'a [FstOutput]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -51,24 +75,13 @@ impl<'f, 'a> Stream<'a> for FstStreamUnion<'f> {
     }
 }
 
-pub struct FstStreamIntersection<'f> {
-    heap: FstStreamHeap<'f>,
+pub struct StreamIntersection<'f> {
+    heap: StreamHeap<'f>,
     outs: Vec<FstOutput>,
     cur_slot: Option<Slot>,
 }
 
-impl<'f> FstStreamIntersection<'f> {
-    pub fn new<I>(fsts: I) -> FstStreamIntersection<'f>
-            where I: IntoIterator<Item=&'f Fst> {
-        FstStreamIntersection {
-            heap: FstStreamHeap::new(fsts),
-            outs: vec![],
-            cur_slot: None,
-        }
-    }
-}
-
-impl<'f, 'a> Stream<'a> for FstStreamIntersection<'f> {
+impl<'a, 'f> Stream<'a> for StreamIntersection<'f> {
     type Item = (&'a [u8], &'a [FstOutput]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -99,15 +112,15 @@ impl<'f, 'a> Stream<'a> for FstStreamIntersection<'f> {
     }
 }
 
-struct FstStreamHeap<'f> {
-    rdrs: Vec<FstStream<'f>>,
+struct StreamHeap<'f> {
+    rdrs: Vec<Box<for<'a> Stream<'a, Item=(&'a [u8], Output)> + 'f>>,
     heap: BinaryHeap<Slot>,
 }
 
-impl<'f> FstStreamHeap<'f> {
-    fn new<I: IntoIterator<Item=&'f Fst>>(fsts: I) -> FstStreamHeap<'f> {
-        let mut u = FstStreamHeap {
-            rdrs: fsts.into_iter().map(Fst::stream).collect(),
+impl<'f> StreamHeap<'f> {
+    fn new(streams: Vec<BoxedStream<'f>>) -> StreamHeap<'f> {
+        let mut u = StreamHeap {
+            rdrs: streams,
             heap: BinaryHeap::new(),
         };
         for i in 0..u.rdrs.len() {
@@ -205,7 +218,7 @@ mod tests {
     use raw::Fst;
     use {Result, Stream};
 
-    use super::{FstOutput, FstStreamIntersection, FstStreamUnion};
+    use super::{StreamOp, FstOutput};
 
     fn s(string: &str) -> String { string.to_owned() }
 
@@ -233,7 +246,10 @@ mod tests {
         let set1 = fst_set(&["a", "b", "c"]);
         let set2 = fst_set(&["x", "y", "z"]);
 
-        let union = stream_to_set(FstStreamUnion::new(&[set1, set2])).unwrap();
+        let op = StreamOp::new()
+                              .add(set1.stream()).add(set2.stream())
+                              .union();
+        let union = stream_to_set(op).unwrap();
         assert_eq!(fst_input_strs(&union), vec!["a", "b", "c", "x", "y", "z"]);
     }
 
@@ -242,7 +258,10 @@ mod tests {
         let set1 = fst_set(&["aa", "b", "cc"]);
         let set2 = fst_set(&["b", "cc", "z"]);
 
-        let union = stream_to_set(FstStreamUnion::new(&[set1, set2])).unwrap();
+        let op = StreamOp::new()
+                              .add(set1.stream()).add(set2.stream())
+                              .union();
+        let union = stream_to_set(op).unwrap();
         assert_eq!(fst_input_strs(&union), vec!["aa", "b", "cc", "z"]);
     }
 
@@ -251,7 +270,10 @@ mod tests {
         let map1 = fst_map(vec![("a", 1), ("b", 2), ("c", 3)]);
         let map2 = fst_map(vec![("x", 1), ("y", 2), ("z", 3)]);
 
-        let union = stream_to_map(FstStreamUnion::new(&[map1, map2])).unwrap();
+        let op = StreamOp::new()
+                              .add(map1.stream()).add(map2.stream())
+                              .union();
+        let union = stream_to_map(op).unwrap();
         assert_eq!(
             fst_inputstrs_outputs(&union),
             vec![
@@ -266,8 +288,12 @@ mod tests {
         let map2 = fst_map(vec![("b", 1), ("cc", 2), ("z", 3)]);
         let map3 = fst_map(vec![("b", 1)]);
 
-        let maps = &[map1, map2, map3];
-        let union = stream_to_map(FstStreamUnion::new(maps)).unwrap();
+        let op = StreamOp::new()
+                              .add(map1.stream())
+                              .add(map2.stream())
+                              .add(map3.stream())
+                              .union();
+        let union = stream_to_map(op).unwrap();
         assert_eq!(
             fst_inputstrs_outputs(&union),
             vec![
@@ -281,8 +307,11 @@ mod tests {
             fst_set(&["a", "b", "c"]),
             fst_set(&["x", "y", "z"]),
         ];
-        let inter = stream_to_set(FstStreamIntersection::new(sets)).unwrap();
-        assert_eq!(fst_input_strs(&inter), Vec::<&str>::new());
+        let op = StreamOp::new()
+                              .add(sets[0].stream()).add(sets[1].stream())
+                              .intersection();
+        let inter_stream = stream_to_set(op).unwrap();
+        assert_eq!(fst_input_strs(&inter_stream), Vec::<&str>::new());
     }
 
     #[test]
@@ -291,8 +320,11 @@ mod tests {
             fst_set(&["aa", "b", "cc"]),
             fst_set(&["b", "cc", "z"]),
         ];
-        let inter = stream_to_set(FstStreamIntersection::new(sets)).unwrap();
-        assert_eq!(fst_input_strs(&inter), vec!["b", "cc"]);
+        let op = StreamOp::new()
+                              .add(sets[0].stream()).add(sets[1].stream())
+                              .intersection();
+        let inter_stream = stream_to_set(op).unwrap();
+        assert_eq!(fst_input_strs(&inter_stream), vec!["b", "cc"]);
     }
 
     #[test]
@@ -301,8 +333,12 @@ mod tests {
             fst_map(vec![("a", 1), ("b", 2), ("c", 3)]),
             fst_map(vec![("x", 1), ("y", 2), ("z", 3)]),
         ];
-        let inter = stream_to_map(FstStreamIntersection::new(maps)).unwrap();
-        assert_eq!(fst_inputstrs_outputs(&inter), Vec::<(String, u64)>::new());
+        let op = StreamOp::new()
+                              .add(maps[0].stream()).add(maps[1].stream())
+                              .intersection();
+        let inter_stream = stream_to_map(op).unwrap();
+        assert_eq!(fst_inputstrs_outputs(&inter_stream),
+                   Vec::<(String, u64)>::new());
     }
 
     #[test]
@@ -312,7 +348,12 @@ mod tests {
             fst_map(vec![("b", 1), ("cc", 2), ("z", 3)]),
             fst_map(vec![("b", 1)]),
         ];
-        let inter = stream_to_map(FstStreamIntersection::new(maps)).unwrap();
-        assert_eq!(fst_inputstrs_outputs(&inter), vec![(s("b"), 4)]);
+        let op = StreamOp::new()
+                              .add(maps[0].stream())
+                              .add(maps[1].stream())
+                              .add(maps[2].stream())
+                              .intersection();
+        let inter_stream = stream_to_map(op).unwrap();
+        assert_eq!(fst_inputstrs_outputs(&inter_stream), vec![(s("b"), 4)]);
     }
 }

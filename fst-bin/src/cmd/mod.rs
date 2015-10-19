@@ -211,8 +211,11 @@ Options:
         for fst_path in &args.arg_input {
             fsts.push(try!(fst::Fst::from_file_path(fst_path)));
         }
-
-        let mut union = fst::FstStreamUnion::new(&fsts);
+        let mut op = fst::StreamOp::new();
+        for fst in &fsts {
+            op = op.add(fst.stream());
+        }
+        let mut union = op.union();
         while let Some((key, _)) = union.next() {
             try!(merged.add(key));
         }

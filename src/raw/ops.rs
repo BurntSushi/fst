@@ -1,9 +1,11 @@
 use std::cmp;
 use std::collections::BinaryHeap;
+use std::iter::FromIterator;
 
 use raw::Output;
-use Stream;
+use stream::{IntoStream, Stream};
 
+// Permits stream operations to be hetergenous with respect to streams.
 type BoxedStream<'f> = Box<for<'a> Stream<'a, Item=(&'a [u8], Output)> + 'f>;
 
 #[derive(Copy, Clone, Debug)]
@@ -21,11 +23,17 @@ impl<'f> StreamOp<'f> {
         StreamOp { streams: vec![] }
     }
 
-    pub fn add<S>(mut self, stream: S) -> Self
-            where S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
-        let s = Box::new(stream);
-        self.streams.push(s);
+    pub fn add<I, S>(mut self, stream: I) -> Self
+            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+        self.push(stream);
         self
+    }
+
+    pub fn push<I, S>(&mut self, stream: I)
+            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+        self.streams.push(Box::new(stream.into_stream()));
     }
 
     pub fn union(self) -> StreamUnion<'f> {
@@ -42,6 +50,44 @@ impl<'f> StreamOp<'f> {
             outs: vec![],
             cur_slot: None,
         }
+    }
+
+    pub fn difference(mut self) -> StreamDifference<'f> {
+        let first = self.streams.swap_remove(0);
+        StreamDifference {
+            set: first,
+            key: vec![],
+            heap: StreamHeap::new(self.streams),
+            outs: vec![],
+        }
+    }
+
+    pub fn symmetric_difference(self) -> StreamSymmetricDifference<'f> {
+        StreamSymmetricDifference {
+            heap: StreamHeap::new(self.streams),
+            outs: vec![],
+            cur_slot: None,
+        }
+    }
+}
+
+impl<'f, I, S> Extend<I> for StreamOp<'f>
+    where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+          S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+    fn extend<T>(&mut self, it: T) where T: IntoIterator<Item=I> {
+        for stream in it {
+            self.push(stream);
+        }
+    }
+}
+
+impl<'f, I, S> FromIterator<I> for StreamOp<'f>
+    where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+          S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+    fn from_iter<T>(it: T) -> Self where T: IntoIterator<Item=I> {
+        let mut op = StreamOp::new();
+        op.extend(it);
+        op
     }
 }
 
@@ -102,6 +148,81 @@ impl<'a, 'f> Stream<'a> for StreamIntersection<'f> {
                 popped += 1;
             }
             if popped < self.heap.num_slots() {
+                self.heap.refill(slot);
+            } else {
+                self.cur_slot = Some(slot);
+                let key = self.cur_slot.as_ref().unwrap().input();
+                return Some((key, &self.outs))
+            }
+        }
+    }
+}
+
+pub struct StreamDifference<'f> {
+    set: BoxedStream<'f>,
+    key: Vec<u8>,
+    heap: StreamHeap<'f>,
+    outs: Vec<FstOutput>,
+}
+
+impl<'a, 'f> Stream<'a> for StreamDifference<'f> {
+    type Item = (&'a [u8], &'a [FstOutput]);
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        loop {
+            match self.set.next() {
+                None => return None,
+                Some((key, out)) => {
+                    self.key.clear();
+                    self.key.extend(key);
+                    self.outs.clear();
+                    self.outs.push(FstOutput {
+                        index: 0,
+                        output: out.value(),
+                    });
+                }
+            };
+            let mut popped: usize = 0;
+            while let Some(slot) = self.heap.pop_if_equal(&self.key) {
+                self.heap.refill(slot);
+                popped += 1;
+            }
+            if popped == 0 {
+                return Some((&self.key, &self.outs))
+            }
+        }
+    }
+}
+
+pub struct StreamSymmetricDifference<'f> {
+    heap: StreamHeap<'f>,
+    outs: Vec<FstOutput>,
+    cur_slot: Option<Slot>,
+}
+
+impl<'a, 'f> Stream<'a> for StreamSymmetricDifference<'f> {
+    type Item = (&'a [u8], &'a [FstOutput]);
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        if let Some(slot) = self.cur_slot.take() {
+            self.heap.refill(slot);
+        }
+        loop {
+            let slot = match self.heap.pop() {
+                None => return None,
+                Some(slot) => slot,
+            };
+            self.outs.clear();
+            self.outs.push(slot.fst_output());
+            let mut popped: usize = 1;
+            while let Some(slot2) = self.heap.pop_if_equal(slot.input()) {
+                self.outs.push(slot2.fst_output());
+                self.heap.refill(slot2);
+                popped += 1;
+            }
+            // This key is in the symmetric difference if and only if it
+            // appears in an odd number of sets.
+            if popped % 2 == 0 {
                 self.heap.refill(slot);
             } else {
                 self.cur_slot = Some(slot);
@@ -213,147 +334,171 @@ impl Ord for Slot {
 
 #[cfg(test)]
 mod tests {
-    use raw::build::Builder;
-    use raw::tests::{fst_map, fst_set, fst_inputstrs_outputs, fst_input_strs};
+    use raw::tests::{fst_map, fst_set};
     use raw::Fst;
-    use {Result, Stream};
+    use stream::{IntoStream, Stream};
 
-    use super::{StreamOp, FstOutput};
+    use super::StreamOp;
 
     fn s(string: &str) -> String { string.to_owned() }
 
-    fn stream_to_set<I>(mut stream: I) -> Result<Fst>
-            where I: for<'a> Stream<'a, Item=(&'a [u8], &'a [FstOutput])> {
-        let mut bfst = Builder::memory();
-        while let Some((key, _)) = stream.next() {
-            try!(bfst.add(key));
+    macro_rules! create_set_op {
+        ($name:ident, $op:ident) => {
+            fn $name(sets: Vec<Vec<&str>>) -> Vec<String> {
+                let fsts: Vec<Fst> = sets.into_iter().map(fst_set).collect();
+                let op: StreamOp = fsts.iter().collect();
+                let mut stream = op.$op().into_stream();
+                let mut keys = vec![];
+                while let Some((key, _)) = stream.next() {
+                    keys.push(String::from_utf8(key.to_vec()).unwrap());
+                }
+                keys
+            }
         }
-        Ok(try!(Fst::from_bytes(try!(bfst.into_inner()))))
     }
 
-    fn stream_to_map<I>(mut stream: I) -> Result<Fst>
-            where I: for<'a> Stream<'a, Item=(&'a [u8], &'a [FstOutput])> {
-        let mut bfst = Builder::memory();
-        while let Some((key, outs)) = stream.next() {
-            let merged = outs.iter().fold(0, |a, b| a + b.output);
-            try!(bfst.insert(key, merged));
+    macro_rules! create_map_op {
+        ($name:ident, $op:ident) => {
+            fn $name(sets: Vec<Vec<(&str, u64)>>) -> Vec<(String, u64)> {
+                let fsts: Vec<Fst> = sets.into_iter().map(fst_map).collect();
+                let op: StreamOp = fsts.iter().collect();
+                let mut stream = op.$op().into_stream();
+                let mut keys = vec![];
+                while let Some((key, outs)) = stream.next() {
+                    let merged = outs.iter().fold(0, |a, b| a + b.output);
+                    let s = String::from_utf8(key.to_vec()).unwrap();
+                    keys.push((s, merged));
+                }
+                keys
+            }
         }
-        Ok(try!(Fst::from_bytes(try!(bfst.into_inner()))))
     }
+
+    create_set_op!(fst_union, union);
+    create_set_op!(fst_intersection, intersection);
+    create_set_op!(fst_symmetric_difference, symmetric_difference);
+    create_set_op!(fst_difference, difference);
+    create_map_op!(fst_union_map, union);
+    create_map_op!(fst_intersection_map, intersection);
+    create_map_op!(fst_symmetric_difference_map, symmetric_difference);
+    create_map_op!(fst_difference_map, difference);
 
     #[test]
     fn union_set() {
-        let set1 = fst_set(&["a", "b", "c"]);
-        let set2 = fst_set(&["x", "y", "z"]);
-
-        let op = StreamOp::new()
-                              .add(set1.stream()).add(set2.stream())
-                              .union();
-        let union = stream_to_set(op).unwrap();
-        assert_eq!(fst_input_strs(&union), vec!["a", "b", "c", "x", "y", "z"]);
+        let v = fst_union(vec![
+            vec!["a", "b", "c"],
+            vec!["x", "y", "z"],
+        ]);
+        assert_eq!(v, vec!["a", "b", "c", "x", "y", "z"]);
     }
 
     #[test]
     fn union_set_dupes() {
-        let set1 = fst_set(&["aa", "b", "cc"]);
-        let set2 = fst_set(&["b", "cc", "z"]);
-
-        let op = StreamOp::new()
-                              .add(set1.stream()).add(set2.stream())
-                              .union();
-        let union = stream_to_set(op).unwrap();
-        assert_eq!(fst_input_strs(&union), vec!["aa", "b", "cc", "z"]);
+        let v = fst_union(vec![
+            vec!["aa", "b", "cc"],
+            vec!["b", "cc", "z"],
+        ]);
+        assert_eq!(v, vec!["aa", "b", "cc", "z"]);
     }
 
     #[test]
     fn union_map() {
-        let map1 = fst_map(vec![("a", 1), ("b", 2), ("c", 3)]);
-        let map2 = fst_map(vec![("x", 1), ("y", 2), ("z", 3)]);
-
-        let op = StreamOp::new()
-                              .add(map1.stream()).add(map2.stream())
-                              .union();
-        let union = stream_to_map(op).unwrap();
-        assert_eq!(
-            fst_inputstrs_outputs(&union),
-            vec![
-                (s("a"), 1), (s("b"), 2), (s("c"), 3),
-                (s("x"), 1), (s("y"), 2), (s("z"), 3),
-            ]);
+        let v = fst_union_map(vec![
+            vec![("a", 1), ("b", 2), ("c", 3)],
+            vec![("x", 1), ("y", 2), ("z", 3)],
+        ]);
+        assert_eq!(v, vec![
+            (s("a"), 1), (s("b"), 2), (s("c"), 3),
+            (s("x"), 1), (s("y"), 2), (s("z"), 3),
+        ]);
     }
 
     #[test]
     fn union_map_dupes() {
-        let map1 = fst_map(vec![("aa", 1), ("b", 2), ("cc", 3)]);
-        let map2 = fst_map(vec![("b", 1), ("cc", 2), ("z", 3)]);
-        let map3 = fst_map(vec![("b", 1)]);
-
-        let op = StreamOp::new()
-                              .add(map1.stream())
-                              .add(map2.stream())
-                              .add(map3.stream())
-                              .union();
-        let union = stream_to_map(op).unwrap();
-        assert_eq!(
-            fst_inputstrs_outputs(&union),
-            vec![
-                (s("aa"), 1), (s("b"), 4), (s("cc"), 5), (s("z"), 3),
-            ]);
+        let v = fst_union_map(vec![
+            vec![("aa", 1), ("b", 2), ("cc", 3)],
+            vec![("b", 1), ("cc", 2), ("z", 3)],
+            vec![("b", 1)],
+        ]);
+        assert_eq!(v, vec![
+            (s("aa"), 1), (s("b"), 4), (s("cc"), 5), (s("z"), 3),
+        ]);
     }
 
     #[test]
     fn intersect_set() {
-        let sets = &[
-            fst_set(&["a", "b", "c"]),
-            fst_set(&["x", "y", "z"]),
-        ];
-        let op = StreamOp::new()
-                              .add(sets[0].stream()).add(sets[1].stream())
-                              .intersection();
-        let inter_stream = stream_to_set(op).unwrap();
-        assert_eq!(fst_input_strs(&inter_stream), Vec::<&str>::new());
+        let v = fst_intersection(vec![
+            vec!["a", "b", "c"],
+            vec!["x", "y", "z"],
+        ]);
+        assert_eq!(v, Vec::<String>::new());
     }
 
     #[test]
     fn intersect_set_dupes() {
-        let sets = &[
-            fst_set(&["aa", "b", "cc"]),
-            fst_set(&["b", "cc", "z"]),
-        ];
-        let op = StreamOp::new()
-                              .add(sets[0].stream()).add(sets[1].stream())
-                              .intersection();
-        let inter_stream = stream_to_set(op).unwrap();
-        assert_eq!(fst_input_strs(&inter_stream), vec!["b", "cc"]);
+        let v = fst_intersection(vec![
+            vec!["aa", "b", "cc"],
+            vec!["b", "cc", "z"],
+        ]);
+        assert_eq!(v, vec!["b", "cc"]);
     }
 
     #[test]
     fn intersect_map() {
-        let maps = &[
-            fst_map(vec![("a", 1), ("b", 2), ("c", 3)]),
-            fst_map(vec![("x", 1), ("y", 2), ("z", 3)]),
-        ];
-        let op = StreamOp::new()
-                              .add(maps[0].stream()).add(maps[1].stream())
-                              .intersection();
-        let inter_stream = stream_to_map(op).unwrap();
-        assert_eq!(fst_inputstrs_outputs(&inter_stream),
-                   Vec::<(String, u64)>::new());
+        let v = fst_intersection_map(vec![
+            vec![("a", 1), ("b", 2), ("c", 3)],
+            vec![("x", 1), ("y", 2), ("z", 3)],
+        ]);
+        assert_eq!(v, Vec::<(String, u64)>::new());
     }
 
     #[test]
     fn intersect_map_dupes() {
-        let maps = &[
-            fst_map(vec![("aa", 1), ("b", 2), ("cc", 3)]),
-            fst_map(vec![("b", 1), ("cc", 2), ("z", 3)]),
-            fst_map(vec![("b", 1)]),
-        ];
-        let op = StreamOp::new()
-                              .add(maps[0].stream())
-                              .add(maps[1].stream())
-                              .add(maps[2].stream())
-                              .intersection();
-        let inter_stream = stream_to_map(op).unwrap();
-        assert_eq!(fst_inputstrs_outputs(&inter_stream), vec![(s("b"), 4)]);
+        let v = fst_intersection_map(vec![
+            vec![("aa", 1), ("b", 2), ("cc", 3)],
+            vec![("b", 1), ("cc", 2), ("z", 3)],
+            vec![("b", 1)],
+        ]);
+        assert_eq!(v, vec![(s("b"), 4)]);
+    }
+
+    #[test]
+    fn symmetric_difference() {
+        let v = fst_symmetric_difference(vec![
+            vec!["a", "b", "c"],
+            vec!["a", "b"],
+            vec!["a"],
+        ]);
+        assert_eq!(v, vec!["a", "c"]);
+    }
+
+    #[test]
+    fn symmetric_difference_map() {
+        let v = fst_symmetric_difference_map(vec![
+            vec![("a", 1), ("b", 2), ("c", 3)],
+            vec![("a", 1), ("b", 2)],
+            vec![("a", 1)],
+        ]);
+        assert_eq!(v, vec![(s("a"), 3), (s("c"), 3)]);
+    }
+
+    #[test]
+    fn difference() {
+        let v = fst_difference(vec![
+            vec!["a", "b", "c"],
+            vec!["a", "b"],
+            vec!["a"],
+        ]);
+        assert_eq!(v, vec!["c"]);
+    }
+
+    #[test]
+    fn difference_map() {
+        let v = fst_difference_map(vec![
+            vec![("a", 1), ("b", 2), ("c", 3)],
+            vec![("a", 1), ("b", 2)],
+            vec![("a", 1)],
+        ]);
+        assert_eq!(v, vec![(s("c"), 3)]);
     }
 }

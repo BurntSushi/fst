@@ -12,13 +12,18 @@ pub use automaton::Automaton;
 pub use error::{Error, Result};
 pub use regex::Error as RegexError;
 pub use regex::Regex;
-pub use set::{Set, SetBuilder, SetStream, SetStreamBuilder};
-pub use stream::Stream;
+pub use set::{Set, SetBuilder, SetOp};
+pub use stream::{IntoStream, Stream};
 
 mod automaton;
 mod error;
 mod map;
 pub mod raw;
 mod regex;
-mod set;
+#[path = "set.rs"]
+mod inner_set;
 mod stream;
+
+pub mod set {
+    pub use inner_set::*;
+}

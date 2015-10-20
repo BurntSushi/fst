@@ -7,12 +7,16 @@ use memmap::{Mmap, Protection};
 
 use automaton::{Automaton, AlwaysMatch};
 use error::{Error, Result};
-use stream::Stream;
+use stream::{IntoStream, Stream};
 
 pub use self::build::Builder;
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
-pub use self::ops::{FstOutput, StreamOp, StreamIntersection, StreamUnion};
+pub use self::ops::{
+    FstOutput, StreamOp,
+    StreamIntersection, StreamUnion,
+    StreamDifference, StreamSymmetricDifference,
+};
 
 mod build;
 mod common_inputs;
@@ -42,6 +46,7 @@ pub struct Fst {
     data: FstData,
     root_addr: CompiledAddr,
     ty: FstType,
+    len: usize,
 }
 
 impl Fst {
@@ -56,7 +61,7 @@ impl Fst {
 
 impl Fst {
     fn new(data: FstData) -> Result<Self> {
-        if data.as_slice().len() < 24 {
+        if data.as_slice().len() < 32 {
             return Err(Error::Format);
         }
         // The read_u64 unwraps below are OK because they can never fail.
@@ -76,10 +81,15 @@ impl Fst {
             let mut last = &data.as_slice()[data.as_slice().len() - 8..];
             last.read_u64::<LittleEndian>().unwrap()
         };
+        let len = {
+            let mut last2 = &data.as_slice()[data.as_slice().len() - 16..];
+            last2.read_u64::<LittleEndian>().unwrap()
+        };
         Ok(Fst {
             data: data,
             root_addr: u64_to_usize(root_addr),
             ty: ty,
+            len: u64_to_usize(len),
         })
     }
 
@@ -131,6 +141,14 @@ impl Fst {
         self.data.as_slice()
     }
 
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     fn empty_final_output(&self) -> Option<Output> {
         let root = self.root();
         if root.is_final() {
@@ -141,6 +159,15 @@ impl Fst {
     }
 }
 
+impl<'a, 'f> IntoStream<'a> for &'f Fst {
+    type Item = (&'a [u8], Output);
+    type Into = FstStream<'f>;
+
+    fn into_stream(self) -> Self::Into {
+        FstStreamBuilder::new(self, AlwaysMatch).into_stream()
+    }
+}
+
 pub struct FstStreamBuilder<'a, A=AlwaysMatch> {
     fst: &'a Fst,
     aut: A,
@@ -148,18 +175,14 @@ pub struct FstStreamBuilder<'a, A=AlwaysMatch> {
     max: Bound,
 }
 
-impl<'a, A: Automaton> FstStreamBuilder<'a, A> {
-    fn new(fst: &'a Fst, aut: A) -> Self {
+impl<'f, A: Automaton> FstStreamBuilder<'f, A> {
+    fn new(fst: &'f Fst, aut: A) -> Self {
         FstStreamBuilder {
             fst: fst,
             aut: aut,
             min: Bound::Unbounded,
             max: Bound::Unbounded,
         }
-    }
-
-    pub fn into_stream(self) -> FstStream<'a, A> {
-        FstStream::new(self.fst, self.aut, self.min, self.max)
     }
 
     pub fn ge<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
@@ -180,6 +203,15 @@ impl<'a, A: Automaton> FstStreamBuilder<'a, A> {
     pub fn lt<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
         self.max = Bound::Excluded(bound.as_ref().to_owned());
         self
+    }
+}
+
+impl<'a, 'f, A: Automaton> IntoStream<'a> for FstStreamBuilder<'f, A> {
+    type Item = (&'a [u8], Output);
+    type Into = FstStream<'f, A>;
+
+    fn into_stream(self) -> FstStream<'f, A> {
+        FstStream::new(self.fst, self.aut, self.min, self.max)
     }
 }
 
@@ -385,11 +417,11 @@ impl<'f, 'a, A: Automaton> Stream<'a> for FstStream<'f, A> {
 pub struct Output(u64);
 
 impl Output {
-    fn new(v: u64) -> Output {
+    pub fn new(v: u64) -> Output {
         Output(v)
     }
 
-    fn zero() -> Output {
+    pub fn zero() -> Output {
         Output(0)
     }
 

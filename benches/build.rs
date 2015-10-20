@@ -3,7 +3,7 @@
 extern crate fst;
 extern crate test;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use fst::raw::{Builder, Fst};
 use test::Bencher;
@@ -62,6 +62,30 @@ fn build_hash_map(b: &mut Bencher) {
     b.bytes = WORDS.len() as u64;
     b.iter(|| {
         let mut set = HashMap::new();
+        for &(ref word, len) in &words {
+            set.insert(word, len);
+        }
+    });
+}
+
+#[bench]
+fn build_btree_set(b: &mut Bencher) {
+    let words = get_words();
+    b.bytes = WORDS.len() as u64;
+    b.iter(|| {
+        let mut set = BTreeSet::new();
+        for word in &words {
+            set.insert(word);
+        }
+    });
+}
+
+#[bench]
+fn build_btree_map(b: &mut Bencher) {
+    let words = get_words_outputs();
+    b.bytes = WORDS.len() as u64;
+    b.iter(|| {
+        let mut set = BTreeMap::new();
         for &(ref word, len) in &words {
             set.insert(word, len);
         }

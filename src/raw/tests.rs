@@ -1,7 +1,7 @@
 use automaton::AlwaysMatch;
 use error::Error;
 use raw::{Builder, Bound, Fst, FstStream, Output};
-use stream::Stream;
+use stream::{IntoStream, Stream};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -11,10 +11,13 @@ pub fn fst_set<I, S>(ss: I) -> Fst
     let mut ss: Vec<Vec<u8>> =
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
     ss.sort();
-    for s in ss.into_iter() {
+    for s in ss.iter().into_iter() {
         bfst.add(s).unwrap();
     }
-    Fst::from_bytes(bfst.into_inner().unwrap()).unwrap()
+    let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
+    ss.dedup();
+    assert_eq!(fst.len(), ss.len());
+    fst
 }
 
 pub fn fst_map<I, S>(ss: I) -> Fst
@@ -202,7 +205,7 @@ fn fst_map_100000_lengths() {
 
 #[test]
 fn invalid_version() {
-    match Fst::from_bytes(vec![0; 24]) {
+    match Fst::from_bytes(vec![0; 32]) {
         Err(Error::Version { expected, got }) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),

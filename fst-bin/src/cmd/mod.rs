@@ -78,7 +78,7 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
-    use fst::{Regex, Stream};
+    use fst::{Regex, IntoStream, Stream};
     use fst::raw as fst;
 
     use util;
@@ -178,8 +178,7 @@ Options:
 
 pub mod union {
     use docopt::Docopt;
-    use fst::Stream;
-    use fst::raw as fst;
+    use fst::{self, Stream};
 
     use util;
     use Error;
@@ -205,19 +204,15 @@ Options:
                                 .unwrap_or_else(|e| e.exit());
 
         let wtr = try!(util::get_buf_writer(args.flag_output));
-        let mut merged = try!(fst::Builder::new(wtr));
+        let mut merged = try!(fst::SetBuilder::new(wtr));
 
-        let mut fsts = vec![];
-        for fst_path in &args.arg_input {
-            fsts.push(try!(fst::Fst::from_file_path(fst_path)));
+        let mut sets = vec![];
+        for set_path in &args.arg_input {
+            sets.push(try!(fst::Set::from_file_path(set_path)));
         }
-        let mut op = fst::StreamOp::new();
-        for fst in &fsts {
-            op = op.add(fst.stream());
-        }
-        let mut union = op.union();
-        while let Some((key, _)) = union.next() {
-            try!(merged.add(key));
+        let mut union = sets.iter().collect::<fst::set::SetOp>().union();
+        while let Some(key) = union.next() {
+            try!(merged.insert(key));
         }
         try!(merged.finish());
         Ok(())

@@ -35,6 +35,8 @@ pub struct Builder<W> {
     /// this case actually corresponds to the next state for the transition,
     /// since states are compiled in reverse.)
     last_addr: CompiledAddr,
+    /// The number of keys added.
+    len: usize,
 }
 
 #[derive(Debug)]
@@ -85,6 +87,7 @@ impl<W: io::Write> Builder<W> {
             registry: Registry::new(5_000, 1),
             last: None,
             last_addr: NONE_ADDRESS,
+            len: 0,
         })
     }
 
@@ -97,6 +100,7 @@ impl<W: io::Write> Builder<W> {
         try!(self.compile_from(0));
         let mut root_node = self.unfinished.pop_root();
         let root_addr = try!(self.compile(&root_node));
+        try!(self.wtr.write_u64::<LittleEndian>(self.len as u64));
         try!(self.wtr.write_u64::<LittleEndian>(root_addr as u64));
         try!(self.wtr.flush());
         Ok(self.wtr.into_inner())
@@ -118,6 +122,7 @@ impl<W: io::Write> Builder<W> {
             where B: AsRef<[u8]> {
         let bs = bs.as_ref();
         if bs.is_empty() {
+            self.len = 1; // must be first key, so length is always 1
             self.unfinished.set_root_output(out);
             return Ok(());
         }
@@ -133,6 +138,7 @@ impl<W: io::Write> Builder<W> {
             assert!(out.is_zero());
             return Ok(());
         }
+        self.len += 1;
         try!(self.compile_from(prefix_len));
         self.unfinished.add_suffix(&bs[prefix_len..], out);
         Ok(())

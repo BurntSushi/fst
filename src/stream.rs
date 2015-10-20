@@ -12,3 +12,23 @@ pub trait Stream<'a> {
 
     fn next(&'a mut self) -> Option<Self::Item>;
 }
+
+/// IntoStream describes types that can be converted to streams.
+///
+/// This is analogous to the `IntoIterator` trait for `Iterator` in
+/// `std::iter`.
+pub trait IntoStream<'a> {
+    type Item: 'a;
+    type Into: Stream<'a, Item=Self::Item>;
+
+    fn into_stream(self) -> Self::Into;
+}
+
+impl<'a, S: Stream<'a>> IntoStream<'a> for S {
+    type Item = S::Item;
+    type Into = S;
+
+    fn into_stream(self) -> S {
+        self
+    }
+}

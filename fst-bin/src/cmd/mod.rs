@@ -178,7 +178,7 @@ Options:
 
 pub mod union {
     use docopt::Docopt;
-    use fst::{self, Stream};
+    use fst;
 
     use util;
     use Error;
@@ -210,10 +210,8 @@ Options:
         for set_path in &args.arg_input {
             sets.push(try!(fst::Set::from_file_path(set_path)));
         }
-        let mut union = sets.iter().collect::<fst::set::SetOp>().union();
-        while let Some(key) = union.next() {
-            try!(merged.insert(key));
-        }
+        let union = sets.iter().collect::<fst::set::SetOp>().union();
+        try!(merged.extend_stream(union));
         try!(merged.finish());
         Ok(())
     }

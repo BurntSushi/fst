@@ -85,7 +85,7 @@ impl Compiler {
                     self.set_jump(jmp_to_end, end);
                 }
             }
-            Expr::Repeat { ref e, greedy: false, .. } => {
+            Expr::Repeat { greedy: false, .. } => {
                 return Err(Error::NoLazy.into());
             }
             Expr::Repeat { ref e, r: Repeater::ZeroOrOne, .. } => {

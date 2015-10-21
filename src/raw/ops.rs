@@ -5,11 +5,11 @@ use std::iter::FromIterator;
 use raw::Output;
 use stream::{IntoStream, Stream};
 
-// Permits stream operations to be hetergenous with respect to streams.
+// Permits stream operations to be hetergeneous with respect to streams.
 type BoxedStream<'f> = Box<for<'a> Stream<'a, Item=(&'a [u8], Output)> + 'f>;
 
 #[derive(Copy, Clone, Debug)]
-pub struct FstOutput {
+pub struct IndexedOutput {
     pub index: usize,
     pub output: u64,
 }
@@ -93,12 +93,12 @@ impl<'f, I, S> FromIterator<I> for StreamOp<'f>
 
 pub struct StreamUnion<'f> {
     heap: StreamHeap<'f>,
-    outs: Vec<FstOutput>,
+    outs: Vec<IndexedOutput>,
     cur_slot: Option<Slot>,
 }
 
 impl<'a, 'f> Stream<'a> for StreamUnion<'f> {
-    type Item = (&'a [u8], &'a [FstOutput]);
+    type Item = (&'a [u8], &'a [IndexedOutput]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         if let Some(slot) = self.cur_slot.take() {
@@ -112,9 +112,9 @@ impl<'a, 'f> Stream<'a> for StreamUnion<'f> {
             }
         };
         self.outs.clear();
-        self.outs.push(slot.fst_output());
+        self.outs.push(slot.indexed_output());
         while let Some(slot2) = self.heap.pop_if_equal(slot.input()) {
-            self.outs.push(slot2.fst_output());
+            self.outs.push(slot2.indexed_output());
             self.heap.refill(slot2);
         }
         Some((slot.input(), &self.outs))
@@ -123,12 +123,12 @@ impl<'a, 'f> Stream<'a> for StreamUnion<'f> {
 
 pub struct StreamIntersection<'f> {
     heap: StreamHeap<'f>,
-    outs: Vec<FstOutput>,
+    outs: Vec<IndexedOutput>,
     cur_slot: Option<Slot>,
 }
 
 impl<'a, 'f> Stream<'a> for StreamIntersection<'f> {
-    type Item = (&'a [u8], &'a [FstOutput]);
+    type Item = (&'a [u8], &'a [IndexedOutput]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         if let Some(slot) = self.cur_slot.take() {
@@ -140,10 +140,10 @@ impl<'a, 'f> Stream<'a> for StreamIntersection<'f> {
                 Some(slot) => slot,
             };
             self.outs.clear();
-            self.outs.push(slot.fst_output());
+            self.outs.push(slot.indexed_output());
             let mut popped: usize = 1;
             while let Some(slot2) = self.heap.pop_if_equal(slot.input()) {
-                self.outs.push(slot2.fst_output());
+                self.outs.push(slot2.indexed_output());
                 self.heap.refill(slot2);
                 popped += 1;
             }
@@ -162,11 +162,11 @@ pub struct StreamDifference<'f> {
     set: BoxedStream<'f>,
     key: Vec<u8>,
     heap: StreamHeap<'f>,
-    outs: Vec<FstOutput>,
+    outs: Vec<IndexedOutput>,
 }
 
 impl<'a, 'f> Stream<'a> for StreamDifference<'f> {
-    type Item = (&'a [u8], &'a [FstOutput]);
+    type Item = (&'a [u8], &'a [IndexedOutput]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         loop {
@@ -176,7 +176,7 @@ impl<'a, 'f> Stream<'a> for StreamDifference<'f> {
                     self.key.clear();
                     self.key.extend(key);
                     self.outs.clear();
-                    self.outs.push(FstOutput {
+                    self.outs.push(IndexedOutput {
                         index: 0,
                         output: out.value(),
                     });
@@ -196,12 +196,12 @@ impl<'a, 'f> Stream<'a> for StreamDifference<'f> {
 
 pub struct StreamSymmetricDifference<'f> {
     heap: StreamHeap<'f>,
-    outs: Vec<FstOutput>,
+    outs: Vec<IndexedOutput>,
     cur_slot: Option<Slot>,
 }
 
 impl<'a, 'f> Stream<'a> for StreamSymmetricDifference<'f> {
-    type Item = (&'a [u8], &'a [FstOutput]);
+    type Item = (&'a [u8], &'a [IndexedOutput]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         if let Some(slot) = self.cur_slot.take() {
@@ -213,10 +213,10 @@ impl<'a, 'f> Stream<'a> for StreamSymmetricDifference<'f> {
                 Some(slot) => slot,
             };
             self.outs.clear();
-            self.outs.push(slot.fst_output());
+            self.outs.push(slot.indexed_output());
             let mut popped: usize = 1;
             while let Some(slot2) = self.heap.pop_if_equal(slot.input()) {
-                self.outs.push(slot2.fst_output());
+                self.outs.push(slot2.indexed_output());
                 self.heap.refill(slot2);
                 popped += 1;
             }
@@ -295,20 +295,15 @@ impl Slot {
         }
     }
 
-    fn fst_output(&self) -> FstOutput {
-        FstOutput { index: self.idx, output: self.output.value() }
+    fn indexed_output(&self) -> IndexedOutput {
+        IndexedOutput { index: self.idx, output: self.output.value() }
     }
 
     fn input(&self) -> &[u8] {
         &self.input
     }
 
-    fn output(&self) -> Output {
-        self.output
-    }
-
     fn set_input(&mut self, input: &[u8]) {
-        let addcap = input.len().checked_sub(self.input.len()).unwrap_or(0);
         self.input.clear();
         self.input.extend(input);
     }

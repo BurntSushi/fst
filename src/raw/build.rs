@@ -6,6 +6,7 @@ use error::{Error, Result};
 use raw::{VERSION, NONE_ADDRESS, CompiledAddr, FstType, Output, Transition};
 use raw::counting_writer::CountingWriter;
 use raw::registry::{Registry, RegistryEntry};
+use stream::{IntoStream, Stream};
 
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
@@ -98,7 +99,7 @@ impl<W: io::Write> Builder<W> {
 
     pub fn into_inner(mut self) -> Result<W> {
         try!(self.compile_from(0));
-        let mut root_node = self.unfinished.pop_root();
+        let root_node = self.unfinished.pop_root();
         let root_addr = try!(self.compile(&root_node));
         try!(self.wtr.write_u64::<LittleEndian>(self.len as u64));
         try!(self.wtr.write_u64::<LittleEndian>(root_addr as u64));
@@ -116,6 +117,24 @@ impl<W: io::Write> Builder<W> {
             where B: AsRef<[u8]> {
         try!(self.check_last_key(bs.as_ref(), true));
         self.insert_output(bs, Output::new(val))
+    }
+
+    pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
+            where T: AsRef<[u8]>, I: IntoIterator<Item=(T, Output)> {
+        for (key, out) in iter {
+            try!(self.insert(key, out.value()));
+        }
+        Ok(())
+    }
+
+    pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
+            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+        let mut stream = stream.into_stream();
+        while let Some((key, out)) = stream.next() {
+            try!(self.insert(key, out.value()));
+        }
+        Ok(())
     }
 
     fn insert_output<B>(&mut self, bs: B, out: Output) -> Result<()>
@@ -227,7 +246,7 @@ impl UnfinishedNodes {
     }
 
     fn pop_empty(&mut self) -> BuilderNode {
-        let mut unfinished = self.stack.pop().unwrap();
+        let unfinished = self.stack.pop().unwrap();
         assert!(unfinished.last.is_none());
         unfinished.node
     }

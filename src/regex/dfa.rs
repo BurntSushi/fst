@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use regex::Inst;
+use regex::{Error, Inst};
 use regex::sparse::SparseSet;
 use Result;
+
+const STATE_LIMIT: usize = 1_000; // currently at least 2MB >_<
 
 pub struct DfaBuilder {
     dfa: Dfa,
@@ -23,7 +25,6 @@ struct State {
 
 impl DfaBuilder {
     pub fn new(insts: Vec<Inst>) -> Self {
-        let ninsts = insts.len();
         DfaBuilder {
             dfa: Dfa {
                 insts: insts,
@@ -49,6 +50,9 @@ impl DfaBuilder {
                         states.push(ns);
                     }
                 }
+                if self.dfa.states.len() > STATE_LIMIT {
+                    return Err(Error::TooManyStates(STATE_LIMIT).into());
+                }
             }
         }
         Ok(self.dfa)
@@ -73,7 +77,6 @@ impl DfaBuilder {
         // There are probably many ways to optimize this routine. ---AG
 
         let mut insts = vec![];
-        let mut any = false;
         let mut is_match = false;
         for i in 0..set.len() {
             let ip = set.get(i);

@@ -7,6 +7,7 @@ use regex_syntax;
 pub enum Error {
     Syntax(regex_syntax::Error),
     CompiledTooBig(usize),
+    TooManyStates(usize),
     NoLazy,
     NoWordBoundary,
     NoEmpty,
@@ -27,6 +28,10 @@ impl fmt::Display for Error {
                 write!(f, "Compiled regex exceeds size limit of {} bytes",
                        size_limit)
             }
+            TooManyStates(size_limit) => {
+                write!(f, "Compiled regex exceeds size limit of {} states",
+                       size_limit)
+            }
             NoLazy => write!(f, "Lazy reptition operators such as '+?' are \
                                  not allowed."),
             NoWordBoundary => write!(f, "Word boundary operators are not \
@@ -43,6 +48,7 @@ impl error::Error for Error {
         match *self {
             Syntax(ref err) => err.description(),
             CompiledTooBig(_) => "compiled regex is too big",
+            TooManyStates(_) => "compiled regex has too many states",
             NoLazy => "lazy repetition operators are not allowed",
             NoWordBoundary => "word boundary operators are not allowed",
             NoEmpty => "empty match operators are not allowed",

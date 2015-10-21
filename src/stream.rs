@@ -32,3 +32,11 @@ impl<'a, S: Stream<'a>> IntoStream<'a> for S {
         self
     }
 }
+
+impl<'a, I: Iterator> Stream<'a> for I where <I as Iterator>::Item: 'a {
+    type Item = I::Item;
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        Iterator::next(self)
+    }
+}

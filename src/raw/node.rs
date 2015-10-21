@@ -244,7 +244,7 @@ impl State {
         use self::State::*;
         match *self {
             OneTransNextOutput(s) => { assert!(i == 0); s.output(node) }
-            OneTransNext(s) => { assert!(i == 0); Output::zero() }
+            OneTransNext(_) => { assert!(i == 0); Output::zero() }
             OneTransFinal(s) => { assert!(i == 0); s.output(node) }
             OneTrans(s) => { assert!(i == 0); s.output(node) }
             AnyTrans(s) => s.output(node, i),
@@ -287,7 +287,7 @@ impl State {
 
 impl StateOneTransNextOutput {
     fn compile<W: io::Write>(
-        mut wtr: W, addr: CompiledAddr, input: u8, output: Output,
+        mut wtr: W, _: CompiledAddr, input: u8, output: Output,
     ) -> io::Result<()> {
         let mut state = StateOneTransNextOutput::new();
         let pack_size = try!(pack_uint(&mut wtr, output.encode()));
@@ -335,7 +335,7 @@ impl StateOneTransNextOutput {
 
 impl StateOneTransNext {
     fn compile<W: io::Write>(
-        mut wtr: W, addr: CompiledAddr, input: u8,
+        mut wtr: W, _: CompiledAddr, input: u8,
     ) -> io::Result<()> {
         let mut state = StateOneTransNext::new();
         state.set_common_input(input);
@@ -464,7 +464,6 @@ impl StateOneTransFinal {
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
         let tsize = self.sizes(node).transition_pack_size();
-        let osize = self.sizes(node).output_pack_size();
         let i = node.start_addr()
                 - self.input_len()
                 - 1 // pack size
@@ -550,7 +549,6 @@ impl StateOneTrans {
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
         let tsize = self.sizes(node).transition_pack_size();
-        let osize = self.sizes(node).output_pack_size();
         let i = node.start_addr()
                 - self.input_len()
                 - 1 // pack size
@@ -633,7 +631,7 @@ impl StateAnyTrans {
     }
 
     #[inline]
-    fn set_state_ntrans(&mut self, mut n: u8) {
+    fn set_state_ntrans(&mut self, n: u8) {
         if n <= 0b00_111111 {
             self.0 = (self.0 & 0b11_000000) | n;
         }

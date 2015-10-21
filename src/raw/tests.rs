@@ -42,30 +42,11 @@ pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
     words
 }
 
-pub fn fst_input_strs(fst: &Fst) -> Vec<String> {
-    let mut words = vec![];
-    let mut rdr = fst.stream();
-    while let Some((word, _)) = rdr.next() {
-        words.push(::std::str::from_utf8(word).unwrap().to_owned());
-    }
-    words
-}
-
 pub fn fst_inputs_outputs(fst: &Fst) -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
     let mut rdr = fst.stream();
     while let Some((word, out)) = rdr.next() {
         words.push((word.to_vec(), out.value()));
-    }
-    words
-}
-
-pub fn fst_inputstrs_outputs(fst: &Fst) -> Vec<(String, u64)> {
-    let mut words = vec![];
-    let mut rdr = fst.stream();
-    while let Some((word, out)) = rdr.next() {
-        let word = ::std::str::from_utf8(word).unwrap().to_owned();
-        words.push((word, out.value()));
     }
     words
 }
@@ -206,7 +187,7 @@ fn fst_map_100000_lengths() {
 #[test]
 fn invalid_version() {
     match Fst::from_bytes(vec![0; 32]) {
-        Err(Error::Version { expected, got }) => assert_eq!(got, 0),
+        Err(Error::Version { got, .. }) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
     }

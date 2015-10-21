@@ -1,3 +1,4 @@
+use std::fmt;
 use std::iter::FromIterator;
 use std::io;
 use std::path::Path;
@@ -11,42 +12,280 @@ use raw::{
 use stream::{IntoStream, Stream};
 use Result;
 
+/// Set is a lexicographically ordered set of byte strings.
+///
+/// A `Set` is constructed with the `SetBuilder` type. Alternatively, a `Set`
+/// can be constructed in memory from a lexicographically ordered iterator
+/// of byte strings (`Set::new`).
+///
+/// A key feature of `Set` is that it can be serialized to disk compactly. Its
+/// underlying representation is built such that the `Set` can be memory mapped
+/// (`Set::from_file_path`) and searched without necessarily loading the entire
+/// set into memory.
+///
+/// It supports most common operations associated with sets, such as
+/// membership, union, intersection, subset/superset, etc. It also supports
+/// range queries and automata based searches (e.g. a regular expression).
+///
+/// Sets are represented by a finite state transducer where output values are
+/// always zero. As such, sets have the following invariants:
+///
+/// 1. Once constructed, a `Set` can never be modified.
+/// 2. Sets must be constructed with lexicographically ordered byte sequences.
 pub struct Set(Fst);
 
 impl Set {
+    /// Opens a set stored at the given file path via a memory map.
+    ///
+    /// The set must have been written with a compatible finite state
+    /// transducer builder (`SetBuilder` qualifies). If the format is invalid
+    /// or if there is a mismatch between the API version of this library
+    /// and the set, then an error is returned.
     pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         Fst::from_file_path(path).map(Set)
     }
 
+    /// Creates a set from its representation as a raw byte sequence.
+    ///
+    /// Note that this operation is very cheap (no allocations and no copies).
+    ///
+    /// The set must have been written with a compatible finite state
+    /// transducer builder (`SetBuilder` qualifies). If the format is invalid
+    /// or if there is a mismatch between the API version of this library
+    /// and the set, then an error is returned.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Fst::from_bytes(bytes).map(Set)
     }
 
+    /// Create a `Set` from an iterator of lexicographically ordered byte
+    /// strings.
+    ///
+    /// If the iterator does not yield values in lexicographic order, then an
+    /// error is returned.
+    ///
+    /// Note that this is a convenience function to build a set in memory.
+    /// To build a set that streams to an arbitrary `io::Write`, use
+    /// `SetBuilder`.
+    pub fn from_iter<T, I>(iter: I) -> Result<Self>
+            where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
+        let mut builder = SetBuilder::memory();
+        try!(builder.extend_iter(iter));
+        Set::from_bytes(try!(builder.into_inner()))
+    }
+
+    /// Return a lexicographically ordered stream of all keys in this set.
+    ///
+    /// While this is a stream, it does require heap space proportional to the
+    /// longest key in the set.
+    ///
+    /// If the set is memory mapped, then no further heap space is needed.
+    /// Note though that your operating system may fill your page cache
+    /// (which will cause the resident memory usage of the process to go up
+    /// correspondingly).
+    ///
+    /// # Example
+    ///
+    /// Since streams are not iterators, the traditional `for` loop cannot be
+    /// used. `while let` is useful instead:
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let mut stream = set.into_stream();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = stream.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"a", b"b", b"c"]);
+    /// ```
     pub fn stream(&self) -> SetStream {
         SetStream(self.0.stream())
     }
 
+    /// Return a builder for range queries.
+    ///
+    /// A range query returns a subset of keys in this set in a range given in
+    /// lexicographic order.
+    ///
+    /// Memory requirements are the same as described on `Set::stream`.
+    ///
+    /// # Example
+    ///
+    /// Returns only the keys in the range given.
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set = Set::from_iter(&["a", "b", "c", "d", "e"]).unwrap();
+    /// let mut stream = set.range().ge("b").lt("e").into_stream();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = stream.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"b", b"c", b"d"]);
+    /// ```
     pub fn range(&self) -> SetStreamBuilder {
         SetStreamBuilder(self.0.range())
     }
 
+    /// Tests the membership of a single key.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::Set;
+    ///
+    /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
+    ///
+    /// assert_eq!(set.contains("b"), true);
+    /// assert_eq!(set.contains("z"), false);
+    /// ```
     pub fn contains<B: AsRef<[u8]>>(&self, key: B) -> bool {
         self.0.find(key).is_some()
     }
 
+    /// Executes an automaton on the keys of this set.
+    ///
+    /// Note that this returns a `SetStreamBuilder`, which can be used to
+    /// add a range query to the search (see the `range` method).
+    ///
+    /// Memory requirements are the same as described on `Set::stream`.
+    ///
+    /// # Example
+    ///
+    /// This crate provides an implementation of regular expressions
+    /// for `Automaton`. Make sure to see the documentation for `fst::Regex`
+    /// for more details such as what kind of regular expressions are allowed.
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Regex, Set};
+    ///
+    /// let set = Set::from_iter(&["foo", "foo1", "foo2", "foo3", "foobar"])
+    ///               .unwrap();
+    ///
+    /// let re = Regex::new("f[a-z]+3?").unwrap();
+    /// let mut stream = set.search(re).into_stream();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = stream.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![
+    ///     "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
+    /// ]);
+    /// ```
     pub fn search<A: Automaton>(&self, aut: A) -> SetStreamBuilder<A> {
         SetStreamBuilder(self.0.search(aut))
     }
 
+    /// Returns the number of elements in this set.
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
+    /// Returns true if and only if this set is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    pub fn as_fst(&self) -> &Fst {
+    /// Returns true if and only if the `self` set is disjoint with the set
+    /// `stream`.
+    ///
+    /// `stream` must be a lexicographically ordered sequence of byte strings.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
+    ///
+    /// assert_eq!(set1.is_disjoint(&set2), true);
+    ///
+    /// let set3 = Set::from_iter(&["a", "c"]).unwrap();
+    ///
+    /// assert_eq!(set1.is_disjoint(&set3), false);
+    /// ```
+    pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
+            where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
+                  S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
+        self.0.is_disjoint(SetStreamZeroOutput(stream.into_stream()))
+    }
+
+    /// Returns true if and only if the `self` set is a subset of `stream`.
+    ///
+    /// `stream` must be a lexicographically ordered sequence of byte strings.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::Set;
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
+    ///
+    /// assert_eq!(set1.is_subset(&set2), false);
+    ///
+    /// let set3 = Set::from_iter(&["a", "c"]).unwrap();
+    ///
+    /// assert_eq!(set1.is_subset(&set3), false);
+    /// assert_eq!(set3.is_subset(&set1), true);
+    /// ```
+    pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
+            where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
+                  S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
+        self.0.is_subset(SetStreamZeroOutput(stream.into_stream()))
+    }
+
+    /// Returns true if and only if the `self` set is a superset of `stream`.
+    ///
+    /// `stream` must be a lexicographically ordered sequence of byte strings.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::Set;
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
+    ///
+    /// assert_eq!(set1.is_superset(&set2), false);
+    ///
+    /// let set3 = Set::from_iter(&["a", "c"]).unwrap();
+    ///
+    /// assert_eq!(set1.is_superset(&set3), true);
+    /// assert_eq!(set3.is_superset(&set1), false);
+    /// ```
+    pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
+            where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
+                  S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
+        self.0.is_superset(SetStreamZeroOutput(stream.into_stream()))
+    }
+}
+
+impl fmt::Debug for Set {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(write!(f, "Set(["));
+        let mut stream = self.stream();
+        let mut first = true;
+        while let Some(key) = stream.next() {
+            if !first {
+                try!(write!(f, ", "));
+            }
+            first = false;
+            try!(write!(f, "{}", String::from_utf8_lossy(key)));
+        }
+        write!(f, "])")
+    }
+}
+
+impl AsRef<Fst> for Set {
+    /// Returns the underlying finite state transducer.
+    fn as_ref(&self) -> &Fst {
         &self.0
     }
 }
@@ -77,6 +316,17 @@ impl<W: io::Write> SetBuilder<W> {
         self.0.add(bytes)
     }
 
+    pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
+            where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
+        self.0.extend_iter(iter.into_iter().map(|key| (key, Output::zero())))
+    }
+
+    pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
+            where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
+                  S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
+        self.0.extend_stream(SetStreamZeroOutput(stream.into_stream()))
+    }
+
     pub fn finish(self) -> Result<()> {
         self.0.finish()
     }
@@ -99,19 +349,19 @@ impl<'a, 's, A: Automaton> Stream<'a> for SetStream<'s, A> {
 pub struct SetStreamBuilder<'s, A=AlwaysMatch>(FstStreamBuilder<'s, A>);
 
 impl<'s, A: Automaton> SetStreamBuilder<'s, A> {
-    pub fn ge<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+    pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.ge(bound))
     }
 
-    pub fn gt<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+    pub fn gt<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.gt(bound))
     }
 
-    pub fn le<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+    pub fn le<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.le(bound))
     }
 
-    pub fn lt<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
+    pub fn lt<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.lt(bound))
     }
 }

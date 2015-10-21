@@ -13,7 +13,7 @@ pub use self::build::Builder;
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
 pub use self::ops::{
-    FstOutput, StreamOp,
+    IndexedOutput, StreamOp,
     StreamIntersection, StreamUnion,
     StreamDifference, StreamSymmetricDifference,
 };
@@ -25,7 +25,6 @@ mod node;
 mod ops;
 mod pack;
 mod registry;
-mod registry_minimal;
 #[cfg(test)] mod tests;
 
 pub const VERSION: u64 = 1;
@@ -149,6 +148,34 @@ impl Fst {
         self.len == 0
     }
 
+    pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
+            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+        StreamOp::new().add(self).add(stream).intersection().next().is_none()
+    }
+
+    pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
+            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+        let mut op = StreamOp::new().add(self).add(stream).intersection();
+        let mut count = 0;
+        while let Some(_) = op.next() {
+            count += 1;
+        }
+        count == self.len()
+    }
+
+    pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
+            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+        let mut op = StreamOp::new().add(self).add(stream).union();
+        let mut count = 0;
+        while let Some(_) = op.next() {
+            count += 1;
+        }
+        count == self.len()
+    }
+
     fn empty_final_output(&self) -> Option<Output> {
         let root = self.root();
         if root.is_final() {
@@ -223,14 +250,6 @@ enum Bound {
 }
 
 impl Bound {
-    fn includes_empty(&self) -> bool {
-        match *self {
-            Bound::Included(ref v) => v == &[],
-            Bound::Excluded(_) => false,
-            Bound::Unbounded => true,
-        }
-    }
-
     fn exceeded_by(&self, inp: &[u8]) -> bool {
         match *self {
             Bound::Included(ref v) => inp > v,

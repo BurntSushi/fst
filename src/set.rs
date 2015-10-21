@@ -283,8 +283,8 @@ impl fmt::Debug for Set {
     }
 }
 
+/// Returns the underlying finite state transducer.
 impl AsRef<Fst> for Set {
-    /// Returns the underlying finite state transducer.
     fn as_ref(&self) -> &Fst {
         &self.0
     }

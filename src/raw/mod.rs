@@ -13,9 +13,8 @@ pub use self::build::Builder;
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
 pub use self::ops::{
-    IndexedOutput, StreamOp,
-    StreamIntersection, StreamUnion,
-    StreamDifference, StreamSymmetricDifference,
+    IndexedValue, FstOpBuilder,
+    FstIntersection, FstUnion, FstDifference, FstSymmetricDifference,
 };
 
 mod build;
@@ -148,16 +147,20 @@ impl Fst {
         self.len == 0
     }
 
+    pub fn op(&self) -> FstOpBuilder {
+        FstOpBuilder::new().add(self)
+    }
+
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
             where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
                   S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
-        StreamOp::new().add(self).add(stream).intersection().next().is_none()
+        self.op().add(stream).intersection().next().is_none()
     }
 
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
             where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
                   S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
-        let mut op = StreamOp::new().add(self).add(stream).intersection();
+        let mut op = self.op().add(stream).intersection();
         let mut count = 0;
         while let Some(_) = op.next() {
             count += 1;
@@ -168,7 +171,7 @@ impl Fst {
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
             where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
                   S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
-        let mut op = StreamOp::new().add(self).add(stream).union();
+        let mut op = self.op().add(stream).union();
         let mut count = 0;
         while let Some(_) = op.next() {
             count += 1;

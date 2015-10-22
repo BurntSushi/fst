@@ -5,9 +5,8 @@ use std::path::Path;
 
 use automaton::{Automaton, AlwaysMatch};
 use raw::{
-    Builder, Fst, FstStream, FstStreamBuilder, Output,
-    StreamOp, StreamUnion, StreamIntersection,
-    StreamDifference, StreamSymmetricDifference,
+    Builder, Fst, FstStream, FstStreamBuilder, Output, FstOpBuilder,
+    FstUnion, FstIntersection, FstDifference, FstSymmetricDifference,
 };
 use stream::{IntoStream, Stream};
 use Result;
@@ -110,6 +109,8 @@ impl Set {
     /// lexicographic order.
     ///
     /// Memory requirements are the same as described on `Set::stream`.
+    /// Notably, only the keys in the range are read; keys outside the range
+    /// are not.
     ///
     /// # Example
     ///
@@ -143,7 +144,7 @@ impl Set {
     /// assert_eq!(set.contains("b"), true);
     /// assert_eq!(set.contains("z"), false);
     /// ```
-    pub fn contains<B: AsRef<[u8]>>(&self, key: B) -> bool {
+    pub fn contains<K: AsRef<[u8]>>(&self, key: K) -> bool {
         self.0.find(key).is_some()
     }
 
@@ -189,6 +190,32 @@ impl Set {
     /// Returns true if and only if this set is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// Creates a new set operation with this set added to it.
+    ///
+    /// The `SetOpBuilder` type can be used to add additional set streams
+    /// and perform set operations like union, intersection, difference and
+    /// symmetric difference.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
+    ///
+    /// let mut union = set1.op().add(&set2).union();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = union.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"a", b"b", b"c", b"y", b"z"]);
+    /// ```
+    pub fn op(&self) -> SetOpBuilder {
+        SetOpBuilder::new().add(self)
     }
 
     /// Returns true if and only if the `self` set is disjoint with the set
@@ -299,44 +326,168 @@ impl<'s, 'a> IntoStream<'a> for &'s Set {
     }
 }
 
+/// A builder for creating a set.
+///
+/// This is not your average everyday builder. It has two important qualities
+/// that make it a bit unique from what you might expect:
+///
+/// 1. All keys must be added in lexicographic order. Adding a key out of order
+///    will result in an error.
+/// 2. The representation of a set is streamed to *any* `io::Write` as it is
+///    built. For an in memory representation, this can be a `Vec<u8>`.
+///
+/// Point (2) is especially important because it means that a set can be
+/// constructed *without storing the entire set in memory*. Namely, since it
+/// works with any `io::Write`, it can be streamed directly to a file.
+///
+/// With that said, the builder does use memory, but **memory usage is bounded
+/// to a constant size**. The amount of memory used trades off with the
+/// compression ratio. Currently, the implementation hard codes this trade off
+/// which can result in about 5-20MB of heap usage during construction. (N.B.
+/// Guaranteeing a maximal compression ratio requires memory proportional to
+/// the size of the set, which defeats the benefit of streaming it to disk.
+/// In practice, a small bounded amount of memory achieves close-to-minimal
+/// compression ratios.)
+///
+/// The algorithmic complexity of set construction is `O(n)` where `n` is the
+/// number of elements added to the set.
+///
+/// # Example: build in memory
+///
+/// This shows how to use the builder to construct a set in memory. Note that
+/// `Set::from_iter` provides a convenience function that achieves this same
+/// goal without needing to explicitly use `SetBuilder`.
+///
+/// ```rust
+/// use fst::{IntoStream, Stream, Set, SetBuilder};
+///
+/// let mut build = SetBuilder::memory();
+/// build.insert("bruce").unwrap();
+/// build.insert("clarence").unwrap();
+/// build.insert("stevie").unwrap();
+///
+/// // You could also call `finish()` here, but since we're building the set
+/// // memory, there would be no way to get the `Vec<u8>` back.
+/// let bytes = build.into_inner().unwrap();
+///
+/// // At this point, the set has been constructed, but here's how to read it.
+/// let set = Set::from_bytes(bytes).unwrap();
+/// let mut stream = set.into_stream();
+/// let mut keys = vec![];
+/// while let Some(key) = stream.next() {
+///     keys.push(key.to_vec());
+/// }
+/// assert_eq!(keys, vec![
+///     "bruce".as_bytes(), "clarence".as_bytes(), "stevie".as_bytes(),
+/// ]);
+/// ```
+///
+/// # Example: stream to file
+///
+/// This shows how to stream construction of a set to a file.
+///
+/// ```rust,no_run
+/// use std::fs::File;
+/// use std::io;
+///
+/// use fst::{IntoStream, Stream, Set, SetBuilder};
+///
+/// let mut wtr = io::BufWriter::new(File::create("set.fst").unwrap());
+/// let mut build = SetBuilder::new(wtr).unwrap();
+/// build.insert("bruce").unwrap();
+/// build.insert("clarence").unwrap();
+/// build.insert("stevie").unwrap();
+///
+/// // If you want the writer back, then call `into_inner`. Otherwise, this
+/// // will finish construction and call `flush`.
+/// build.finish().unwrap();
+///
+/// // At this point, the set has been constructed, but here's how to read it.
+/// let set = Set::from_file_path("set.fst").unwrap();
+/// let mut stream = set.into_stream();
+/// let mut keys = vec![];
+/// while let Some(key) = stream.next() {
+///     keys.push(key.to_vec());
+/// }
+/// assert_eq!(keys, vec![
+///     "bruce".as_bytes(), "clarence".as_bytes(), "stevie".as_bytes(),
+/// ]);
+/// ```
 pub struct SetBuilder<W>(Builder<W>);
 
 impl SetBuilder<Vec<u8>> {
+    /// Create a builder that builds a set in memory.
     pub fn memory() -> Self {
         SetBuilder(Builder::memory())
     }
 }
 
 impl<W: io::Write> SetBuilder<W> {
+    /// Create a builder that builds a set by writing it to `wtr` in a
+    /// streaming fashion.
     pub fn new(wtr: W) -> Result<SetBuilder<W>> {
         Builder::new_type(wtr, 1).map(SetBuilder)
     }
 
-    pub fn insert<B: AsRef<[u8]>>(&mut self, bytes: B) -> Result<()> {
-        self.0.add(bytes)
+    /// Insert a new key into the set.
+    ///
+    /// If a key is inserted that is less than any previous key added, then
+    /// an error is returned. Similarly, if there was a problem writing to
+    /// the underlying writer, an error is returned.
+    pub fn insert<K: AsRef<[u8]>>(&mut self, key: K) -> Result<()> {
+        self.0.add(key)
     }
 
+    /// Calls insert on each item in the iterator.
+    ///
+    /// If an error occurred while adding an element, processing is stopped
+    /// and the error is returned.
     pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
             where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
         self.0.extend_iter(iter.into_iter().map(|key| (key, Output::zero())))
     }
 
+    /// Calls insert on each item in the stream.
+    ///
+    /// Note that unlike `extend_iter`, this is not generic on the items in
+    /// the stream.
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
             where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
                   S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
         self.0.extend_stream(SetStreamZeroOutput(stream.into_stream()))
     }
 
+    /// Finishes the construction of the set and flushes the underlying
+    /// writer. After completion, the data written to `W` may be read using
+    /// one of `Set`'s constructor methods.
     pub fn finish(self) -> Result<()> {
         self.0.finish()
     }
 
+    /// Just like `finish`, except it returns the underlying writer after
+    /// flushing it.
     pub fn into_inner(self) -> Result<W> {
         self.0.into_inner()
     }
 }
 
+/// A lexicographically ordered stream of keys from a set.
+///
+/// The `A` type parameter corresponds to an optional automaton to filter
+/// the stream. By default, no filtering is done.
+///
+/// The `'s` lifetime parameter refers to the lifetime of the underlying set.
 pub struct SetStream<'s, A=AlwaysMatch>(FstStream<'s, A>) where A: Automaton;
+
+impl<'s, A: Automaton> SetStream<'s, A> {
+    /// Creates a new set stream from an fst stream.
+    ///
+    /// Not part of the public API, but useful in sibling module `map`.
+    #[doc(hidden)]
+    pub fn new(fst_stream: FstStream<'s, A>) -> Self {
+        SetStream(fst_stream)
+    }
+}
 
 impl<'a, 's, A: Automaton> Stream<'a> for SetStream<'s, A> {
     type Item = &'a [u8];
@@ -346,21 +497,37 @@ impl<'a, 's, A: Automaton> Stream<'a> for SetStream<'s, A> {
     }
 }
 
+/// A builder for constructing range queries on streams.
+///
+/// Once all bounds are set, one should call `into_stream` to get a
+/// `SetStream`.
+///
+/// Bounds are not additive. That is, if `ge` is called twice on the same
+/// builder, then the second setting wins.
+///
+/// The `A` type parameter corresponds to an optional automaton to filter
+/// the stream. By default, no filtering is done.
+///
+/// The `'s` lifetime parameter refers to the lifetime of the underlying set.
 pub struct SetStreamBuilder<'s, A=AlwaysMatch>(FstStreamBuilder<'s, A>);
 
 impl<'s, A: Automaton> SetStreamBuilder<'s, A> {
+    /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.ge(bound))
     }
 
+    /// Specify a greater-than bound.
     pub fn gt<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.gt(bound))
     }
 
+    /// Specify a less-than-or-equal-to bound.
     pub fn le<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.le(bound))
     }
 
+    /// Specify a less-than bound.
     pub fn lt<T: AsRef<[u8]>>(self, bound: T) -> Self {
         SetStreamBuilder(self.0.lt(bound))
     }
@@ -375,13 +542,35 @@ impl<'s, 'a, A: Automaton> IntoStream<'a> for SetStreamBuilder<'s, A> {
     }
 }
 
-pub struct SetOp<'s>(StreamOp<'s>);
+/// A builder for collecting set streams on which to perform set operations.
+///
+/// Set operations include intersection, union, difference and symmetric
+/// difference. The result of each set operation is itself a stream that emits
+/// keys in lexicographic order.
+///
+/// All set operations work efficiently on an arbitrary number of
+/// streams with memory proportional to the number of streams.
+///
+/// The algorithmic complexity of all set operations is `O(n1 + n2 + n3 + ...)`
+/// where `n1, n2, n3, ...` correspond to the number of elements in each
+/// stream.
+///
+/// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+pub struct SetOpBuilder<'s>(FstOpBuilder<'s>);
 
-impl<'s> SetOp<'s> {
+impl<'s> SetOpBuilder<'s> {
+    /// Create a new set operation builder.
     pub fn new() -> Self {
-        SetOp(StreamOp::new())
+        SetOpBuilder(FstOpBuilder::new())
     }
 
+    /// Add a stream to this set operation.
+    ///
+    /// This is useful for a chaining style pattern, e.g.,
+    /// `builder.add(stream1).add(stream2).union()`.
+    ///
+    /// The stream must emit a lexicographically ordered sequence of byte
+    /// strings.
     pub fn add<I, S>(mut self, streamable: I) -> Self
             where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
                   S: 's + for<'a> Stream<'a, Item=&'a [u8]> {
@@ -389,30 +578,115 @@ impl<'s> SetOp<'s> {
         self
     }
 
+    /// Add a stream to this set operation.
+    ///
+    /// The stream must emit a lexicographically ordered sequence of byte
+    /// strings.
     pub fn push<I, S>(&mut self, streamable: I)
             where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
                   S: 's + for<'a> Stream<'a, Item=&'a [u8]> {
         self.0.push(SetStreamZeroOutput(streamable.into_stream()));
     }
 
+    /// Performs a union operation on all streams that have been added.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
+    ///
+    /// let mut union = set1.op().add(&set2).union();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = union.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"a", b"b", b"c", b"y", b"z"]);
+    /// ```
     pub fn union(self) -> SetUnion<'s> {
         SetUnion(self.0.union())
     }
 
+    /// Performs an intersection operation on all streams that have been added.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
+    ///
+    /// let mut union = set1.op().add(&set2).intersection();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = union.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"a"]);
+    /// ```
     pub fn intersection(self) -> SetIntersection<'s> {
         SetIntersection(self.0.intersection())
     }
 
+    /// Performs a difference operation with respect to the first stream added.
+    /// That is, this returns a stream of all elements in the first stream
+    /// that don't exist in any other stream that has been added.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
+    ///
+    /// let mut union = set1.op().add(&set2).difference();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = union.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"b", b"c"]);
+    /// ```
     pub fn difference(self) -> SetDifference<'s> {
         SetDifference(self.0.difference())
     }
 
+    /// Performs a symmetric difference operation on all of the streams that
+    /// have been added.
+    ///
+    /// When there are only two streams, then the keys returned correspond to
+    /// keys that are in either stream but *not* in both streams.
+    ///
+    /// More generally, for any number of streams, keys that occur in an odd
+    /// number of streams are returned.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStream, Stream, Set};
+    ///
+    /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
+    /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
+    ///
+    /// let mut union = set1.op().add(&set2).symmetric_difference();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(key) = union.next() {
+    ///     keys.push(key.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"b", b"c", b"y", b"z"]);
+    /// ```
     pub fn symmetric_difference(self) -> SetSymmetricDifference<'s> {
         SetSymmetricDifference(self.0.symmetric_difference())
     }
 }
 
-impl<'f, I, S> Extend<I> for SetOp<'f>
+impl<'f, I, S> Extend<I> for SetOpBuilder<'f>
     where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
           S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
     fn extend<T>(&mut self, it: T) where T: IntoIterator<Item=I> {
@@ -422,17 +696,20 @@ impl<'f, I, S> Extend<I> for SetOp<'f>
     }
 }
 
-impl<'f, I, S> FromIterator<I> for SetOp<'f>
+impl<'f, I, S> FromIterator<I> for SetOpBuilder<'f>
     where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
           S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
     fn from_iter<T>(it: T) -> Self where T: IntoIterator<Item=I> {
-        let mut op = SetOp::new();
+        let mut op = SetOpBuilder::new();
         op.extend(it);
         op
     }
 }
 
-pub struct SetUnion<'s>(StreamUnion<'s>);
+/// A stream of set union over multiple streams in lexicographic order.
+///
+/// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+pub struct SetUnion<'s>(FstUnion<'s>);
 
 impl<'a, 's> Stream<'a> for SetUnion<'s> {
     type Item = &'a [u8];
@@ -442,7 +719,10 @@ impl<'a, 's> Stream<'a> for SetUnion<'s> {
     }
 }
 
-pub struct SetIntersection<'s>(StreamIntersection<'s>);
+/// A stream of set intersection over multiple streams in lexicographic order.
+///
+/// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+pub struct SetIntersection<'s>(FstIntersection<'s>);
 
 impl<'a, 's> Stream<'a> for SetIntersection<'s> {
     type Item = &'a [u8];
@@ -452,7 +732,14 @@ impl<'a, 's> Stream<'a> for SetIntersection<'s> {
     }
 }
 
-pub struct SetDifference<'s>(StreamDifference<'s>);
+/// A stream of set difference over multiple streams in lexicographic order.
+///
+/// The difference operation is take with respect to the first stream and the
+/// rest of the streams. i.e., All elements in the first stream that do not
+/// appear in any other streams.
+///
+/// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+pub struct SetDifference<'s>(FstDifference<'s>);
 
 impl<'a, 's> Stream<'a> for SetDifference<'s> {
     type Item = &'a [u8];
@@ -462,7 +749,11 @@ impl<'a, 's> Stream<'a> for SetDifference<'s> {
     }
 }
 
-pub struct SetSymmetricDifference<'s>(StreamSymmetricDifference<'s>);
+/// A stream of set symmetric difference over multiple streams in lexicographic
+/// order.
+///
+/// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+pub struct SetSymmetricDifference<'s>(FstSymmetricDifference<'s>);
 
 impl<'a, 's> Stream<'a> for SetSymmetricDifference<'s> {
     type Item = &'a [u8];
@@ -472,6 +763,11 @@ impl<'a, 's> Stream<'a> for SetSymmetricDifference<'s> {
     }
 }
 
+/// A specialized stream for mapping set streams (`&[u8]`) to streams used
+/// by raw fsts (`(&[u8], Output)`).
+///
+/// If this were iterators, we could use `iter::Map`, but doing this on streams
+/// requires HKT, so we need to write out the monomorphization ourselves.
 struct SetStreamZeroOutput<S>(S);
 
 impl<'a, S: Stream<'a>> Stream<'a> for SetStreamZeroOutput<S> {

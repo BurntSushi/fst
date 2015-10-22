@@ -9,18 +9,18 @@ use stream::{IntoStream, Stream};
 type BoxedStream<'f> = Box<for<'a> Stream<'a, Item=(&'a [u8], Output)> + 'f>;
 
 #[derive(Copy, Clone, Debug)]
-pub struct IndexedOutput {
+pub struct IndexedValue {
     pub index: usize,
-    pub output: u64,
+    pub value: u64,
 }
 
-pub struct StreamOp<'f> {
+pub struct FstOpBuilder<'f> {
     streams: Vec<BoxedStream<'f>>,
 }
 
-impl<'f> StreamOp<'f> {
+impl<'f> FstOpBuilder<'f> {
     pub fn new() -> Self {
-        StreamOp { streams: vec![] }
+        FstOpBuilder { streams: vec![] }
     }
 
     pub fn add<I, S>(mut self, stream: I) -> Self
@@ -36,25 +36,25 @@ impl<'f> StreamOp<'f> {
         self.streams.push(Box::new(stream.into_stream()));
     }
 
-    pub fn union(self) -> StreamUnion<'f> {
-        StreamUnion {
+    pub fn union(self) -> FstUnion<'f> {
+        FstUnion {
             heap: StreamHeap::new(self.streams),
             outs: vec![],
             cur_slot: None,
         }
     }
 
-    pub fn intersection(self) -> StreamIntersection<'f> {
-        StreamIntersection {
+    pub fn intersection(self) -> FstIntersection<'f> {
+        FstIntersection {
             heap: StreamHeap::new(self.streams),
             outs: vec![],
             cur_slot: None,
         }
     }
 
-    pub fn difference(mut self) -> StreamDifference<'f> {
+    pub fn difference(mut self) -> FstDifference<'f> {
         let first = self.streams.swap_remove(0);
-        StreamDifference {
+        FstDifference {
             set: first,
             key: vec![],
             heap: StreamHeap::new(self.streams),
@@ -62,8 +62,8 @@ impl<'f> StreamOp<'f> {
         }
     }
 
-    pub fn symmetric_difference(self) -> StreamSymmetricDifference<'f> {
-        StreamSymmetricDifference {
+    pub fn symmetric_difference(self) -> FstSymmetricDifference<'f> {
+        FstSymmetricDifference {
             heap: StreamHeap::new(self.streams),
             outs: vec![],
             cur_slot: None,
@@ -71,7 +71,7 @@ impl<'f> StreamOp<'f> {
     }
 }
 
-impl<'f, I, S> Extend<I> for StreamOp<'f>
+impl<'f, I, S> Extend<I> for FstOpBuilder<'f>
     where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
           S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
     fn extend<T>(&mut self, it: T) where T: IntoIterator<Item=I> {
@@ -81,24 +81,24 @@ impl<'f, I, S> Extend<I> for StreamOp<'f>
     }
 }
 
-impl<'f, I, S> FromIterator<I> for StreamOp<'f>
+impl<'f, I, S> FromIterator<I> for FstOpBuilder<'f>
     where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
           S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
     fn from_iter<T>(it: T) -> Self where T: IntoIterator<Item=I> {
-        let mut op = StreamOp::new();
+        let mut op = FstOpBuilder::new();
         op.extend(it);
         op
     }
 }
 
-pub struct StreamUnion<'f> {
+pub struct FstUnion<'f> {
     heap: StreamHeap<'f>,
-    outs: Vec<IndexedOutput>,
+    outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
-impl<'a, 'f> Stream<'a> for StreamUnion<'f> {
-    type Item = (&'a [u8], &'a [IndexedOutput]);
+impl<'a, 'f> Stream<'a> for FstUnion<'f> {
+    type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         if let Some(slot) = self.cur_slot.take() {
@@ -112,23 +112,23 @@ impl<'a, 'f> Stream<'a> for StreamUnion<'f> {
             }
         };
         self.outs.clear();
-        self.outs.push(slot.indexed_output());
+        self.outs.push(slot.indexed_value());
         while let Some(slot2) = self.heap.pop_if_equal(slot.input()) {
-            self.outs.push(slot2.indexed_output());
+            self.outs.push(slot2.indexed_value());
             self.heap.refill(slot2);
         }
         Some((slot.input(), &self.outs))
     }
 }
 
-pub struct StreamIntersection<'f> {
+pub struct FstIntersection<'f> {
     heap: StreamHeap<'f>,
-    outs: Vec<IndexedOutput>,
+    outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
-impl<'a, 'f> Stream<'a> for StreamIntersection<'f> {
-    type Item = (&'a [u8], &'a [IndexedOutput]);
+impl<'a, 'f> Stream<'a> for FstIntersection<'f> {
+    type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         if let Some(slot) = self.cur_slot.take() {
@@ -140,10 +140,10 @@ impl<'a, 'f> Stream<'a> for StreamIntersection<'f> {
                 Some(slot) => slot,
             };
             self.outs.clear();
-            self.outs.push(slot.indexed_output());
+            self.outs.push(slot.indexed_value());
             let mut popped: usize = 1;
             while let Some(slot2) = self.heap.pop_if_equal(slot.input()) {
-                self.outs.push(slot2.indexed_output());
+                self.outs.push(slot2.indexed_value());
                 self.heap.refill(slot2);
                 popped += 1;
             }
@@ -158,15 +158,15 @@ impl<'a, 'f> Stream<'a> for StreamIntersection<'f> {
     }
 }
 
-pub struct StreamDifference<'f> {
+pub struct FstDifference<'f> {
     set: BoxedStream<'f>,
     key: Vec<u8>,
     heap: StreamHeap<'f>,
-    outs: Vec<IndexedOutput>,
+    outs: Vec<IndexedValue>,
 }
 
-impl<'a, 'f> Stream<'a> for StreamDifference<'f> {
-    type Item = (&'a [u8], &'a [IndexedOutput]);
+impl<'a, 'f> Stream<'a> for FstDifference<'f> {
+    type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         loop {
@@ -176,9 +176,9 @@ impl<'a, 'f> Stream<'a> for StreamDifference<'f> {
                     self.key.clear();
                     self.key.extend(key);
                     self.outs.clear();
-                    self.outs.push(IndexedOutput {
+                    self.outs.push(IndexedValue {
                         index: 0,
-                        output: out.value(),
+                        value: out.value(),
                     });
                 }
             };
@@ -194,14 +194,14 @@ impl<'a, 'f> Stream<'a> for StreamDifference<'f> {
     }
 }
 
-pub struct StreamSymmetricDifference<'f> {
+pub struct FstSymmetricDifference<'f> {
     heap: StreamHeap<'f>,
-    outs: Vec<IndexedOutput>,
+    outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
-impl<'a, 'f> Stream<'a> for StreamSymmetricDifference<'f> {
-    type Item = (&'a [u8], &'a [IndexedOutput]);
+impl<'a, 'f> Stream<'a> for FstSymmetricDifference<'f> {
+    type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         if let Some(slot) = self.cur_slot.take() {
@@ -213,10 +213,10 @@ impl<'a, 'f> Stream<'a> for StreamSymmetricDifference<'f> {
                 Some(slot) => slot,
             };
             self.outs.clear();
-            self.outs.push(slot.indexed_output());
+            self.outs.push(slot.indexed_value());
             let mut popped: usize = 1;
             while let Some(slot2) = self.heap.pop_if_equal(slot.input()) {
-                self.outs.push(slot2.indexed_output());
+                self.outs.push(slot2.indexed_value());
                 self.heap.refill(slot2);
                 popped += 1;
             }
@@ -295,8 +295,8 @@ impl Slot {
         }
     }
 
-    fn indexed_output(&self) -> IndexedOutput {
-        IndexedOutput { index: self.idx, output: self.output.value() }
+    fn indexed_value(&self) -> IndexedValue {
+        IndexedValue { index: self.idx, value: self.output.value() }
     }
 
     fn input(&self) -> &[u8] {
@@ -333,7 +333,7 @@ mod tests {
     use raw::Fst;
     use stream::{IntoStream, Stream};
 
-    use super::StreamOp;
+    use super::FstOpBuilder;
 
     fn s(string: &str) -> String { string.to_owned() }
 
@@ -341,7 +341,7 @@ mod tests {
         ($name:ident, $op:ident) => {
             fn $name(sets: Vec<Vec<&str>>) -> Vec<String> {
                 let fsts: Vec<Fst> = sets.into_iter().map(fst_set).collect();
-                let op: StreamOp = fsts.iter().collect();
+                let op: FstOpBuilder = fsts.iter().collect();
                 let mut stream = op.$op().into_stream();
                 let mut keys = vec![];
                 while let Some((key, _)) = stream.next() {
@@ -356,11 +356,11 @@ mod tests {
         ($name:ident, $op:ident) => {
             fn $name(sets: Vec<Vec<(&str, u64)>>) -> Vec<(String, u64)> {
                 let fsts: Vec<Fst> = sets.into_iter().map(fst_map).collect();
-                let op: StreamOp = fsts.iter().collect();
+                let op: FstOpBuilder = fsts.iter().collect();
                 let mut stream = op.$op().into_stream();
                 let mut keys = vec![];
                 while let Some((key, outs)) = stream.next() {
-                    let merged = outs.iter().fold(0, |a, b| a + b.output);
+                    let merged = outs.iter().fold(0, |a, b| a + b.value);
                     let s = String::from_utf8(key.to_vec()).unwrap();
                     keys.push((s, merged));
                 }

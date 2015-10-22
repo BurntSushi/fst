@@ -210,7 +210,7 @@ Options:
         for set_path in &args.arg_input {
             sets.push(try!(fst::Set::from_file_path(set_path)));
         }
-        let union = sets.iter().collect::<fst::set::SetOp>().union();
+        let union = sets.iter().collect::<fst::set::SetOpBuilder>().union();
         try!(merged.extend_stream(union));
         try!(merged.finish());
         Ok(())

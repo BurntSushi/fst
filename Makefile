@@ -2,7 +2,7 @@ all:
 	echo Nothing to do...
 
 ctags:
-	ctags --recurse --options=ctags.rust --languages=Rust
+	ctags --options=ctags.rust --languages=Rust src/*.rs src/*/*.rs
 
 docs:
 	cargo doc

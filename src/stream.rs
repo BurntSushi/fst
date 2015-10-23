@@ -1,4 +1,4 @@
-/// Stream describes a "streaming iterator."
+/// Streamer describes a "streaming iterator."
 ///
 /// It provides a mechanism for writing code that is generic over streams
 /// produced by this crate.
@@ -21,13 +21,13 @@
 /// a means for composing multiple stream abstractions with different concrete
 /// types. For example, one might want to take the union of a range query
 /// stream with a stream that has been filtered by a regex. These streams have
-/// different concrete types. A `Stream` trait allows us to write code that is
-/// generic over these concrete types. (All of the set operations are
+/// different concrete types. A `Streamer` trait allows us to write code that
+/// is generic over these concrete types. (All of the set operations are
 /// implemented this way.)
 ///
 /// A problem with streams is that the trait is itself parameterized by a
 /// lifetime. In practice, this makes them very unergonomic because specifying
-/// a `Stream` bound generally requires a higher-ranked trait bound. This is
+/// a `Streamer` bound generally requires a higher-ranked trait bound. This is
 /// necessary because the lifetime can't actually be named in the enclosing
 /// function; instead, the lifetime is local to iteration itself. Therefore,
 /// one must assert that the bound is valid for *any particular* lifetime.
@@ -38,7 +38,7 @@
 ///
 /// ```ignore
 /// fn takes_stream<T, S>(s: S)
-///     where S: for<'a> Stream<'a, Item=T>
+///     where S: for<'a> Streamer<'a, Item=T>
 /// {
 /// }
 /// ```
@@ -50,7 +50,7 @@
 /// 2. It is often convenient to separate the notion of "stream" with
 ///    "stream constructor." This represents a similar split found in the
 ///    standard library for `Iterator` and `IntoIterator`, respectively.
-/// 3. The `Item=T` is invalid because `Stream`'s associated type is
+/// 3. The `Item=T` is invalid because `Streamer`'s associated type is
 ///    parameterized by a lifetime and there is no way to parameterize an
 ///    arbitrary type constructor. (In this context, `T` is the type
 ///    constructor, because it will invariably require a lifetime to become
@@ -61,8 +61,8 @@
 ///
 /// ```ignore
 /// fn takes_stream<'f, I, S>(s: S)
-///     where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
-///           S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)>
+///     where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+///           S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)>
 /// {
 /// }
 /// ```
@@ -94,7 +94,7 @@
 ///
 /// Stretching this abstraction further with Rust's current type system is not
 /// advised.
-pub trait Stream<'a> {
+pub trait Streamer<'a> {
     /// The type of the item emitted by this stream.
     type Item: 'a;
 
@@ -106,21 +106,21 @@ pub trait Stream<'a> {
     fn next(&'a mut self) -> Option<Self::Item>;
 }
 
-/// IntoStream describes types that can be converted to streams.
+/// IntoStreamer describes types that can be converted to streams.
 ///
 /// This is analogous to the `IntoIterator` trait for `Iterator` in
 /// `std::iter`.
-pub trait IntoStream<'a> {
+pub trait IntoStreamer<'a> {
     /// The type of the item emitted by the stream.
     type Item: 'a;
     /// The type of the stream to be constructed.
-    type Into: Stream<'a, Item=Self::Item>;
+    type Into: Streamer<'a, Item=Self::Item>;
 
     /// Construct a stream from `Self`.
     fn into_stream(self) -> Self::Into;
 }
 
-impl<'a, S: Stream<'a>> IntoStream<'a> for S {
+impl<'a, S: Streamer<'a>> IntoStreamer<'a> for S {
     type Item = S::Item;
     type Into = S;
 
@@ -129,7 +129,7 @@ impl<'a, S: Stream<'a>> IntoStream<'a> for S {
     }
 }
 
-impl<'a, I: Iterator> Stream<'a> for I where <I as Iterator>::Item: 'a {
+impl<'a, I: Iterator> Streamer<'a> for I where <I as Iterator>::Item: 'a {
     type Item = I::Item;
 
     fn next(&'a mut self) -> Option<Self::Item> {

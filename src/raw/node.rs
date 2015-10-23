@@ -822,7 +822,7 @@ mod tests {
     use raw::{Builder, Transition, CompiledAddr, Fst, Output};
     use raw::build::BuilderNode;
     use raw::node::{Node, node_new};
-    use stream::Stream;
+    use stream::Streamer;
 
     const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
 

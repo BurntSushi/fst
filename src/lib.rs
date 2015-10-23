@@ -12,7 +12,7 @@ pub use map::{Map, MapBuilder};
 pub use regex::Error as RegexError;
 pub use regex::Regex;
 pub use set::{Set, SetBuilder};
-pub use stream::{IntoStream, Stream};
+pub use stream::{IntoStreamer, Streamer};
 
 mod automaton;
 mod error;

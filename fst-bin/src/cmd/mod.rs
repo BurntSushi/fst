@@ -41,7 +41,7 @@ pub mod words {
 
     use docopt::Docopt;
     use fst::raw as fst;
-    use fst::Stream;
+    use fst::Streamer;
 
     use util;
     use Error;
@@ -78,7 +78,7 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
-    use fst::{Regex, IntoStream, Stream};
+    use fst::{Regex, IntoStreamer, Streamer};
     use fst::raw as fst;
 
     use util;
@@ -210,7 +210,7 @@ Options:
         for set_path in &args.arg_input {
             sets.push(try!(fst::Set::from_file_path(set_path)));
         }
-        let union = sets.iter().collect::<fst::set::SetOpBuilder>().union();
+        let union = sets.iter().collect::<fst::set::OpBuilder>().union();
         try!(merged.extend_stream(union));
         try!(merged.finish());
         Ok(())

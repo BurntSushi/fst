@@ -7,14 +7,14 @@ use memmap::{Mmap, Protection};
 
 use automaton::{Automaton, AlwaysMatch};
 use error::{Error, Result};
-use stream::{IntoStream, Stream};
+use stream::{IntoStreamer, Streamer};
 
 pub use self::build::Builder;
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
 pub use self::ops::{
-    IndexedValue, FstOpBuilder,
-    FstIntersection, FstUnion, FstDifference, FstSymmetricDifference,
+    IndexedValue, OpBuilder,
+    Intersection, Union, Difference, SymmetricDifference,
 };
 
 mod build;
@@ -91,12 +91,12 @@ impl Fst {
         })
     }
 
-    pub fn stream(&self) -> FstStream {
-        FstStreamBuilder::new(self, AlwaysMatch).into_stream()
+    pub fn stream(&self) -> Stream {
+        StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
 
-    pub fn range(&self) -> FstStreamBuilder {
-        FstStreamBuilder::new(self, AlwaysMatch)
+    pub fn range(&self) -> StreamBuilder {
+        StreamBuilder::new(self, AlwaysMatch)
     }
 
     pub fn find<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
@@ -119,8 +119,8 @@ impl Fst {
         }
     }
 
-    pub fn search<A: Automaton>(&self, aut: A) -> FstStreamBuilder<A> {
-        FstStreamBuilder::new(self, aut)
+    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
+        StreamBuilder::new(self, aut)
     }
 
     pub fn fst_type(&self) -> FstType {
@@ -147,19 +147,19 @@ impl Fst {
         self.len == 0
     }
 
-    pub fn op(&self) -> FstOpBuilder {
-        FstOpBuilder::new().add(self)
+    pub fn op(&self) -> OpBuilder {
+        OpBuilder::new().add(self)
     }
 
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         self.op().add(stream).intersection().next().is_none()
     }
 
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         let mut op = self.op().add(stream).intersection();
         let mut count = 0;
         while let Some(_) = op.next() {
@@ -169,8 +169,8 @@ impl Fst {
     }
 
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         let mut op = self.op().add(stream).union();
         let mut count = 0;
         while let Some(_) = op.next() {
@@ -189,25 +189,25 @@ impl Fst {
     }
 }
 
-impl<'a, 'f> IntoStream<'a> for &'f Fst {
+impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
     type Item = (&'a [u8], Output);
-    type Into = FstStream<'f>;
+    type Into = Stream<'f>;
 
     fn into_stream(self) -> Self::Into {
-        FstStreamBuilder::new(self, AlwaysMatch).into_stream()
+        StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
 }
 
-pub struct FstStreamBuilder<'a, A=AlwaysMatch> {
+pub struct StreamBuilder<'a, A=AlwaysMatch> {
     fst: &'a Fst,
     aut: A,
     min: Bound,
     max: Bound,
 }
 
-impl<'f, A: Automaton> FstStreamBuilder<'f, A> {
+impl<'f, A: Automaton> StreamBuilder<'f, A> {
     fn new(fst: &'f Fst, aut: A) -> Self {
-        FstStreamBuilder {
+        StreamBuilder {
             fst: fst,
             aut: aut,
             min: Bound::Unbounded,
@@ -236,12 +236,12 @@ impl<'f, A: Automaton> FstStreamBuilder<'f, A> {
     }
 }
 
-impl<'a, 'f, A: Automaton> IntoStream<'a> for FstStreamBuilder<'f, A> {
+impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
     type Item = (&'a [u8], Output);
-    type Into = FstStream<'f, A>;
+    type Into = Stream<'f, A>;
 
-    fn into_stream(self) -> FstStream<'f, A> {
-        FstStream::new(self.fst, self.aut, self.min, self.max)
+    fn into_stream(self) -> Stream<'f, A> {
+        Stream::new(self.fst, self.aut, self.min, self.max)
     }
 }
 
@@ -262,26 +262,26 @@ impl Bound {
     }
 }
 
-pub struct FstStream<'f, A=AlwaysMatch> where A: Automaton {
+pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
     fst: &'f Fst,
     aut: A,
     inp: Vec<u8>,
     empty_output: Option<Output>,
-    stack: Vec<FstStreamState<A::State>>,
+    stack: Vec<StreamState<A::State>>,
     end_at: Bound,
 }
 
 #[derive(Clone, Copy, Debug)]
-struct FstStreamState<S> {
+struct StreamState<S> {
     addr: CompiledAddr,
     trans: usize,
     out: Output,
     aut_state: Option<S>,
 }
 
-impl<'f, A: Automaton> FstStream<'f, A> {
+impl<'f, A: Automaton> Stream<'f, A> {
     fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
-        let mut rdr = FstStream {
+        let mut rdr = Stream {
             fst: fst,
             aut: aut,
             inp: Vec::with_capacity(16),
@@ -296,7 +296,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
     fn seek_min(&mut self, min: Bound) {
         let (key, inclusive) = match min {
             Bound::Excluded(ref min) if min.is_empty() => {
-                self.stack = vec![FstStreamState {
+                self.stack = vec![StreamState {
                     addr: self.fst.root_addr,
                     trans: 0,
                     out: Output::zero(),
@@ -312,7 +312,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
             }
             _ => {
                 self.empty_output = self.fst.empty_final_output();
-                self.stack = vec![FstStreamState {
+                self.stack = vec![StreamState {
                     addr: self.fst.root_addr,
                     trans: 0,
                     out: Output::zero(),
@@ -334,7 +334,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
             match node.find_input(b) {
                 Some(i) => {
                     let t = node.transition(i);
-                    self.stack.push(FstStreamState {
+                    self.stack.push(StreamState {
                         addr: node.addr(),
                         trans: i+1,
                         out: out,
@@ -351,7 +351,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
                     // Since this is a minimum bound, we need to find the
                     // first transition in this node that proceeds the current
                     // input byte.
-                    self.stack.push(FstStreamState {
+                    self.stack.push(StreamState {
                         addr: node.addr(),
                         trans: node.transitions()
                                    .position(|t| t.inp > b)
@@ -371,7 +371,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
             } else {
                 let state = self.stack[last];
                 let node = self.fst.node(state.addr);
-                self.stack.push(FstStreamState {
+                self.stack.push(StreamState {
                     addr: node.transition_addr(state.trans - 1),
                     trans: 0,
                     out: out,
@@ -382,7 +382,7 @@ impl<'f, A: Automaton> FstStream<'f, A> {
     }
 }
 
-impl<'f, 'a, A: Automaton> Stream<'a> for FstStream<'f, A> {
+impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
     type Item = (&'a [u8], Output);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -405,7 +405,7 @@ impl<'f, 'a, A: Automaton> Stream<'a> for FstStream<'f, A> {
             }
             let trans = node.transition(state.trans);
             let out = state.out.cat(trans.out);
-            self.stack.push(FstStreamState {
+            self.stack.push(StreamState {
                 addr: state.addr,
                 trans: state.trans + 1,
                 out: state.out,
@@ -417,7 +417,7 @@ impl<'f, 'a, A: Automaton> Stream<'a> for FstStream<'f, A> {
                     Some(state) => state,
                 };
             self.inp.push(trans.inp);
-            self.stack.push(FstStreamState {
+            self.stack.push(StreamState {
                 addr: trans.addr,
                 trans: 0,
                 out: out,

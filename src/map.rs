@@ -4,16 +4,13 @@ use std::io;
 use std::path::Path;
 
 use automaton::{Automaton, AlwaysMatch};
-use raw::{
-    Builder, Fst, FstStream, FstStreamBuilder, Output, FstOpBuilder,
-    FstUnion, FstIntersection, FstDifference, FstSymmetricDifference,
-};
+use raw;
 pub use raw::IndexedValue as IndexedValue;
-use set::SetStream;
-use stream::{IntoStream, Stream};
+use set;
+use stream::{IntoStreamer, Streamer};
 use Result;
 
-pub struct Map(Fst);
+pub struct Map(raw::Fst);
 
 impl Map {
     /// Opens a map stored at the given file path via a memory map.
@@ -23,7 +20,7 @@ impl Map {
     /// or if there is a mismatch between the API version of this library
     /// and the map, then an error is returned.
     pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Fst::from_file_path(path).map(Map)
+        raw::Fst::from_file_path(path).map(Map)
     }
 
     /// Creates a map from its representation as a raw byte sequence.
@@ -35,7 +32,7 @@ impl Map {
     /// or if there is a mismatch between the API version of this library
     /// and the map, then an error is returned.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Fst::from_bytes(bytes).map(Map)
+        raw::Fst::from_bytes(bytes).map(Map)
     }
 
     /// Create a `Map` from an iterator of lexicographically ordered byte
@@ -54,8 +51,8 @@ impl Map {
         Map::from_bytes(try!(builder.into_inner()))
     }
 
-    pub fn stream(&self) -> MapStream {
-        MapStream(self.0.stream())
+    pub fn stream(&self) -> Stream {
+        Stream(self.0.stream())
     }
 
     /// Return a lexicographically ordered stream of all keys in this map.
@@ -74,7 +71,7 @@ impl Map {
     /// used. `while let` is useful instead:
     ///
     /// ```rust
-    /// use fst::{IntoStream, Stream, Map};
+    /// use fst::{IntoStreamer, Streamer, Map};
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
     /// let mut stream = map.into_stream();
@@ -89,12 +86,12 @@ impl Map {
     ///     ("c".as_bytes().to_vec(), 3),
     /// ]);
     /// ```
-    pub fn stream_keys(&self) -> SetStream {
-        SetStream::new(self.0.stream())
+    pub fn stream_keys(&self) -> set::Stream {
+        set::Stream::new(self.0.stream())
     }
 
-    pub fn range(&self) -> MapStreamBuilder {
-        MapStreamBuilder(self.0.range())
+    pub fn range(&self) -> StreamBuilder {
+        StreamBuilder(self.0.range())
     }
 
     /// Tests the membership of a single key.
@@ -113,8 +110,8 @@ impl Map {
         self.0.find(key).is_some()
     }
 
-    pub fn search<A: Automaton>(&self, aut: A) -> MapStreamBuilder<A> {
-        MapStreamBuilder(self.0.search(aut))
+    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
+        StreamBuilder(self.0.search(aut))
     }
 
     /// Returns the number of elements in this map.
@@ -127,26 +124,26 @@ impl Map {
         self.0.is_empty()
     }
 
-    pub fn op(&self) -> MapOpBuilder {
-        MapOpBuilder::new().add(self)
+    pub fn op(&self) -> OpBuilder {
+        OpBuilder::new().add(self)
     }
 
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
-        self.0.is_disjoint(SetStreamZeroOutput(stream.into_stream()))
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
+                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
+        self.0.is_disjoint(StreamZeroOutput(stream.into_stream()))
     }
 
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
-        self.0.is_subset(SetStreamZeroOutput(stream.into_stream()))
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
+                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
+        self.0.is_subset(StreamZeroOutput(stream.into_stream()))
     }
 
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStream<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Stream<'a, Item=&'a [u8]> {
-        self.0.is_superset(SetStreamZeroOutput(stream.into_stream()))
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
+                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
+        self.0.is_superset(StreamZeroOutput(stream.into_stream()))
     }
 }
 
@@ -167,26 +164,26 @@ impl fmt::Debug for Map {
 }
 
 /// Returns the underlying finite state transducer.
-impl AsRef<Fst> for Map {
-    fn as_ref(&self) -> &Fst {
+impl AsRef<raw::Fst> for Map {
+    fn as_ref(&self) -> &raw::Fst {
         &self.0
     }
 }
 
-impl<'s, 'a> IntoStream<'a> for &'s Map {
+impl<'s, 'a> IntoStreamer<'a> for &'s Map {
     type Item = (&'a [u8], u64);
-    type Into = MapStream<'s>;
+    type Into = Stream<'s>;
 
     fn into_stream(self) -> Self::Into {
-        MapStream(self.0.stream())
+        Stream(self.0.stream())
     }
 }
-pub struct MapBuilder<W>(Builder<W>);
+pub struct MapBuilder<W>(raw::Builder<W>);
 
 impl MapBuilder<Vec<u8>> {
     /// Create a builder that builds a map in memory.
     pub fn memory() -> Self {
-        MapBuilder(Builder::memory())
+        MapBuilder(raw::Builder::memory())
     }
 }
 
@@ -194,7 +191,7 @@ impl<W: io::Write> MapBuilder<W> {
     /// Create a builder that builds a map by writing it to `wtr` in a
     /// streaming fashion.
     pub fn new(wtr: W) -> Result<MapBuilder<W>> {
-        Builder::new_type(wtr, 1).map(MapBuilder)
+        raw::Builder::new_type(wtr, 1).map(MapBuilder)
     }
 
     /// Insert a new key-value pair into the map.
@@ -212,7 +209,8 @@ impl<W: io::Write> MapBuilder<W> {
     /// and the error is returned.
     pub fn extend_iter<K, I>(&mut self, iter: I) -> Result<()>
             where K: AsRef<[u8]>, I: IntoIterator<Item=(K, u64)> {
-        self.0.extend_iter(iter.into_iter().map(|(k, v)| (k, Output::new(v))))
+        self.0.extend_iter(iter.into_iter()
+                               .map(|(k, v)| (k, raw::Output::new(v))))
     }
 
     /// Calls insert on each item in the stream.
@@ -220,9 +218,9 @@ impl<W: io::Write> MapBuilder<W> {
     /// Note that unlike `extend_iter`, this is not generic on the items in
     /// the stream.
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
-            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], u64)> {
-        self.0.extend_stream(MapStreamOutput(stream.into_stream()))
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
+                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
+        self.0.extend_stream(StreamOutput(stream.into_stream()))
     }
 
     /// Finishes the construction of the map and flushes the underlying
@@ -245,9 +243,9 @@ impl<W: io::Write> MapBuilder<W> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying map.
-pub struct MapStream<'s, A=AlwaysMatch>(FstStream<'s, A>) where A: Automaton;
+pub struct Stream<'s, A=AlwaysMatch>(raw::Stream<'s, A>) where A: Automaton;
 
-impl<'a, 's, A: Automaton> Stream<'a> for MapStream<'s, A> {
+impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
     type Item = (&'a [u8], u64);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -258,7 +256,7 @@ impl<'a, 's, A: Automaton> Stream<'a> for MapStream<'s, A> {
 /// A builder for constructing range queries on streams.
 ///
 /// Once all bounds are set, one should call `into_stream` to get a
-/// `MapStream`.
+/// `Stream`.
 ///
 /// Bounds are not additive. That is, if `ge` is called twice on the same
 /// builder, then the second setting wins.
@@ -267,79 +265,79 @@ impl<'a, 's, A: Automaton> Stream<'a> for MapStream<'s, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying map.
-pub struct MapStreamBuilder<'s, A=AlwaysMatch>(FstStreamBuilder<'s, A>);
+pub struct StreamBuilder<'s, A=AlwaysMatch>(raw::StreamBuilder<'s, A>);
 
-impl<'s, A: Automaton> MapStreamBuilder<'s, A> {
+impl<'s, A: Automaton> StreamBuilder<'s, A> {
     /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> Self {
-        MapStreamBuilder(self.0.ge(bound))
+        StreamBuilder(self.0.ge(bound))
     }
 
     /// Specify a greater-than bound.
     pub fn gt<T: AsRef<[u8]>>(self, bound: T) -> Self {
-        MapStreamBuilder(self.0.gt(bound))
+        StreamBuilder(self.0.gt(bound))
     }
 
     /// Specify a less-than-or-equal-to bound.
     pub fn le<T: AsRef<[u8]>>(self, bound: T) -> Self {
-        MapStreamBuilder(self.0.le(bound))
+        StreamBuilder(self.0.le(bound))
     }
 
     /// Specify a less-than bound.
     pub fn lt<T: AsRef<[u8]>>(self, bound: T) -> Self {
-        MapStreamBuilder(self.0.lt(bound))
+        StreamBuilder(self.0.lt(bound))
     }
 }
 
-impl<'s, 'a, A: Automaton> IntoStream<'a> for MapStreamBuilder<'s, A> {
+impl<'s, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'s, A> {
     type Item = (&'a [u8], u64);
-    type Into = MapStream<'s, A>;
+    type Into = Stream<'s, A>;
 
     fn into_stream(self) -> Self::Into {
-        MapStream(self.0.into_stream())
+        Stream(self.0.into_stream())
     }
 }
 
-pub struct MapOpBuilder<'s>(FstOpBuilder<'s>);
+pub struct OpBuilder<'s>(raw::OpBuilder<'s>);
 
-impl<'s> MapOpBuilder<'s> {
+impl<'s> OpBuilder<'s> {
     pub fn new() -> Self {
-        MapOpBuilder(FstOpBuilder::new())
+        OpBuilder(raw::OpBuilder::new())
     }
 
     pub fn add<I, S>(mut self, streamable: I) -> Self
-            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 's + for<'a> Stream<'a, Item=(&'a [u8], u64)> {
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
+                  S: 's + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
         self.push(streamable);
         self
     }
 
     pub fn push<I, S>(&mut self, streamable: I)
-            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 's + for<'a> Stream<'a, Item=(&'a [u8], u64)> {
-        self.0.push(MapStreamOutput(streamable.into_stream()));
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
+                  S: 's + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
+        self.0.push(StreamOutput(streamable.into_stream()));
     }
 
-    pub fn union(self) -> MapUnion<'s> {
-        MapUnion(self.0.union())
+    pub fn union(self) -> Union<'s> {
+        Union(self.0.union())
     }
 
-    pub fn intersection(self) -> MapIntersection<'s> {
-        MapIntersection(self.0.intersection())
+    pub fn intersection(self) -> Intersection<'s> {
+        Intersection(self.0.intersection())
     }
 
-    pub fn difference(self) -> MapDifference<'s> {
-        MapDifference(self.0.difference())
+    pub fn difference(self) -> Difference<'s> {
+        Difference(self.0.difference())
     }
 
-    pub fn symmetric_difference(self) -> MapSymmetricDifference<'s> {
-        MapSymmetricDifference(self.0.symmetric_difference())
+    pub fn symmetric_difference(self) -> SymmetricDifference<'s> {
+        SymmetricDifference(self.0.symmetric_difference())
     }
 }
 
-impl<'f, I, S> Extend<I> for MapOpBuilder<'f>
-    where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], u64)>,
-          S: 'f + for<'a> Stream<'a, Item=(&'a [u8], u64)> {
+impl<'f, I, S> Extend<I> for OpBuilder<'f>
+    where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
+          S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
     fn extend<T>(&mut self, it: T) where T: IntoIterator<Item=I> {
         for stream in it {
             self.push(stream);
@@ -347,19 +345,19 @@ impl<'f, I, S> Extend<I> for MapOpBuilder<'f>
     }
 }
 
-impl<'f, I, S> FromIterator<I> for MapOpBuilder<'f>
-    where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], u64)>,
-          S: 'f + for<'a> Stream<'a, Item=(&'a [u8], u64)> {
+impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
+    where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
+          S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
     fn from_iter<T>(it: T) -> Self where T: IntoIterator<Item=I> {
-        let mut op = MapOpBuilder::new();
+        let mut op = OpBuilder::new();
         op.extend(it);
         op
     }
 }
 
-pub struct MapUnion<'s>(FstUnion<'s>);
+pub struct Union<'s>(raw::Union<'s>);
 
-impl<'a, 's> Stream<'a> for MapUnion<'s> {
+impl<'a, 's> Streamer<'a> for Union<'s> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -367,9 +365,9 @@ impl<'a, 's> Stream<'a> for MapUnion<'s> {
     }
 }
 
-pub struct MapIntersection<'s>(FstIntersection<'s>);
+pub struct Intersection<'s>(raw::Intersection<'s>);
 
-impl<'a, 's> Stream<'a> for MapIntersection<'s> {
+impl<'a, 's> Streamer<'a> for Intersection<'s> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -377,9 +375,9 @@ impl<'a, 's> Stream<'a> for MapIntersection<'s> {
     }
 }
 
-pub struct MapDifference<'s>(FstDifference<'s>);
+pub struct Difference<'s>(raw::Difference<'s>);
 
-impl<'a, 's> Stream<'a> for MapDifference<'s> {
+impl<'a, 's> Streamer<'a> for Difference<'s> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -387,9 +385,9 @@ impl<'a, 's> Stream<'a> for MapDifference<'s> {
     }
 }
 
-pub struct MapSymmetricDifference<'s>(FstSymmetricDifference<'s>);
+pub struct SymmetricDifference<'s>(raw::SymmetricDifference<'s>);
 
-impl<'a, 's> Stream<'a> for MapSymmetricDifference<'s> {
+impl<'a, 's> Streamer<'a> for SymmetricDifference<'s> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -402,14 +400,14 @@ impl<'a, 's> Stream<'a> for MapSymmetricDifference<'s> {
 ///
 /// If this were iterators, we could use `iter::Map`, but doing this on streams
 /// requires HKT, so we need to write out the monomorphization ourselves.
-struct MapStreamOutput<S>(S);
+struct StreamOutput<S>(S);
 
-impl<'a, S> Stream<'a> for MapStreamOutput<S>
-        where S: Stream<'a, Item=(&'a [u8], u64)> {
-    type Item = (&'a [u8], Output);
+impl<'a, S> Streamer<'a> for StreamOutput<S>
+        where S: Streamer<'a, Item=(&'a [u8], u64)> {
+    type Item = (&'a [u8], raw::Output);
 
     fn next(&'a mut self) -> Option<Self::Item> {
-        self.0.next().map(|(k, v)| (k, Output::new(v)))
+        self.0.next().map(|(k, v)| (k, raw::Output::new(v)))
     }
 }
 
@@ -418,12 +416,12 @@ impl<'a, S> Stream<'a> for MapStreamOutput<S>
 ///
 /// If this were iterators, we could use `iter::Map`, but doing this on streams
 /// requires HKT, so we need to write out the monomorphization ourselves.
-struct SetStreamZeroOutput<S>(S);
+struct StreamZeroOutput<S>(S);
 
-impl<'a, S: Stream<'a>> Stream<'a> for SetStreamZeroOutput<S> {
-    type Item = (S::Item, Output);
+impl<'a, S: Streamer<'a>> Streamer<'a> for StreamZeroOutput<S> {
+    type Item = (S::Item, raw::Output);
 
     fn next(&'a mut self) -> Option<Self::Item> {
-        self.0.next().map(|key| (key, Output::zero()))
+        self.0.next().map(|key| (key, raw::Output::zero()))
     }
 }

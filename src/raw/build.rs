@@ -6,7 +6,7 @@ use error::{Error, Result};
 use raw::{VERSION, NONE_ADDRESS, CompiledAddr, FstType, Output, Transition};
 use raw::counting_writer::CountingWriter;
 use raw::registry::{Registry, RegistryEntry};
-use stream::{IntoStream, Stream};
+use stream::{IntoStreamer, Streamer};
 
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
@@ -128,8 +128,8 @@ impl<W: io::Write> Builder<W> {
     }
 
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
-            where I: for<'a> IntoStream<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Stream<'a, Item=(&'a [u8], Output)> {
+            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         let mut stream = stream.into_stream();
         while let Some((key, out)) = stream.next() {
             try!(self.insert(key, out.value()));

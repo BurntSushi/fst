@@ -34,12 +34,11 @@ mod stream;
 ///
 /// `Map` is a read only interface to pre-constructed sets. `MapBuilder` is
 /// used to create new sets. (Once a set is created, it can never be modified.)
-/// `MapStream`, `MapStreamKeys` and `MapStreamValues` are stream of values
-/// that originated from a map. `MapStreamBuilder` builds range queries.
-/// `MapOpBuilder` collects a set of streams and executes set operations like
-/// `union` or `intersection` on them with the option of specifying a merge
-/// strategy for a map's values. The rest of the types are streams for set
-/// operations.
+/// `Stream`, `Keys` and `Values` are streams that originated from a map.
+/// `StreamBuilder` builds range queries. `OpBuilder` collects a set of streams
+/// and executes set operations like `union` or `intersection` on them with the
+/// option of specifying a merge strategy for a map's values. The rest of the
+/// types are streams for set operations.
 pub mod map {
     pub use inner_map::*;
 }
@@ -57,13 +56,12 @@ pub mod map {
 ///
 /// # Overview of types
 ///
-/// `Set` is a read only interface to pre-constructed sets. `SetBuilder`
-/// is used to create new sets. (Once a set is created, it can never be
-/// modified.) `SetStream` is a stream of values that originated from a set
-/// (analogous to an iterator). `SetStreamBuilder` builds range queries.
-/// `SetOpBuilder` collects a set of streams and executes set operations like
-/// `union` or `intersection` on them. The rest of the types are streams for
-/// set operations.
+/// `Set` is a read only interface to pre-constructed sets. `SetBuilder` is
+/// used to create new sets. (Once a set is created, it can never be modified.)
+/// `Stream` is a stream of values that originated from a set (analogous to an
+/// iterator). `StreamBuilder` builds range queries. `OpBuilder` collects a set
+/// of streams and executes set operations like `union` or `intersection` on
+/// them. The rest of the types are streams for set operations.
 pub mod set {
     pub use inner_set::*;
 }

@@ -12,7 +12,7 @@ use Result;
 ///
 /// A `Set` is constructed with the `SetBuilder` type. Alternatively, a `Set`
 /// can be constructed in memory from a lexicographically ordered iterator
-/// of byte strings (`Set::new`).
+/// of byte strings (`Set::from_iter`).
 ///
 /// A key feature of `Set` is that it can be serialized to disk compactly. Its
 /// underlying representation is built such that the `Set` can be memory mapped
@@ -88,7 +88,7 @@ impl Set {
     /// use fst::{IntoStreamer, Streamer, Set};
     ///
     /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
-    /// let mut stream = set.into_stream();
+    /// let mut stream = set.stream();
     ///
     /// let mut keys = vec![];
     /// while let Some(key) = stream.next() {
@@ -363,7 +363,7 @@ impl<'s, 'a> IntoStreamer<'a> for &'s Set {
 /// build.insert("clarence").unwrap();
 /// build.insert("stevie").unwrap();
 ///
-/// // You could also call `finish()` here, but since we're building the set
+/// // You could also call `finish()` here, but since we're building the set in
 /// // memory, there would be no way to get the `Vec<u8>` back.
 /// let bytes = build.into_inner().unwrap();
 ///
@@ -618,10 +618,10 @@ impl<'s> OpBuilder<'s> {
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
     ///
-    /// let mut union = set1.op().add(&set2).intersection();
+    /// let mut intersection = set1.op().add(&set2).intersection();
     ///
     /// let mut keys = vec![];
-    /// while let Some(key) = union.next() {
+    /// while let Some(key) = intersection.next() {
     ///     keys.push(key.to_vec());
     /// }
     /// assert_eq!(keys, vec![b"a"]);
@@ -642,10 +642,10 @@ impl<'s> OpBuilder<'s> {
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
     ///
-    /// let mut union = set1.op().add(&set2).difference();
+    /// let mut difference = set1.op().add(&set2).difference();
     ///
     /// let mut keys = vec![];
-    /// while let Some(key) = union.next() {
+    /// while let Some(key) = difference.next() {
     ///     keys.push(key.to_vec());
     /// }
     /// assert_eq!(keys, vec![b"b", b"c"]);
@@ -671,10 +671,10 @@ impl<'s> OpBuilder<'s> {
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
     ///
-    /// let mut union = set1.op().add(&set2).symmetric_difference();
+    /// let mut sym_difference = set1.op().add(&set2).symmetric_difference();
     ///
     /// let mut keys = vec![];
-    /// while let Some(key) = union.next() {
+    /// while let Some(key) = sym_difference.next() {
     ///     keys.push(key.to_vec());
     /// }
     /// assert_eq!(keys, vec![b"b", b"c", b"y", b"z"]);
@@ -732,7 +732,7 @@ impl<'a, 's> Streamer<'a> for Intersection<'s> {
 
 /// A stream of set difference over multiple streams in lexicographic order.
 ///
-/// The difference operation is take with respect to the first stream and the
+/// The difference operation is taken with respect to the first stream and the
 /// rest of the streams. i.e., All elements in the first stream that do not
 /// appear in any other streams.
 ///

@@ -6,10 +6,53 @@ use std::path::Path;
 use automaton::{Automaton, AlwaysMatch};
 use raw;
 pub use raw::IndexedValue as IndexedValue;
-use set;
 use stream::{IntoStreamer, Streamer};
 use Result;
 
+/// Map is a lexicographically ordered map from byte strings to integers.
+///
+/// A `Map` is constructed with the `MapBuilder` type. Alternatively, a `Map`
+/// can be constructed in memory from a lexicographically ordered iterator
+/// of key-value pairs (`Map::from_iter`).
+///
+/// A key feature of `Map` is that it can be serialized to disk compactly. Its
+/// underlying representation is built such that the `Map` can be memory mapped
+/// (`Map::from_file_path`) and searched without necessarily loading the entire
+/// map into memory.
+///
+/// It supports most common operations associated with maps, such as key
+/// lookup and search. It also supports set operations on its keys along with
+/// the ability to specify how conflicting values are merged together. Maps
+/// also support range queries and automata based searches (e.g. a regular
+/// expression).
+///
+/// Maps are represented by a finite state transducer where inputs are the keys
+/// and outputs are the values. As such, maps have the following invariants:
+///
+/// 1. Once constructed, a `Map` can never be modified.
+/// 2. Maps must be constructed with lexicographically ordered byte sequences.
+///    There is no restricting on the ordering of values.
+///
+/// # Differences with sets
+///
+/// Maps and sets are represented by the same underlying data structure: the
+/// finite state transducer. The principal difference between them is that
+/// sets always have their output values set to `0`. This has an impact on the
+/// representation size and is reflected in the type system for convenience.
+/// A secondary but subtle difference is that duplicate values can be added
+/// to a set, but it is an error to do so with maps. That is, a set can have
+/// the same key added sequentially, but a map can't.
+///
+/// # The future
+///
+/// It is regrettable that the output value is fixed to `u64`. Indeed, it is
+/// not necessary, but it was a major simplification in the implementation.
+/// In the future, the value type may become generic to an extent (outputs must
+/// satisfy a basic algebra).
+///
+/// Keys will always be byte strings; however, we may grow more conveniences
+/// around dealing with them (such as a serialization/deserialization step,
+/// although it isn't clear where exactly this should live).
 pub struct Map(raw::Fst);
 
 impl Map {
@@ -51,11 +94,8 @@ impl Map {
         Map::from_bytes(try!(builder.into_inner()))
     }
 
-    pub fn stream(&self) -> Stream {
-        Stream(self.0.stream())
-    }
-
-    /// Return a lexicographically ordered stream of all keys in this map.
+    /// Return a lexicographically ordered stream of all key-value pairs in
+    /// this map.
     ///
     /// While this is a stream, it does require heap space proportional to the
     /// longest key in the map.
@@ -74,22 +114,98 @@ impl Map {
     /// use fst::{IntoStreamer, Streamer, Map};
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
-    /// let mut stream = map.into_stream();
+    /// let mut stream = map.stream();
     ///
     /// let mut kvs = vec![];
     /// while let Some((k, v)) = stream.next() {
     ///     kvs.push((k.to_vec(), v));
     /// }
     /// assert_eq!(kvs, vec![
-    ///     ("a".as_bytes().to_vec(), 1),
-    ///     ("b".as_bytes().to_vec(), 2),
-    ///     ("c".as_bytes().to_vec(), 3),
+    ///     (b"a".to_vec(), 1),
+    ///     (b"b".to_vec(), 2),
+    ///     (b"c".to_vec(), 3),
     /// ]);
     /// ```
-    pub fn stream_keys(&self) -> set::Stream {
-        set::Stream::new(self.0.stream())
+    pub fn stream(&self) -> Stream {
+        Stream(self.0.stream())
     }
 
+    /// Return a lexicographically ordered stream of all keys in this map.
+    ///
+    /// Memory requirements are the same as described on `Map::stream`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStreamer, Streamer, Map};
+    ///
+    /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
+    /// let mut stream = map.keys();
+    ///
+    /// let mut keys = vec![];
+    /// while let Some(k) = stream.next() {
+    ///     keys.push(k.to_vec());
+    /// }
+    /// assert_eq!(keys, vec![b"a", b"b", b"c"]);
+    /// ```
+    pub fn keys(&self) -> Keys {
+        Keys(self.0.stream())
+    }
+
+    /// Return a stream of all values in this map ordered lexicographically
+    /// by each value's corresponding key.
+    ///
+    /// Memory requirements are the same as described on `Map::stream`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStreamer, Streamer, Map};
+    ///
+    /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
+    /// let mut stream = map.values();
+    ///
+    /// let mut values = vec![];
+    /// while let Some(v) = stream.next() {
+    ///     values.push(v);
+    /// }
+    /// assert_eq!(values, vec![1, 2, 3]);
+    /// ```
+    pub fn values(&self) -> Values {
+        Values(self.0.stream())
+    }
+
+    /// Return a builder for range queries.
+    ///
+    /// A range query returns a subset of key-value pairs in this map in a
+    /// range given in lexicographic order.
+    ///
+    /// Memory requirements are the same as described on `Map::stream`.
+    /// Notably, only the keys in the range are read; keys outside the range
+    /// are not.
+    ///
+    /// # Example
+    ///
+    /// Returns only the key-value pairs in the range given.
+    ///
+    /// ```rust
+    /// use fst::{IntoStreamer, Streamer, Map};
+    ///
+    /// let map = Map::from_iter(vec![
+    ///     ("a", 1), ("b", 2), ("c", 3), ("d", 4), ("e", 5),
+    /// ]).unwrap();
+    /// let mut stream = map.range().ge("b").lt("e").into_stream();
+    ///
+    /// let mut kvs = vec![];
+    /// while let Some((k, v)) = stream.next() {
+    ///     kvs.push((k.to_vec(), v));
+    /// }
+    /// assert_eq!(kvs, vec![
+    ///     (b"b".to_vec(), 2),
+    ///     (b"c".to_vec(), 3),
+    ///     (b"d".to_vec(), 4),
+    /// ]);
+    /// ```
     pub fn range(&self) -> StreamBuilder {
         StreamBuilder(self.0.range())
     }
@@ -103,13 +219,46 @@ impl Map {
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
     ///
-    /// assert_eq!(map.contains("b"), true);
-    /// assert_eq!(map.contains("z"), false);
+    /// assert_eq!(map.contains_key("b"), true);
+    /// assert_eq!(map.contains_key("z"), false);
     /// ```
-    pub fn contains<K: AsRef<[u8]>>(&self, key: K) -> bool {
+    pub fn contains_key<K: AsRef<[u8]>>(&self, key: K) -> bool {
         self.0.find(key).is_some()
     }
 
+    /// Executes an automaton on the keys of this map.
+    ///
+    /// Note that this returns a `StreamBuilder`, which can be used to
+    /// add a range query to the search (see the `range` method).
+    ///
+    /// Memory requirements are the same as described on `Map::stream`.
+    ///
+    /// # Example
+    ///
+    /// This crate provides an implementation of regular expressions
+    /// for `Automaton`. Make sure to see the documentation for `fst::Regex`
+    /// for more details such as what kind of regular expressions are allowed.
+    ///
+    /// ```rust
+    /// use fst::{IntoStreamer, Streamer, Regex, Map};
+    ///
+    /// let map = Map::from_iter(vec![
+    ///     ("foo", 1), ("foo1", 2), ("foo2", 3), ("foo3", 4), ("foobar", 5),
+    /// ]).unwrap();
+    ///
+    /// let re = Regex::new("f[a-z]+3?").unwrap();
+    /// let mut stream = map.search(re).into_stream();
+    ///
+    /// let mut kvs = vec![];
+    /// while let Some((k, v)) = stream.next() {
+    ///     kvs.push((k.to_vec(), v));
+    /// }
+    /// assert_eq!(kvs, vec![
+    ///     (b"foo".to_vec(), 1),
+    ///     (b"foo3".to_vec(), 4),
+    ///     (b"foobar".to_vec(), 5),
+    /// ]);
+    /// ```
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
         StreamBuilder(self.0.search(aut))
     }
@@ -124,26 +273,51 @@ impl Map {
         self.0.is_empty()
     }
 
+    /// Creates a new map operation with this map added to it.
+    ///
+    /// The `OpBuilder` type can be used to add additional map streams
+    /// and perform set operations like union, intersection, difference and
+    /// symmetric difference on the keys of the map. These set operations also
+    /// allow one to specify how conflicting values are merged in the stream.
+    ///
+    /// # Example
+    ///
+    /// This example demonstrates a union on multiple map streams. Notice that
+    /// the stream returned from the union is not a sequence of key-value
+    /// pairs, but rather a sequence of keys associated with one or more
+    /// values. Namely, a key is associated with each value associated with
+    /// that same key in the all of the streams.
+    ///
+    /// ```rust
+    /// use fst::{Streamer, Map};
+    /// use fst::map::IndexedValue;
+    ///
+    /// let map1 = Map::from_iter(vec![
+    ///     ("a", 1), ("b", 2), ("c", 3),
+    /// ]).unwrap();
+    /// let map2 = Map::from_iter(vec![
+    ///     ("a", 10), ("y", 11), ("z", 12),
+    /// ]).unwrap();
+    ///
+    /// let mut union = map1.op().add(&map2).union();
+    ///
+    /// let mut kvs = vec![];
+    /// while let Some((k, vs)) = union.next() {
+    ///     kvs.push((k.to_vec(), vs.to_vec()));
+    /// }
+    /// assert_eq!(kvs, vec![
+    ///     (b"a".to_vec(), vec![
+    ///         IndexedValue { index: 0, value: 1 },
+    ///         IndexedValue { index: 1, value: 10 },
+    ///     ]),
+    ///     (b"b".to_vec(), vec![IndexedValue { index: 0, value: 2 }]),
+    ///     (b"c".to_vec(), vec![IndexedValue { index: 0, value: 3 }]),
+    ///     (b"y".to_vec(), vec![IndexedValue { index: 1, value: 11 }]),
+    ///     (b"z".to_vec(), vec![IndexedValue { index: 1, value: 12 }]),
+    /// ]);
+    /// ```
     pub fn op(&self) -> OpBuilder {
         OpBuilder::new().add(self)
-    }
-
-    pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
-        self.0.is_disjoint(StreamZeroOutput(stream.into_stream()))
-    }
-
-    pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
-        self.0.is_subset(StreamZeroOutput(stream.into_stream()))
-    }
-
-    pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
-        self.0.is_superset(StreamZeroOutput(stream.into_stream()))
     }
 }
 
@@ -170,14 +344,108 @@ impl AsRef<raw::Fst> for Map {
     }
 }
 
-impl<'s, 'a> IntoStreamer<'a> for &'s Map {
+impl<'m, 'a> IntoStreamer<'a> for &'m Map {
     type Item = (&'a [u8], u64);
-    type Into = Stream<'s>;
+    type Into = Stream<'m>;
 
     fn into_stream(self) -> Self::Into {
         Stream(self.0.stream())
     }
 }
+
+/// A builder for creating a map.
+///
+/// This is not your average everyday builder. It has two important qualities
+/// that make it a bit unique from what you might expect:
+///
+/// 1. All keys must be added in lexicographic order. Adding a key out of order
+///    will result in an error. Additionally, adding a duplicate key will also
+///    result in an error. That is, once a key is associated with a value,
+///    that association can never be modified or deleted.
+/// 2. The representation of a map is streamed to *any* `io::Write` as it is
+///    built. For an in memory representation, this can be a `Vec<u8>`.
+///
+/// Point (2) is especially important because it means that a map can be
+/// constructed *without storing the entire map in memory*. Namely, since it
+/// works with any `io::Write`, it can be streamed directly to a file.
+///
+/// With that said, the builder does use memory, but **memory usage is bounded
+/// to a constant size**. The amount of memory used trades off with the
+/// compression ratio. Currently, the implementation hard codes this trade off
+/// which can result in about 5-20MB of heap usage during construction. (N.B.
+/// Guaranteeing a maximal compression ratio requires memory proportional to
+/// the size of the map, which defeats some of the benefit of streaming
+/// it to disk. In practice, a small bounded amount of memory achieves
+/// close-to-minimal compression ratios.)
+///
+/// The algorithmic complexity of map construction is `O(n)` where `n` is the
+/// number of elements added to the map.
+///
+/// # Example: build in memory
+///
+/// This shows how to use the builder to construct a map in memory. Note that
+/// `Map::from_iter` provides a convenience function that achieves this same
+/// goal without needing to explicitly use `MapBuilder`.
+///
+/// ```rust
+/// use fst::{IntoStreamer, Streamer, Map, MapBuilder};
+///
+/// let mut build = MapBuilder::memory();
+/// build.insert("bruce", 1).unwrap();
+/// build.insert("clarence", 2).unwrap();
+/// build.insert("stevie", 3).unwrap();
+///
+/// // You could also call `finish()` here, but since we're building the map in
+/// // memory, there would be no way to get the `Vec<u8>` back.
+/// let bytes = build.into_inner().unwrap();
+///
+/// // At this point, the map has been constructed, but here's how to read it.
+/// let map = Map::from_bytes(bytes).unwrap();
+/// let mut stream = map.into_stream();
+/// let mut kvs = vec![];
+/// while let Some((k, v)) = stream.next() {
+///     kvs.push((k.to_vec(), v));
+/// }
+/// assert_eq!(kvs, vec![
+///     (b"bruce".to_vec(), 1),
+///     (b"clarence".to_vec(), 2),
+///     (b"stevie".to_vec(), 3),
+/// ]);
+/// ```
+///
+/// # Example: stream to file
+///
+/// This shows how to stream construction of a set to a file.
+///
+/// ```rust,no_run
+/// use std::fs::File;
+/// use std::io;
+///
+/// use fst::{IntoStreamer, Streamer, Map, MapBuilder};
+///
+/// let mut wtr = io::BufWriter::new(File::create("map.fst").unwrap());
+/// let mut build = MapBuilder::new(wtr).unwrap();
+/// build.insert("bruce", 1).unwrap();
+/// build.insert("clarence", 2).unwrap();
+/// build.insert("stevie", 3).unwrap();
+///
+/// // If you want the writer back, then call `into_inner`. Otherwise, this
+/// // will finish construction and call `flush`.
+/// build.finish().unwrap();
+///
+/// // At this point, the map has been constructed, but here's how to read it.
+/// let map = Map::from_file_path("map.fst").unwrap();
+/// let mut stream = map.into_stream();
+/// let mut kvs = vec![];
+/// while let Some((k, v)) = stream.next() {
+///     kvs.push((k.to_vec(), v));
+/// }
+/// assert_eq!(kvs, vec![
+///     (b"bruce".to_vec(), 1),
+///     (b"clarence".to_vec(), 2),
+///     (b"stevie".to_vec(), 3),
+/// ]);
+/// ```
 pub struct MapBuilder<W>(raw::Builder<W>);
 
 impl MapBuilder<Vec<u8>> {
@@ -207,6 +475,10 @@ impl<W: io::Write> MapBuilder<W> {
     ///
     /// If an error occurred while adding an element, processing is stopped
     /// and the error is returned.
+    ///
+    /// If a key is inserted that is less than or equal to any previous key
+    /// added, then an error is returned. Similarly, if there was a problem
+    /// writing to the underlying writer, an error is returned.
     pub fn extend_iter<K, I>(&mut self, iter: I) -> Result<()>
             where K: AsRef<[u8]>, I: IntoIterator<Item=(K, u64)> {
         self.0.extend_iter(iter.into_iter()
@@ -217,6 +489,10 @@ impl<W: io::Write> MapBuilder<W> {
     ///
     /// Note that unlike `extend_iter`, this is not generic on the items in
     /// the stream.
+    ///
+    /// If a key is inserted that is less than or equal to any previous key
+    /// added, then an error is returned. Similarly, if there was a problem
+    /// writing to the underlying writer, an error is returned.
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
             where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
                   S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
@@ -242,14 +518,41 @@ impl<W: io::Write> MapBuilder<W> {
 /// The `A` type parameter corresponds to an optional automaton to filter
 /// the stream. By default, no filtering is done.
 ///
-/// The `'s` lifetime parameter refers to the lifetime of the underlying map.
-pub struct Stream<'s, A=AlwaysMatch>(raw::Stream<'s, A>) where A: Automaton;
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct Stream<'m, A=AlwaysMatch>(raw::Stream<'m, A>) where A: Automaton;
 
-impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
+impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     type Item = (&'a [u8], u64);
 
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next().map(|(key, out)| (key, out.value()))
+    }
+}
+
+/// A lexicographically ordered stream of keys from a map.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct Keys<'m>(raw::Stream<'m>);
+
+impl<'a, 'm> Streamer<'a> for Keys<'m> {
+    type Item = &'a [u8];
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        self.0.next().map(|(key, _)| key)
+    }
+}
+
+/// A stream of values from a map, lexicographically ordered by each value's
+/// corresponding key.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct Values<'m>(raw::Stream<'m>);
+
+impl<'a, 'm> Streamer<'a> for Values<'m> {
+    type Item = u64;
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        self.0.next().map(|(_, out)| out.value())
     }
 }
 
@@ -264,10 +567,10 @@ impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
 /// The `A` type parameter corresponds to an optional automaton to filter
 /// the stream. By default, no filtering is done.
 ///
-/// The `'s` lifetime parameter refers to the lifetime of the underlying map.
-pub struct StreamBuilder<'s, A=AlwaysMatch>(raw::StreamBuilder<'s, A>);
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct StreamBuilder<'m, A=AlwaysMatch>(raw::StreamBuilder<'m, A>);
 
-impl<'s, A: Automaton> StreamBuilder<'s, A> {
+impl<'m, A: Automaton> StreamBuilder<'m, A> {
     /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> Self {
         StreamBuilder(self.0.ge(bound))
@@ -289,48 +592,232 @@ impl<'s, A: Automaton> StreamBuilder<'s, A> {
     }
 }
 
-impl<'s, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'s, A> {
+impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
     type Item = (&'a [u8], u64);
-    type Into = Stream<'s, A>;
+    type Into = Stream<'m, A>;
 
     fn into_stream(self) -> Self::Into {
         Stream(self.0.into_stream())
     }
 }
 
-pub struct OpBuilder<'s>(raw::OpBuilder<'s>);
+/// A builder for collecting map streams on which to perform set operations
+/// on the keys of maps.
+///
+/// Set operations include intersection, union, difference and symmetric
+/// difference. The result of each set operation is itself a stream that emits
+/// pairs of keys and a sequence of each occurrence of that key in the
+/// participating streams. This information allows one to perform set
+/// operations on maps and customize how conflicting output values are handled.
+///
+/// All set operations work efficiently on an arbitrary number of
+/// streams with memory proportional to the number of streams.
+///
+/// The algorithmic complexity of all set operations is `O(n1 + n2 + n3 + ...)`
+/// where `n1, n2, n3, ...` correspond to the number of elements in each
+/// stream.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying set.
+pub struct OpBuilder<'m>(raw::OpBuilder<'m>);
 
-impl<'s> OpBuilder<'s> {
+impl<'m> OpBuilder<'m> {
+    /// Create a new set operation builder.
     pub fn new() -> Self {
         OpBuilder(raw::OpBuilder::new())
     }
 
+    /// Add a stream to this set operation.
+    ///
+    /// This is useful for a chaining style pattern, e.g.,
+    /// `builder.add(stream1).add(stream2).union()`.
+    ///
+    /// The stream must emit a lexicographically ordered sequence of key-value
+    /// pairs.
     pub fn add<I, S>(mut self, streamable: I) -> Self
             where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 's + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
+                  S: 'm + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
         self.push(streamable);
         self
     }
 
+    /// Add a stream to this set operation.
+    ///
+    /// The stream must emit a lexicographically ordered sequence of key-value
+    /// pairs.
     pub fn push<I, S>(&mut self, streamable: I)
             where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 's + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
+                  S: 'm + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
         self.0.push(StreamOutput(streamable.into_stream()));
     }
 
-    pub fn union(self) -> Union<'s> {
+    /// Performs a union operation on all streams that have been added.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst::map::IndexedValue;
+    ///
+    /// let map1 = Map::from_iter(vec![
+    ///     ("a", 1), ("b", 2), ("c", 3),
+    /// ]).unwrap();
+    /// let map2 = Map::from_iter(vec![
+    ///     ("a", 11), ("y", 12), ("z", 13),
+    /// ]).unwrap();
+    ///
+    /// let mut union = map1.op().add(&map2).union();
+    ///
+    /// let mut kvs = vec![];
+    /// while let Some((k, vs)) = union.next() {
+    ///     kvs.push((k.to_vec(), vs.to_vec()));
+    /// }
+    /// assert_eq!(kvs, vec![
+    ///     (b"a".to_vec(), vec![
+    ///         IndexedValue { index: 0, value: 1 },
+    ///         IndexedValue { index: 1, value: 11 },
+    ///     ]),
+    ///     (b"b".to_vec(), vec![IndexedValue { index: 0, value: 2 }]),
+    ///     (b"c".to_vec(), vec![IndexedValue { index: 0, value: 3 }]),
+    ///     (b"y".to_vec(), vec![IndexedValue { index: 1, value: 12 }]),
+    ///     (b"z".to_vec(), vec![IndexedValue { index: 1, value: 13 }]),
+    /// ]);
+    /// ```
+    pub fn union(self) -> Union<'m> {
         Union(self.0.union())
     }
 
-    pub fn intersection(self) -> Intersection<'s> {
+    /// Performs an intersection operation on all streams that have been added.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst::map::IndexedValue;
+    ///
+    /// let map1 = Map::from_iter(vec![
+    ///     ("a", 1), ("b", 2), ("c", 3),
+    /// ]).unwrap();
+    /// let map2 = Map::from_iter(vec![
+    ///     ("a", 11), ("y", 12), ("z", 13),
+    /// ]).unwrap();
+    ///
+    /// let mut intersection = map1.op().add(&map2).intersection();
+    ///
+    /// let mut kvs = vec![];
+    /// while let Some((k, vs)) = intersection.next() {
+    ///     kvs.push((k.to_vec(), vs.to_vec()));
+    /// }
+    /// assert_eq!(kvs, vec![
+    ///     (b"a".to_vec(), vec![
+    ///         IndexedValue { index: 0, value: 1 },
+    ///         IndexedValue { index: 1, value: 11 },
+    ///     ]),
+    /// ]);
+    /// ```
+    pub fn intersection(self) -> Intersection<'m> {
         Intersection(self.0.intersection())
     }
 
-    pub fn difference(self) -> Difference<'s> {
+    /// Performs a difference operation with respect to the first stream added.
+    /// That is, this returns a stream of all elements in the first stream
+    /// that don't exist in any other stream that has been added.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{Streamer, Map};
+    /// use fst::map::IndexedValue;
+    ///
+    /// let map1 = Map::from_iter(vec![
+    ///     ("a", 1), ("b", 2), ("c", 3),
+    /// ]).unwrap();
+    /// let map2 = Map::from_iter(vec![
+    ///     ("a", 11), ("y", 12), ("z", 13),
+    /// ]).unwrap();
+    ///
+    /// let mut difference = map1.op().add(&map2).difference();
+    ///
+    /// let mut kvs = vec![];
+    /// while let Some((k, vs)) = difference.next() {
+    ///     kvs.push((k.to_vec(), vs.to_vec()));
+    /// }
+    /// assert_eq!(kvs, vec![
+    ///     (b"b".to_vec(), vec![IndexedValue { index: 0, value: 2 }]),
+    ///     (b"c".to_vec(), vec![IndexedValue { index: 0, value: 3 }]),
+    /// ]);
+    /// ```
+    pub fn difference(self) -> Difference<'m> {
         Difference(self.0.difference())
     }
 
-    pub fn symmetric_difference(self) -> SymmetricDifference<'s> {
+    /// Performs a symmetric difference operation on all of the streams that
+    /// have been added.
+    ///
+    /// When there are only two streams, then the keys returned correspond to
+    /// keys that are in either stream but *not* in both streams.
+    ///
+    /// More generally, for any number of streams, keys that occur in an odd
+    /// number of streams are returned.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst::map::IndexedValue;
+    ///
+    /// let map1 = Map::from_iter(vec![
+    ///     ("a", 1), ("b", 2), ("c", 3),
+    /// ]).unwrap();
+    /// let map2 = Map::from_iter(vec![
+    ///     ("a", 11), ("y", 12), ("z", 13),
+    /// ]).unwrap();
+    ///
+    /// let mut sym_difference = map1.op().add(&map2).symmetric_difference();
+    ///
+    /// let mut kvs = vec![];
+    /// while let Some((k, vs)) = sym_difference.next() {
+    ///     kvs.push((k.to_vec(), vs.to_vec()));
+    /// }
+    /// assert_eq!(kvs, vec![
+    ///     (b"b".to_vec(), vec![IndexedValue { index: 0, value: 2 }]),
+    ///     (b"c".to_vec(), vec![IndexedValue { index: 0, value: 3 }]),
+    ///     (b"y".to_vec(), vec![IndexedValue { index: 1, value: 12 }]),
+    ///     (b"z".to_vec(), vec![IndexedValue { index: 1, value: 13 }]),
+    /// ]);
+    /// ```
+    pub fn symmetric_difference(self) -> SymmetricDifference<'m> {
         SymmetricDifference(self.0.symmetric_difference())
     }
 }
@@ -355,9 +842,12 @@ impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
     }
 }
 
-pub struct Union<'s>(raw::Union<'s>);
+/// A stream of set union over multiple map streams in lexicographic order.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct Union<'m>(raw::Union<'m>);
 
-impl<'a, 's> Streamer<'a> for Union<'s> {
+impl<'a, 'm> Streamer<'a> for Union<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -365,9 +855,13 @@ impl<'a, 's> Streamer<'a> for Union<'s> {
     }
 }
 
-pub struct Intersection<'s>(raw::Intersection<'s>);
+/// A stream of set intersection over multiple map streams in lexicographic
+/// order.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct Intersection<'m>(raw::Intersection<'m>);
 
-impl<'a, 's> Streamer<'a> for Intersection<'s> {
+impl<'a, 'm> Streamer<'a> for Intersection<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -375,9 +869,17 @@ impl<'a, 's> Streamer<'a> for Intersection<'s> {
     }
 }
 
-pub struct Difference<'s>(raw::Difference<'s>);
+/// A stream of set difference over map multiple streams in lexicographic
+/// order.
+///
+/// The difference operation is taken with respect to the first stream and the
+/// rest of the streams. i.e., All elements in the first stream that do not
+/// appear in any other streams.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct Difference<'m>(raw::Difference<'m>);
 
-impl<'a, 's> Streamer<'a> for Difference<'s> {
+impl<'a, 'm> Streamer<'a> for Difference<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -385,9 +887,13 @@ impl<'a, 's> Streamer<'a> for Difference<'s> {
     }
 }
 
-pub struct SymmetricDifference<'s>(raw::SymmetricDifference<'s>);
+/// A stream of set symmetric difference over multiple map streams in
+/// lexicographic order.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct SymmetricDifference<'m>(raw::SymmetricDifference<'m>);
 
-impl<'a, 's> Streamer<'a> for SymmetricDifference<'s> {
+impl<'a, 'm> Streamer<'a> for SymmetricDifference<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -395,8 +901,8 @@ impl<'a, 's> Streamer<'a> for SymmetricDifference<'s> {
     }
 }
 
-/// A specialized stream for mapping map streams (`&[u8]`) to streams used
-/// by raw fsts (`(&[u8], Output)`).
+/// A specialized stream for mapping map streams (`(&[u8], u64)`) to streams
+/// used by raw fsts (`(&[u8], Output)`).
 ///
 /// If this were iterators, we could use `iter::Map`, but doing this on streams
 /// requires HKT, so we need to write out the monomorphization ourselves.
@@ -408,20 +914,5 @@ impl<'a, S> Streamer<'a> for StreamOutput<S>
 
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next().map(|(k, v)| (k, raw::Output::new(v)))
-    }
-}
-
-/// A specialized stream for mapping set streams (`&[u8]`) to streams used
-/// by raw fsts (`(&[u8], Output)`).
-///
-/// If this were iterators, we could use `iter::Map`, but doing this on streams
-/// requires HKT, so we need to write out the monomorphization ourselves.
-struct StreamZeroOutput<S>(S);
-
-impl<'a, S: Streamer<'a>> Streamer<'a> for StreamZeroOutput<S> {
-    type Item = (S::Item, raw::Output);
-
-    fn next(&'a mut self) -> Option<Self::Item> {
-        self.0.next().map(|key| (key, raw::Output::zero()))
     }
 }

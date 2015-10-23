@@ -8,9 +8,18 @@ use stream::{IntoStreamer, Streamer};
 // Permits stream operations to be hetergeneous with respect to streams.
 type BoxedStream<'f> = Box<for<'a> Streamer<'a, Item=(&'a [u8], Output)> + 'f>;
 
-#[derive(Copy, Clone, Debug)]
+/// A value indexed by a stream.
+///
+/// Indexed values are used to indicate the presence of a key in multiple
+/// streams during a set operation. Namely, the index corresponds to the stream
+/// (by the order in which it was added to the operation, starting at `0`)
+/// and the value corresponds to the value associated with a particular key
+/// in that stream.
+#[derive(Copy, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct IndexedValue {
+    /// The index of the stream that produced this value (starting at `0`).
     pub index: usize,
+    /// The value.
     pub value: u64,
 }
 

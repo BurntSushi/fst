@@ -42,15 +42,15 @@ impl Automaton for Regex {
 
     fn start(&self) -> Option<usize> { Some(0) }
 
-    fn is_match(&self, state: Option<usize>) -> bool {
+    fn is_match(&self, state: &Option<usize>) -> bool {
         state.map(|state| self.dfa.is_match(state)).unwrap_or(false)
     }
 
-    fn can_match(&self, state: Option<usize>) -> bool {
+    fn can_match(&self, state: &Option<usize>) -> bool {
         state.is_some()
     }
 
-    fn accept(&self, state: Option<usize>, byte: u8) -> Option<usize> {
+    fn accept(&self, state: &Option<usize>, byte: u8) -> Option<usize> {
         state.and_then(|state| self.dfa.accept(state, byte))
     }
 }
@@ -73,15 +73,3 @@ impl fmt::Debug for Inst {
         }
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-    // use regex::Regex;
-//
-    // #[test]
-    // fn scratch() {
-        // // let re = Regex::new("[\u{0}-\u{10FFFF}]").unwrap();
-        // let re = Regex::new(r"[a-z0-9]").unwrap();
-        // println!("{:?}", re.dfa);
-    // }
-// }

@@ -271,7 +271,7 @@ pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
     end_at: Bound,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct StreamState<S> {
     addr: CompiledAddr,
     trans: usize,
@@ -334,13 +334,13 @@ impl<'f, A: Automaton> Stream<'f, A> {
             match node.find_input(b) {
                 Some(i) => {
                     let t = node.transition(i);
+                    aut_state = self.aut.accept(&aut_state, b);
                     self.stack.push(StreamState {
                         addr: node.addr(),
                         trans: i+1,
                         out: out,
-                        aut_state: aut_state,
+                        aut_state: aut_state.clone(),
                     });
-                    aut_state = self.aut.accept(aut_state, b);
                     out = out.cat(t.out);
                     self.inp.push(b);
                     node = self.fst.node(t.addr);
@@ -369,10 +369,11 @@ impl<'f, A: Automaton> Stream<'f, A> {
                 self.stack[last].trans -= 1;
                 self.inp.pop();
             } else {
-                let state = self.stack[last];
-                let node = self.fst.node(state.addr);
+                let addr = self.stack[last].addr;
+                let trans = self.stack[last].trans;
+                let node = self.fst.node(addr);
                 self.stack.push(StreamState {
-                    addr: node.transition_addr(state.trans - 1),
+                    addr: node.transition_addr(trans - 1),
                     trans: 0,
                     out: out,
                     aut_state: aut_state,
@@ -391,14 +392,14 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
                 self.stack.clear();
                 return None;
             }
-            if self.aut.is_match(self.aut.start()) {
+            if self.aut.is_match(&self.aut.start()) {
                 return Some((&[], out));
             }
         }
         while let Some(state) = self.stack.pop() {
             let node = self.fst.node(state.addr);
             if state.trans >= node.len()
-                    || !self.aut.can_match(state.aut_state) {
+                    || !self.aut.can_match(&state.aut_state) {
                 if node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
                 }
@@ -406,17 +407,15 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             }
             let trans = node.transition(state.trans);
             let out = state.out.cat(trans.out);
+            let next_state = self.aut.accept(&state.aut_state, trans.inp);
+            let is_match = self.aut.is_match(&next_state);
+            self.inp.push(trans.inp);
             self.stack.push(StreamState {
                 addr: state.addr,
                 trans: state.trans + 1,
                 out: state.out,
                 aut_state: state.aut_state,
             });
-            let next_state = self.aut.accept(state.aut_state, trans.inp);
-            if !self.aut.can_match(next_state) {
-                continue;
-            }
-            self.inp.push(trans.inp);
             self.stack.push(StreamState {
                 addr: trans.addr,
                 trans: 0,
@@ -424,10 +423,12 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
                 aut_state: next_state,
             });
             if self.end_at.exceeded_by(&self.inp) {
+                // We are done, forever.
+                self.stack.clear();
                 return None;
             }
             let next_node = self.fst.node(trans.addr);
-            if next_node.is_final() && self.aut.is_match(next_state) {
+            if next_node.is_final() && is_match {
                 return Some((&self.inp, out.cat(next_node.final_output())));
             }
         }

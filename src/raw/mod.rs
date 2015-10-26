@@ -334,12 +334,13 @@ impl<'f, A: Automaton> Stream<'f, A> {
             match node.find_input(b) {
                 Some(i) => {
                     let t = node.transition(i);
+                    let next_state = self.aut.accept(&aut_state, b);
                     aut_state = self.aut.accept(&aut_state, b);
                     self.stack.push(StreamState {
                         addr: node.addr(),
                         trans: i+1,
                         out: out,
-                        aut_state: aut_state.clone(),
+                        aut_state: next_state,
                     });
                     out = out.cat(t.out);
                     self.inp.push(b);

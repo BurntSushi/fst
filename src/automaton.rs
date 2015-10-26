@@ -1,5 +1,5 @@
 pub trait Automaton {
-    type State: Clone;
+    type State;
 
     fn start(&self) -> Self::State;
     fn is_match(&self, state: &Self::State) -> bool;

@@ -38,16 +38,20 @@ impl Regex {
 }
 
 impl Automaton for Regex {
-    type State = usize;
+    type State = Option<usize>;
 
-    fn start(&self) -> usize { 0 }
+    fn start(&self) -> Option<usize> { Some(0) }
 
-    fn is_match(&self, state: usize) -> bool {
-        self.dfa.is_match(state)
+    fn is_match(&self, state: Option<usize>) -> bool {
+        state.map(|state| self.dfa.is_match(state)).unwrap_or(false)
     }
 
-    fn accept(&self, state: usize, byte: u8) -> Option<usize> {
-        self.dfa.accept(state, byte)
+    fn can_match(&self, state: Option<usize>) -> bool {
+        state.is_some()
+    }
+
+    fn accept(&self, state: Option<usize>, byte: u8) -> Option<usize> {
+        state.and_then(|state| self.dfa.accept(state, byte))
     }
 }
 

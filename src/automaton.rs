@@ -3,7 +3,8 @@ pub trait Automaton {
 
     fn start(&self) -> Self::State;
     fn is_match(&self, state: Self::State) -> bool;
-    fn accept(&self, state: Self::State, byte: u8) -> Option<Self::State>;
+    fn can_match(&self, state: Self::State) -> bool;
+    fn accept(&self, state: Self::State, byte: u8) -> Self::State;
 }
 
 pub struct AlwaysMatch;
@@ -13,5 +14,6 @@ impl Automaton for AlwaysMatch {
 
     fn start(&self) -> () { () }
     fn is_match(&self, _: ()) -> bool { true }
-    fn accept(&self, _: (), _: u8) -> Option<()> { Some(()) }
+    fn can_match(&self, _: ()) -> bool { true }
+    fn accept(&self, _: (), _: u8) -> () { () }
 }

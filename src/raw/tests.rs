@@ -453,3 +453,25 @@ fn regex_simple() {
     assert_eq!(rdr.next(), Some((&b"abd"[..], Output::zero())));
     assert!(rdr.next().is_none());
 }
+
+#[test]
+fn levenshtein_simple() {
+    use levenshtein::Levenshtein;
+    let set = fst_set(vec!["woof", "wood", "banana"]);
+    let q = Levenshtein::new("woog", 1).unwrap();
+    let mut rdr = set.search(q).into_stream();
+    while let Some((k, _)) = rdr.next() {
+        println!("{}", ::std::str::from_utf8(k).unwrap());
+    }
+}
+
+#[test]
+fn levenshtein_unicode() {
+    use levenshtein::Levenshtein;
+    let set = fst_set(vec!["woof", "wood", "banana", "☃snowman☃"]);
+    let q = Levenshtein::new("snoman", 3).unwrap();
+    let mut rdr = set.search(q).into_stream();
+    while let Some((k, _)) = rdr.next() {
+        println!("{}", ::std::str::from_utf8(k).unwrap());
+    }
+}

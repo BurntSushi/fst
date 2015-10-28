@@ -58,7 +58,7 @@ const STATE_LIMIT: usize = 10_000; // currently at least 20MB >_<
 ///
 /// While executing this Levenshtein automaton against a finite state
 /// transducer will be very fast, *constructing* an automaton may not be.
-/// Namely, the implementation is a proof of concept. While I believe the
+/// Namely, this implementation is a proof of concept. While I believe the
 /// algorithmic complexity is not exponential, the implementation is not speedy
 /// and it can use enormous amounts of memory (tens of MB before a hard-coded
 /// limit will cause an error to be returned).
@@ -78,6 +78,9 @@ impl Levenshtein {
     /// a deletion or a substitution.)
     ///
     /// If the underlying automaton becomes too big, then an error is returned.
+    ///
+    /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
+    /// can be used with the `search` method of any finite state transducer.
     pub fn new(query: &str, distance: u32) -> Result<Self> {
         let lev = DynamicLevenshtein {
             query: query.to_owned(),

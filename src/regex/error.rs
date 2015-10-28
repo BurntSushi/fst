@@ -3,13 +3,35 @@ use std::fmt;
 
 use regex_syntax;
 
+/// An error that occurred while compiling a regular expression.
 #[derive(Debug)]
 pub enum Error {
+    /// A problem with the syntax of a regular expression.
     Syntax(regex_syntax::Error),
+    /// Too many instructions resulting from the regular expression.
+    ///
+    /// The number given is the limit that was exceeded.
     CompiledTooBig(usize),
+    /// Too many automata states resulting from the regular expression.
+    ///
+    /// This is distinct from `CompiledTooBig` because `TooManyStates` refers
+    /// to the DFA construction where as `CompiledTooBig` refers to the NFA
+    /// construction.
+    ///
+    /// The number given is the limit that was exceeded.
     TooManyStates(usize),
+    /// Lazy quantifiers are not allowed (because they have no useful
+    /// interpretation when used purely for automata intersection, as is the
+    /// case in this crate).
     NoLazy,
+    /// Word boundaries are currently not allowed.
+    ///
+    /// This restriction may be lifted in the future.
     NoWordBoundary,
+    /// Empty or "zero width assertions" such as `^` or `$` are currently
+    /// not allowed.
+    ///
+    /// This restriction may be lifted in the future.
     NoEmpty,
 }
 

@@ -6,10 +6,11 @@ use byteorder::{ReadBytesExt, LittleEndian};
 use memmap::{Mmap, Protection};
 
 use automaton::{Automaton, AlwaysMatch};
-use error::{Error, Result};
+use error::Result;
 use stream::{IntoStreamer, Streamer};
 
 pub use self::build::Builder;
+pub use self::error::Error;
 pub use self::node::{Node, Transitions};
 use self::node::node_new;
 pub use self::ops::{
@@ -20,6 +21,7 @@ pub use self::ops::{
 mod build;
 mod common_inputs;
 mod counting_writer;
+mod error;
 mod node;
 mod ops;
 mod pack;
@@ -60,19 +62,19 @@ impl Fst {
 impl Fst {
     fn new(data: FstData) -> Result<Self> {
         if data.as_slice().len() < 32 {
-            return Err(Error::Format);
+            return Err(Error::Format.into());
         }
         // The read_u64 unwraps below are OK because they can never fail.
         // They can only fail when there is an IO error or if there is an
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
-        // 24 bytes (no unexpected EOF).
+        // N bytes (no unexpected EOF).
         let version = data.as_slice().read_u64::<LittleEndian>().unwrap();
         if version != VERSION {
             return Err(Error::Version {
                 expected: VERSION,
                 got: version,
-            });
+            }.into());
         }
         let ty = (&data.as_slice()[8..]).read_u64::<LittleEndian>().unwrap();
         let root_addr = {
@@ -381,6 +383,30 @@ impl<'f, A: Automaton> Stream<'f, A> {
                 });
             }
         }
+    }
+
+    pub fn into_vec(mut self) -> Vec<(Vec<u8>, Output)> {
+        let mut vs = vec![];
+        while let Some((k, v)) = self.next() {
+            vs.push((k.to_vec(), v));
+        }
+        vs
+    }
+
+    pub fn into_keys(mut self) -> Vec<Vec<u8>> {
+        let mut vs = vec![];
+        while let Some((k, _)) = self.next() {
+            vs.push(k.to_vec());
+        }
+        vs
+    }
+
+    pub fn into_values(mut self) -> Vec<Output> {
+        let mut vs = vec![];
+        while let Some((_, v)) = self.next() {
+            vs.push(v);
+        }
+        vs
     }
 }
 

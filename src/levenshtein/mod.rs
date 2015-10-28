@@ -8,14 +8,81 @@ use utf8_ranges::{Utf8Range, Utf8Sequences};
 use automaton::Automaton;
 use Result;
 
+pub use self::error::Error;
+
+mod error;
+
+const STATE_LIMIT: usize = 10_000; // currently at least 20MB >_<
+
+/// A Unicode aware Levenshtein automaton for running efficient fuzzy queries.
+///
+/// A Levenshtein automata is one way to search any finite state transducer
+/// for keys that *approximately* match a given query. A Levenshtein automaton
+/// approximates this by returning all keys within a certain edit distance of
+/// the query. The edit distance is defined by the number of insertions,
+/// deletions and substitutions required to turn the query into the key.
+/// Insertions, deletions and substitutions are based on
+/// **Unicode characters** (where each character is a single Unicode scalar
+/// value).
+///
+/// # Example
+///
+/// This example shows how to find all keys within an edit distance of `1`
+/// from `foo`.
+///
+/// ```rust
+/// use fst::{IntoStreamer, Streamer, Levenshtein, Set};
+///
+/// let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+/// let set = Set::from_iter(keys).unwrap();
+///
+/// let lev = Levenshtein::new("foo", 1).unwrap();
+/// let mut stream = set.search(lev).into_stream();
+///
+/// let mut keys = vec![];
+/// while let Some(key) = stream.next() {
+///     keys.push(key.to_vec());
+/// }
+/// assert_eq!(keys, vec![
+///     "fo".as_bytes(),   // 1 deletion
+///     "fob".as_bytes(),  // 1 substitution
+///     "foo".as_bytes(),  // 0 insertions/deletions/substitutions
+///     "food".as_bytes(), // 1 insertion
+/// ]);
+/// ```
+///
+/// This example only uses ASCII characters, but it will work equally well
+/// on Unicode characters.
+///
+/// # Warning: experimental
+///
+/// While executing this Levenshtein automaton against a finite state
+/// transducer will be very fast, *constructing* an automaton may not be.
+/// Namely, the implementation is a proof of concept. While I believe the
+/// algorithmic complexity is not exponential, the implementation is not speedy
+/// and it can use enormous amounts of memory (tens of MB before a hard-coded
+/// limit will cause an error to be returned).
+///
+/// This is important functionality, so one should count on this implementation
+/// being vastly improved in the future.
 pub struct Levenshtein {
     prog: DynamicLevenshtein,
     dfa: Dfa,
 }
 
 impl Levenshtein {
-    pub fn new<T: Into<String>>(query: T, distance: usize) -> Result<Self> {
-        let lev = DynamicLevenshtein { query: query.into(), dist: distance };
+    /// Create a new Levenshtein query.
+    ///
+    /// The query finds all matching terms that are at most `distance`
+    /// edit operations from `query`. (An edit operation may be an insertion,
+    /// a deletion or a substitution.)
+    ///
+    /// If the underlying automaton becomes too big, then an error is returned.
+    pub fn new(query: &str, distance: u32) -> Result<Self> {
+        let lev = DynamicLevenshtein {
+            query: query.to_owned(),
+            dist: distance as usize,
+        };
         let dfa = try!(DfaBuilder::new(lev.clone()).build());
         Ok(Levenshtein {
             prog: lev,
@@ -145,6 +212,9 @@ impl DfaBuilder {
                         stack.push(lev_next);
                     }
                 }
+            }
+            if self.dfa.states.len() > STATE_LIMIT {
+                return Err(Error::TooManyStates(STATE_LIMIT).into());
             }
         }
         Ok(self.dfa)

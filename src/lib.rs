@@ -8,6 +8,7 @@ extern crate utf8_ranges;
 
 pub use automaton::Automaton;
 pub use error::{Error, Result};
+pub use levenshtein::Error as LevenshteinError;
 pub use levenshtein::Levenshtein;
 pub use map::{Map, MapBuilder};
 pub use regex::Error as RegexError;

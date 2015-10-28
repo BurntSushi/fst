@@ -1,6 +1,6 @@
 use automaton::AlwaysMatch;
 use error::Error;
-use raw::{Builder, Bound, Fst, Stream, Output};
+use raw::{self, Builder, Bound, Fst, Stream, Output};
 use stream::{IntoStreamer, Streamer};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
@@ -187,7 +187,7 @@ fn fst_map_100000_lengths() {
 #[test]
 fn invalid_version() {
     match Fst::from_bytes(vec![0; 32]) {
-        Err(Error::Version { got, .. }) => assert_eq!(got, 0),
+        Err(Error::Fst(raw::Error::Version { got, .. })) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
     }
@@ -196,7 +196,7 @@ fn invalid_version() {
 #[test]
 fn invalid_format() {
     match Fst::from_bytes(vec![0; 0]) {
-        Err(Error::Format) => {}
+        Err(Error::Fst(raw::Error::Format)) => {}
         Err(err) => panic!("expected format error, got {:?}", err),
         Ok(_) => panic!("expected format error, got FST"),
     }
@@ -450,7 +450,7 @@ fn regex_simple() {
     let set = fst_set(vec!["abc", "abd", "ayz", "za"]);
     let re = Regex::new("a[a-z]*").unwrap();
     let mut rdr = set.search(re).ge("abd").lt("ax").into_stream();
-    assert_eq!(rdr.next(), Some((&b"abd"[..], Output::zero())));
+    assert_eq!(rdr.next(), Some(("abd".as_bytes(), Output::zero())));
     assert!(rdr.next().is_none());
 }
 
@@ -459,10 +459,8 @@ fn levenshtein_simple() {
     use levenshtein::Levenshtein;
     let set = fst_set(vec!["woof", "wood", "banana"]);
     let q = Levenshtein::new("woog", 1).unwrap();
-    let mut rdr = set.search(q).into_stream();
-    while let Some((k, _)) = rdr.next() {
-        println!("{}", ::std::str::from_utf8(k).unwrap());
-    }
+    let vs = set.search(q).into_stream().into_keys();
+    assert_eq!(vs, vec!["wood".as_bytes(), "woof".as_bytes()]);
 }
 
 #[test]
@@ -470,8 +468,6 @@ fn levenshtein_unicode() {
     use levenshtein::Levenshtein;
     let set = fst_set(vec!["woof", "wood", "banana", "☃snowman☃"]);
     let q = Levenshtein::new("snoman", 3).unwrap();
-    let mut rdr = set.search(q).into_stream();
-    while let Some((k, _)) = rdr.next() {
-        println!("{}", ::std::str::from_utf8(k).unwrap());
-    }
+    let vs = set.search(q).into_stream().into_keys();
+    assert_eq!(vs, vec!["☃snowman☃".as_bytes()]);
 }

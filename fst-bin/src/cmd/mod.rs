@@ -78,7 +78,7 @@ pub mod find {
     use std::io::{self, BufRead, Write};
 
     use docopt::Docopt;
-    use fst::{Regex, IntoStreamer, Streamer};
+    use fst::{Levenshtein, Regex, IntoStreamer, Streamer};
     use fst::raw as fst;
 
     use util;
@@ -95,6 +95,8 @@ Options:
     -s, --start ARG     Start of range query.
     -e, --end ARG       Start of range query.
     --regex             Interpret query as a regex.
+    --dist ARG          Maximum allowed edit distance.
+                        Ignored if --regex is set.
 ";
 
     #[derive(Debug, RustcDecodable)]
@@ -106,6 +108,7 @@ Options:
         flag_start: Option<String>,
         flag_end: Option<String>,
         flag_regex: bool,
+        flag_dist: Option<u32>,
     }
 
     pub fn run(argv: Vec<String>) -> Result<(), Error> {
@@ -127,7 +130,9 @@ Options:
                     }
                 }
             }
-        } else if !args.flag_regex && args.arg_query.is_some() {
+        } else if !args.flag_regex
+                && !args.flag_dist.is_some()
+                && args.arg_query.is_some() {
             let query = args.arg_query.as_ref().unwrap();
             if fst.find(query).is_some() {
                 hits += 1;
@@ -138,6 +143,25 @@ Options:
         } else if args.flag_regex && args.arg_query.is_some() {
             let re = try!(Regex::new(args.arg_query.as_ref().unwrap()));
             let mut range = fst.search(re);
+            if let Some(ref min) = args.flag_start {
+                range = range.ge(min);
+            }
+            if let Some(ref max) = args.flag_end {
+                range = range.le(max);
+            }
+            let mut it = range.into_stream();
+            while let Some((term, _)) = it.next() {
+                hits += 1;
+                if !args.flag_count {
+                    try!(wtr.write_all(term));
+                    try!(wtr.write_all(b"\n"));
+                }
+            }
+        } else if args.flag_dist.is_some() && args.arg_query.is_some() {
+            let q = args.arg_query.as_ref().unwrap();
+            let dist = args.flag_dist.unwrap();
+            let lev = try!(Levenshtein::new(q, dist));
+            let mut range = fst.search(lev);
             if let Some(ref min) = args.flag_start {
                 range = range.ge(min);
             }

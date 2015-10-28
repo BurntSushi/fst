@@ -2,9 +2,10 @@ use std::io::{self, Write};
 
 use byteorder::{WriteBytesExt, LittleEndian};
 
-use error::{Error, Result};
+use error::Result;
 use raw::{VERSION, NONE_ADDRESS, CompiledAddr, FstType, Output, Transition};
 use raw::counting_writer::CountingWriter;
+use raw::error::Error;
 use raw::registry::{Registry, RegistryEntry};
 use stream::{IntoStreamer, Streamer};
 
@@ -196,13 +197,13 @@ impl<W: io::Write> Builder<W> {
     fn check_last_key(&mut self, bs: &[u8], check_dupe: bool) -> Result<()> {
         if let Some(ref mut last) = self.last {
             if check_dupe && bs == &**last {
-                return Err(Error::DuplicateKey { got: bs.to_vec() });
+                return Err(Error::DuplicateKey { got: bs.to_vec() }.into());
             }
             if bs < &**last {
                 return Err(Error::OutOfOrder {
                     previous: last.to_vec(),
                     got: bs.to_vec(),
-                });
+                }.into());
             }
             last.clear();
             for &b in bs {

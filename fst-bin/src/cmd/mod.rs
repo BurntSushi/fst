@@ -36,6 +36,45 @@ Usage: fst mkset [options] [<input>] [<output>]
     }
 }
 
+pub mod mkmap {
+    use csv;
+    use docopt::Docopt;
+    use fst::MapBuilder;
+
+    use util;
+    use Error;
+
+    const USAGE: &'static str = "
+Usage: fst mkmap [options] [<input>] [<output>]
+
+The input to this command should be a CSV file with exactly two columns.
+The first column should be the key and the second column should be a value
+that can be interpreted as an unsigned 64 bit integer.
+";
+
+    #[derive(Debug, RustcDecodable)]
+    struct Args {
+        arg_input: Option<String>,
+        arg_output: Option<String>,
+    }
+
+    pub fn run(argv: Vec<String>) -> Result<(), Error> {
+        let args: Args = Docopt::new(USAGE)
+                                .and_then(|d| d.argv(&argv).decode())
+                                .unwrap_or_else(|e| e.exit());
+        let rdr = try!(util::get_reader(args.arg_input));
+        let mut rdr = csv::Reader::from_reader(rdr);
+        let wtr = try!(util::get_buf_writer(args.arg_output));
+        let mut map = try!(MapBuilder::new(wtr));
+        for row in rdr.decode() {
+            let (key, val): (String, u64) = try!(row);
+            try!(map.insert(key, val));
+        }
+        try!(map.finish());
+        Ok(())
+    }
+}
+
 pub mod words {
     use std::io::Write;
 

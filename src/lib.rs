@@ -1,3 +1,9 @@
+/*!
+TODO.
+*/
+
+#![deny(missing_docs)]
+
 extern crate byteorder;
 extern crate memchr;
 extern crate memmap;

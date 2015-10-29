@@ -94,6 +94,40 @@ impl Map {
         Map::from_bytes(try!(builder.into_inner()))
     }
 
+    /// Tests the membership of a single key.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::Map;
+    ///
+    /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
+    ///
+    /// assert_eq!(map.contains_key("b"), true);
+    /// assert_eq!(map.contains_key("z"), false);
+    /// ```
+    pub fn contains_key<K: AsRef<[u8]>>(&self, key: K) -> bool {
+        self.0.find(key).is_some()
+    }
+
+    /// Retrieves the value associated with a key.
+    ///
+    /// If the key does not exist, then `None` is returned.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::Map;
+    ///
+    /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
+    ///
+    /// assert_eq!(map.get("b"), Some(2));
+    /// assert_eq!(map.get("z"), None);
+    /// ```
+    pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<u64> {
+        self.0.find(key).map(|output| output.value())
+    }
+
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this map.
     ///
@@ -208,22 +242,6 @@ impl Map {
     /// ```
     pub fn range(&self) -> StreamBuilder {
         StreamBuilder(self.0.range())
-    }
-
-    /// Tests the membership of a single key.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use fst::Map;
-    ///
-    /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
-    ///
-    /// assert_eq!(map.contains_key("b"), true);
-    /// assert_eq!(map.contains_key("z"), false);
-    /// ```
-    pub fn contains_key<K: AsRef<[u8]>>(&self, key: K) -> bool {
-        self.0.find(key).is_some()
     }
 
     /// Executes an automaton on the keys of this map.
@@ -463,6 +481,10 @@ impl<W: io::Write> MapBuilder<W> {
     }
 
     /// Insert a new key-value pair into the map.
+    ///
+    /// Keys must be convertible to byte strings. Values must be a `u64`, which
+    /// is a restriction of the current implementation of finite state
+    /// transducers. (Values may one day be expanded to other types.)
     ///
     /// If a key is inserted that is less than or equal to any previous key
     /// added, then an error is returned. Similarly, if there was a problem
@@ -869,7 +891,7 @@ impl<'a, 'm> Streamer<'a> for Intersection<'m> {
     }
 }
 
-/// A stream of set difference over map multiple streams in lexicographic
+/// A stream of set difference over multiple map streams in lexicographic
 /// order.
 ///
 /// The difference operation is taken with respect to the first stream and the

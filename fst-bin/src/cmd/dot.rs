@@ -30,7 +30,6 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     writeln!(wtr, r#"
 digraph automaton {{
-    label=<<FONT POINT-SIZE="20">minimal acyclic DFA</FONT>>;
     labelloc="l";
     labeljust="l";
     rankdir="LR";
@@ -43,15 +42,18 @@ digraph automaton {{
 
         let node = fst.node(addr);
         if node.is_final() {
-            writeln!(wtr, "    {} [peripheries=2];", addr).unwrap();
+            writeln!(wtr, "    {} [label=\"\",peripheries=2];", addr).unwrap();
         } else {
-            writeln!(wtr, "    {};", addr).unwrap();
+            writeln!(wtr, "    {} [label=\"\"];", addr).unwrap();
         }
         for t in node.transitions() {
             stack.push(t.addr);
             let inp = (t.inp as char).to_string();
-            writeln!(wtr, "    {} -> {} [label=\"{}\"];",
-                     addr, t.addr, inp).unwrap();
+            let out = if t.out.value() == 0 { "".to_owned() } else {
+                format!("/{}", t.out.value().to_string())
+            };
+            writeln!(wtr, "    {} -> {} [label=\"{}{}\"];",
+                     addr, t.addr, inp, out).unwrap();
         }
     }
     writeln!(wtr, "}}").unwrap();

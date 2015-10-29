@@ -11,13 +11,16 @@ use raw::build::BuilderNode;
 use raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
 use raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
 
+/// Node represents a single state in a finite state transducer.
+///
+/// Nodes are very cheap to construct. Notably, they satisfy the `Copy` trait.
 #[derive(Clone, Copy)]
-pub struct Node<'b> {
-    data: &'b [u8],
+pub struct Node<'f> {
+    data: &'f [u8],
     state: State,
 }
 
-impl<'b> fmt::Debug for Node<'b> {
+impl<'f> fmt::Debug for Node<'f> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(writeln!(f, "NODE@{}", self.start_addr()));
         try!(writeln!(f, "  end_addr: {}", self.end_addr()));
@@ -45,15 +48,14 @@ pub fn node_new(addr: CompiledAddr, data: &[u8]) -> Node {
     }
 }
 
-impl<'b> Node<'b> {
-    pub fn addr(&self) -> CompiledAddr {
-        self.start_addr() as CompiledAddr
-    }
-
-    pub fn transitions<'n>(&'n self) -> Transitions<'b, 'n> {
+impl<'f> Node<'f> {
+    /// Returns an iterator over all transitions in this node in lexicographic
+    /// order.
+    pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
         Transitions { node: self, range: 0..self.len() as u8 }
     }
 
+    /// Returns the transition at index `i`.
     pub fn transition(&self, i: usize) -> Transition {
         Transition {
             inp: self.input(i),
@@ -62,36 +64,55 @@ impl<'b> Node<'b> {
         }
     }
 
-    pub fn input(&self, i: usize) -> u8 {
+    /// Returns the input byte at transition `i`.
+    fn input(&self, i: usize) -> u8 {
         self.state.input(self, i)
     }
 
-    pub fn output(&self, i: usize) -> Output {
+    /// Returns the output value at transition `i`.
+    fn output(&self, i: usize) -> Output {
         self.state.output(self, i)
     }
 
-    pub fn transition_addr(&self, i: usize) -> CompiledAddr {
+    /// Returns the transition address pointed to by transition `i`.
+    fn transition_addr(&self, i: usize) -> CompiledAddr {
         self.state.trans_addr(self, i)
     }
 
-    pub fn final_output(&self) -> Output {
-        self.state.final_output(self)
-    }
-
-    pub fn is_final(&self) -> bool {
-        self.state.is_final()
-    }
-
+    /// Finds the `i`th transition corresponding to the given input byte.
+    ///
+    /// If no transition for this byte exists, then `None` is returned.
     pub fn find_input(&self, b: u8) -> Option<usize> {
         self.state.find_input(self, b)
     }
 
+    /// If this node is final and has a terminal output value, then it is
+    /// returned. Otherwise, a zero output is returned.
+    pub fn final_output(&self) -> Output {
+        self.state.final_output(self)
+    }
+
+    /// Returns true if and only if this node corresponds to a final or "match"
+    /// state in the finite state transducer.
+    pub fn is_final(&self) -> bool {
+        self.state.is_final()
+    }
+
+    /// Returns the number of transitions in this node.
+    ///
+    /// The maximum number of transitions is 256.
     pub fn len(&self) -> usize {
         self.state.ntrans(self)
     }
 
+    /// Returns true if and only if this node has zero transitions.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// Return the address of this node.
+    pub fn addr(&self) -> CompiledAddr {
+        self.start_addr() as CompiledAddr
     }
 
     fn start_addr(&self) -> usize {
@@ -290,7 +311,7 @@ impl StateOneTransNextOutput {
         mut wtr: W, _: CompiledAddr, input: u8, output: Output,
     ) -> io::Result<()> {
         let mut state = StateOneTransNextOutput::new();
-        let pack_size = try!(pack_uint(&mut wtr, output.encode()));
+        let pack_size = try!(pack_uint(&mut wtr, output.value()));
         try!(wtr.write_u8(input));
         state.set_output_pack_size(pack_size);
         wtr.write_u8(state.0).map_err(From::from)
@@ -321,7 +342,7 @@ impl StateOneTransNextOutput {
         let i = node.start_addr()
                 - 1 // input
                 - osize;
-        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::new(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
@@ -388,8 +409,8 @@ impl StateOneTransFinal {
         final_output: Output,
         trans: Transition,
     ) -> io::Result<()> {
-        let final_output = final_output.encode();
-        let trans_output = trans.out.encode();
+        let final_output = final_output.value();
+        let trans_output = trans.out.value();
         let osize = pack_size(cmp::max(final_output, trans_output));
         try!(pack_uint_in(&mut wtr, final_output, osize));
         try!(pack_uint_in(&mut wtr, trans_output, osize));
@@ -449,7 +470,7 @@ impl StateOneTransFinal {
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize;
-        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::new(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn final_output(&self, node: &Node) -> Output {
@@ -459,7 +480,7 @@ impl StateOneTransFinal {
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize - osize;
-        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::new(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
@@ -486,7 +507,7 @@ impl StateOneTrans {
     fn compile<W: io::Write>(
         mut wtr: W, addr: CompiledAddr, trans: Transition,
     ) -> io::Result<()> {
-        let out = trans.out.encode();
+        let out = trans.out.value();
         let output_pack_size = try!(pack_uint(&mut wtr, out));
 
         let delta_addr = addr - trans.addr;
@@ -544,7 +565,7 @@ impl StateOneTrans {
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize;
-        Output::decode(unpack_uint(&node.data[i..], osize as u8).unwrap())
+        Output::new(unpack_uint(&node.data[i..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
@@ -574,11 +595,11 @@ impl StateAnyTrans {
         assert!(node.trans.len() <= ::std::u8::MAX as usize);
 
         let mut tsize = 0;
-        let mut osize = pack_size(node.final_output.encode());
+        let mut osize = pack_size(node.final_output.value());
         let mut any_outs = !node.final_output.is_zero();
         for t in &node.trans {
             tsize = cmp::max(tsize, pack_size((addr - t.addr) as u64));
-            osize = cmp::max(osize, pack_size(t.out.encode()));
+            osize = cmp::max(osize, pack_size(t.out.value()));
             any_outs = any_outs || !t.out.is_zero();
         }
 
@@ -595,9 +616,9 @@ impl StateAnyTrans {
         state.set_state_ntrans(node.trans.len() as u8);
 
         if any_outs {
-            try!(pack_uint_in(&mut wtr, node.final_output.encode(), osize));
+            try!(pack_uint_in(&mut wtr, node.final_output.value(), osize));
             for t in node.trans.iter().rev() {
-                try!(pack_uint_in(&mut wtr, t.out.encode(), osize));
+                try!(pack_uint_in(&mut wtr, t.out.value(), osize));
             }
         }
         for t in node.trans.iter().rev() {
@@ -697,7 +718,7 @@ impl StateAnyTrans {
                  - (ntrans * tsize) // transition addresses
                  - (i * osize) // the previous outputs
                  - osize; // the desired output value
-        Output::decode(unpack_uint(&node.data[at..], osize as u8).unwrap())
+        Output::new(unpack_uint(&node.data[at..], osize as u8).unwrap())
     }
 
     fn final_output(&self, node: &Node) -> Output {
@@ -714,7 +735,7 @@ impl StateAnyTrans {
                  - (ntrans * tsize) // transition addresses
                  - (ntrans * osize) // output values
                  - osize; // the desired output value
-        Output::decode(unpack_uint(&node.data[at..], osize as u8).unwrap())
+        Output::new(unpack_uint(&node.data[at..], osize as u8).unwrap())
     }
 
     fn trans_addr(&self, node: &Node, i: usize) -> CompiledAddr {
@@ -785,12 +806,16 @@ impl PackSizes {
     }
 }
 
-pub struct Transitions<'b: 'n, 'n> {
-    node: &'n Node<'b>,
+/// An iterator over all transitions in a node.
+///
+/// `'f` is the lifetime of the underlying fst and `'n` is the lifetime of
+/// the underlying `Node`.
+pub struct Transitions<'f: 'n, 'n> {
+    node: &'n Node<'f>,
     range: Range<u8>,
 }
 
-impl<'b, 'n> Iterator for Transitions<'b, 'n> {
+impl<'f, 'n> Iterator for Transitions<'f, 'n> {
     type Item = Transition;
 
     fn next(&mut self) -> Option<Transition> {

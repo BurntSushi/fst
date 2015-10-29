@@ -5,7 +5,7 @@ use std::iter::FromIterator;
 use raw::Output;
 use stream::{IntoStreamer, Streamer};
 
-// Permits stream operations to be hetergeneous with respect to streams.
+/// Permits stream operations to be hetergeneous with respect to streams.
 type BoxedStream<'f> = Box<for<'a> Streamer<'a, Item=(&'a [u8], Output)> + 'f>;
 
 /// A value indexed by a stream.
@@ -23,15 +23,40 @@ pub struct IndexedValue {
     pub value: u64,
 }
 
+/// A builder for collecting fst streams on which to perform set operations
+/// on the keys of fsts.
+///
+/// Set operations include intersection, union, difference and symmetric
+/// difference. The result of each set operation is itself a stream that emits
+/// pairs of keys and a sequence of each occurrence of that key in the
+/// participating streams. This information allows one to perform set
+/// operations on fsts and customize how conflicting output values are handled.
+///
+/// All set operations work efficiently on an arbitrary number of
+/// streams with memory proportional to the number of streams.
+///
+/// The algorithmic complexity of all set operations is `O(n1 + n2 + n3 + ...)`
+/// where `n1, n2, n3, ...` correspond to the number of elements in each
+/// stream.
+///
+/// The `'f` lifetime parameter refers to the lifetime of the underlying set.
 pub struct OpBuilder<'f> {
     streams: Vec<BoxedStream<'f>>,
 }
 
 impl<'f> OpBuilder<'f> {
+    /// Create a new set operation builder.
     pub fn new() -> Self {
         OpBuilder { streams: vec![] }
     }
 
+    /// Add a stream to this set operation.
+    ///
+    /// This is useful for a chaining style pattern, e.g.,
+    /// `builder.add(stream1).add(stream2).union()`.
+    ///
+    /// The stream must emit a lexicographically ordered sequence of key-value
+    /// pairs.
     pub fn add<I, S>(mut self, stream: I) -> Self
             where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
                   S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
@@ -39,12 +64,25 @@ impl<'f> OpBuilder<'f> {
         self
     }
 
+    /// Add a stream to this set operation.
+    ///
+    /// The stream must emit a lexicographically ordered sequence of key-value
+    /// pairs.
     pub fn push<I, S>(&mut self, stream: I)
             where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
                   S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         self.streams.push(Box::new(stream.into_stream()));
     }
 
+    /// Performs a union operation on all streams that have been added.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
     pub fn union(self) -> Union<'f> {
         Union {
             heap: StreamHeap::new(self.streams),
@@ -53,6 +91,15 @@ impl<'f> OpBuilder<'f> {
         }
     }
 
+    /// Performs an intersection operation on all streams that have been added.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
     pub fn intersection(self) -> Intersection<'f> {
         Intersection {
             heap: StreamHeap::new(self.streams),
@@ -61,6 +108,17 @@ impl<'f> OpBuilder<'f> {
         }
     }
 
+    /// Performs a difference operation with respect to the first stream added.
+    /// That is, this returns a stream of all elements in the first stream
+    /// that don't exist in any other stream that has been added.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
     pub fn difference(mut self) -> Difference<'f> {
         let first = self.streams.swap_remove(0);
         Difference {
@@ -71,6 +129,22 @@ impl<'f> OpBuilder<'f> {
         }
     }
 
+    /// Performs a symmetric difference operation on all of the streams that
+    /// have been added.
+    ///
+    /// When there are only two streams, then the keys returned correspond to
+    /// keys that are in either stream but *not* in both streams.
+    ///
+    /// More generally, for any number of streams, keys that occur in an odd
+    /// number of streams are returned.
+    ///
+    /// Note that this returns a stream of `(&[u8], &[IndexedValue])`. The
+    /// first element of the tuple is the byte string key. The second element
+    /// of the tuple is a list of all occurrences of that key in participating
+    /// streams. The `IndexedValue` contains an index and the value associated
+    /// with that key in that stream. The index uniquely identifies each
+    /// stream, which is an integer that is auto-incremented when a stream
+    /// is added to this operation (starting at `0`).
     pub fn symmetric_difference(self) -> SymmetricDifference<'f> {
         SymmetricDifference {
             heap: StreamHeap::new(self.streams),
@@ -100,6 +174,9 @@ impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
     }
 }
 
+/// A stream of set union over multiple fst streams in lexicographic order.
+///
+/// The `'f` lifetime parameter refers to the lifetime of the underlying map.
 pub struct Union<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
@@ -130,6 +207,10 @@ impl<'a, 'f> Streamer<'a> for Union<'f> {
     }
 }
 
+/// A stream of set intersection over multiple fst streams in lexicographic
+/// order.
+///
+/// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct Intersection<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
@@ -167,6 +248,14 @@ impl<'a, 'f> Streamer<'a> for Intersection<'f> {
     }
 }
 
+/// A stream of set difference over multiple fst streams in lexicographic
+/// order.
+///
+/// The difference operation is taken with respect to the first stream and the
+/// rest of the streams. i.e., All elements in the first stream that do not
+/// appear in any other streams.
+///
+/// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct Difference<'f> {
     set: BoxedStream<'f>,
     key: Vec<u8>,
@@ -203,6 +292,10 @@ impl<'a, 'f> Streamer<'a> for Difference<'f> {
     }
 }
 
+/// A stream of set symmetric difference over multiple fst streams in
+/// lexicographic order.
+///
+/// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct SymmetricDifference<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,

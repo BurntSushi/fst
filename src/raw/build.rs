@@ -9,6 +9,34 @@ use raw::error::Error;
 use raw::registry::{Registry, RegistryEntry};
 use stream::{IntoStreamer, Streamer};
 
+/// A builder for creating a finite state transducer.
+///
+/// This is not your average everyday builder. It has two important qualities
+/// that make it a bit unique from what you might expect:
+///
+/// 1. All keys must be added in lexicographic order. Adding a key out of order
+///    will result in an error. Additionally, adding a duplicate key with an
+///    output value will also result in an error. That is, once a key is
+///    associated with a value, that association can never be modified or
+///    deleted.
+/// 2. The representation of an fst is streamed to *any* `io::Write` as it is
+///    built. For an in memory representation, this can be a `Vec<u8>`.
+///
+/// Point (2) is especially important because it means that an fst can be
+/// constructed *without storing the entire fst in memory*. Namely, since it
+/// works with any `io::Write`, it can be streamed directly to a file.
+///
+/// With that said, the builder does use memory, but **memory usage is bounded
+/// to a constant size**. The amount of memory used trades off with the
+/// compression ratio. Currently, the implementation hard codes this trade off
+/// which can result in about 5-20MB of heap usage during construction. (N.B.
+/// Guaranteeing a maximal compression ratio requires memory proportional to
+/// the size of the fst, which defeats some of the benefit of streaming
+/// it to disk. In practice, a small bounded amount of memory achieves
+/// close-to-minimal compression ratios.)
+///
+/// The algorithmic complexity of fst construction is `O(n)` where `n` is the
+/// number of elements added to the fst.
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
     ///
@@ -66,16 +94,21 @@ struct LastTransition {
 }
 
 impl Builder<Vec<u8>> {
+    /// Create a builder that builds an fst in memory.
     pub fn memory() -> Self {
         Builder::new(Vec::with_capacity(10 * (1 << 10))).unwrap()
     }
 }
 
 impl<W: io::Write> Builder<W> {
+    /// Create a builder that builds an fst by writing it to `wtr` in a
+    /// streaming fashion.
     pub fn new(wtr: W) -> Result<Builder<W>> {
         Builder::new_type(wtr, 0)
     }
 
+    /// The same as `new`, except it sets the type of the fst to the type
+    /// given.
     pub fn new_type(wtr: W, ty: FstType) -> Result<Builder<W>> {
         let mut wtr = CountingWriter::new(wtr);
         // Don't allow any nodes to have address 0-7. We use these to encode
@@ -93,33 +126,36 @@ impl<W: io::Write> Builder<W> {
         })
     }
 
-    pub fn finish(self) -> Result<()> {
-        try!(self.into_inner());
-        Ok(())
-    }
-
-    pub fn into_inner(mut self) -> Result<W> {
-        try!(self.compile_from(0));
-        let root_node = self.unfinished.pop_root();
-        let root_addr = try!(self.compile(&root_node));
-        try!(self.wtr.write_u64::<LittleEndian>(self.len as u64));
-        try!(self.wtr.write_u64::<LittleEndian>(root_addr as u64));
-        try!(self.wtr.flush());
-        Ok(self.wtr.into_inner())
-    }
-
+    /// Adds a byte string to this FST with a zero output value.
     pub fn add<B>(&mut self, bs: B) -> Result<()>
             where B: AsRef<[u8]> {
         try!(self.check_last_key(bs.as_ref(), false));
         self.insert_output(bs, Output::zero())
     }
 
+    /// Insert a new key-value pair into the fst.
+    ///
+    /// Keys must be convertible to byte strings. Values must be a `u64`, which
+    /// is a restriction of the current implementation of finite state
+    /// transducers. (Values may one day be expanded to other types.)
+    ///
+    /// If a key is inserted that is less than or equal to any previous key
+    /// added, then an error is returned. Similarly, if there was a problem
+    /// writing to the underlying writer, an error is returned.
     pub fn insert<B>(&mut self, bs: B, val: u64) -> Result<()>
             where B: AsRef<[u8]> {
         try!(self.check_last_key(bs.as_ref(), true));
         self.insert_output(bs, Output::new(val))
     }
 
+    /// Calls insert on each item in the iterator.
+    ///
+    /// If an error occurred while adding an element, processing is stopped
+    /// and the error is returned.
+    ///
+    /// If a key is inserted that is less than or equal to any previous key
+    /// added, then an error is returned. Similarly, if there was a problem
+    /// writing to the underlying writer, an error is returned.
     pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
             where T: AsRef<[u8]>, I: IntoIterator<Item=(T, Output)> {
         for (key, out) in iter {
@@ -128,6 +164,14 @@ impl<W: io::Write> Builder<W> {
         Ok(())
     }
 
+    /// Calls insert on each item in the stream.
+    ///
+    /// Note that unlike `extend_iter`, this is not generic on the items in
+    /// the stream.
+    ///
+    /// If a key is inserted that is less than or equal to any previous key
+    /// added, then an error is returned. Similarly, if there was a problem
+    /// writing to the underlying writer, an error is returned.
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
             where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
                   S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
@@ -136,6 +180,26 @@ impl<W: io::Write> Builder<W> {
             try!(self.insert(key, out.value()));
         }
         Ok(())
+    }
+
+    /// Finishes the construction of the fst and flushes the underlying
+    /// writer. After completion, the data written to `W` may be read using
+    /// one of `Fst`'s constructor methods.
+    pub fn finish(self) -> Result<()> {
+        try!(self.into_inner());
+        Ok(())
+    }
+
+    /// Just like `finish`, except it returns the underlying writer after
+    /// flushing it.
+    pub fn into_inner(mut self) -> Result<W> {
+        try!(self.compile_from(0));
+        let root_node = self.unfinished.pop_root();
+        let root_addr = try!(self.compile(&root_node));
+        try!(self.wtr.write_u64::<LittleEndian>(self.len as u64));
+        try!(self.wtr.write_u64::<LittleEndian>(root_addr as u64));
+        try!(self.wtr.flush());
+        Ok(self.wtr.into_inner())
     }
 
     fn insert_output<B>(&mut self, bs: B, out: Output) -> Result<()>

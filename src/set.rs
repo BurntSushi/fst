@@ -69,6 +69,22 @@ impl Set {
         Set::from_bytes(try!(builder.into_inner()))
     }
 
+    /// Tests the membership of a single key.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use fst::Set;
+    ///
+    /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
+    ///
+    /// assert_eq!(set.contains("b"), true);
+    /// assert_eq!(set.contains("z"), false);
+    /// ```
+    pub fn contains<K: AsRef<[u8]>>(&self, key: K) -> bool {
+        self.0.find(key).is_some()
+    }
+
     /// Return a lexicographically ordered stream of all keys in this set.
     ///
     /// While this is a stream, it does require heap space proportional to the
@@ -127,22 +143,6 @@ impl Set {
     /// ```
     pub fn range(&self) -> StreamBuilder {
         StreamBuilder(self.0.range())
-    }
-
-    /// Tests the membership of a single key.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use fst::Set;
-    ///
-    /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
-    ///
-    /// assert_eq!(set.contains("b"), true);
-    /// assert_eq!(set.contains("z"), false);
-    /// ```
-    pub fn contains<K: AsRef<[u8]>>(&self, key: K) -> bool {
-        self.0.find(key).is_some()
     }
 
     /// Executes an automaton on the keys of this set.

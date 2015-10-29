@@ -121,7 +121,7 @@ pub type CompiledAddr = usize;
 /// ![finite state automaton](http://burntsushi.net/stuff/months-set.png)
 ///
 /// Notice here how the prefix and suffix of `jan` and `jun` are shared.
-/// Similarly, the prefixes of `jun` and `jul` are shared and the suffixes
+/// Similarly, the prefixes of `jun` and `jul` are shared and the prefixes
 /// of `mar` and `may` are shared.
 ///
 /// All of the keys from this automaton can be enumerated in lexicographic

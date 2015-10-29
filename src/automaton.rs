@@ -1,6 +1,6 @@
 /// Automaton describes types that behave as a finite automaton.
 ///
-/// All implementators of this trait are represent *byte based* automata.
+/// All implementators of this trait are represented by *byte based* automata.
 /// Stated differently, all transitions in the automata correspond to a single
 /// byte in the input.
 ///

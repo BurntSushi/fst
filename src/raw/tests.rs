@@ -449,7 +449,7 @@ fn regex_simple() {
     use regex::Regex;
     let set = fst_set(vec!["abc", "abd", "ayz", "za"]);
     let re = Regex::new("a[a-z]*").unwrap();
-    let mut rdr = set.search(re).ge("abd").lt("ax").into_stream();
+    let mut rdr = set.search(&re).ge("abd").lt("ax").into_stream();
     assert_eq!(rdr.next(), Some(("abd".as_bytes(), Output::zero())));
     assert!(rdr.next().is_none());
 }
@@ -459,7 +459,7 @@ fn levenshtein_simple() {
     use levenshtein::Levenshtein;
     let set = fst_set(vec!["woof", "wood", "banana"]);
     let q = Levenshtein::new("woog", 1).unwrap();
-    let vs = set.search(q).into_stream().into_keys();
+    let vs = set.search(&q).into_stream().into_keys();
     assert_eq!(vs, vec!["wood".as_bytes(), "woof".as_bytes()]);
 }
 
@@ -468,6 +468,6 @@ fn levenshtein_unicode() {
     use levenshtein::Levenshtein;
     let set = fst_set(vec!["woof", "wood", "banana", "☃snowman☃"]);
     let q = Levenshtein::new("snoman", 3).unwrap();
-    let vs = set.search(q).into_stream().into_keys();
+    let vs = set.search(&q).into_stream().into_keys();
     assert_eq!(vs, vec!["☃snowman☃".as_bytes()]);
 }

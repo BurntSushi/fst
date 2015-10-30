@@ -66,7 +66,7 @@ mod sparse;
 ///               .unwrap();
 ///
 /// let re = Regex::new("f[a-z]+3?").unwrap();
-/// let mut stream = set.search(re).into_stream();
+/// let mut stream = set.search(&re).into_stream();
 ///
 /// let mut keys = vec![];
 /// while let Some(key) = stream.next() {

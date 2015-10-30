@@ -37,7 +37,7 @@ const STATE_LIMIT: usize = 10_000; // currently at least 20MB >_<
 /// let set = Set::from_iter(keys).unwrap();
 ///
 /// let lev = Levenshtein::new("foo", 1).unwrap();
-/// let mut stream = set.search(lev).into_stream();
+/// let mut stream = set.search(&lev).into_stream();
 ///
 /// let mut keys = vec![];
 /// while let Some(key) = stream.next() {

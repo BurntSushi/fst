@@ -265,7 +265,7 @@ impl Map {
     /// ]).unwrap();
     ///
     /// let re = Regex::new("f[a-z]+3?").unwrap();
-    /// let mut stream = map.search(re).into_stream();
+    /// let mut stream = map.search(&re).into_stream();
     ///
     /// let mut kvs = vec![];
     /// while let Some((k, v)) = stream.next() {
@@ -433,7 +433,7 @@ impl<'m, 'a> IntoStreamer<'a> for &'m Map {
 ///
 /// # Example: stream to file
 ///
-/// This shows how to stream construction of a set to a file.
+/// This shows how to do stream construction of a map to a file.
 ///
 /// ```rust,no_run
 /// use std::fs::File;

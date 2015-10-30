@@ -129,11 +129,11 @@ pub type CompiledAddr = usize;
 /// order. Since it is acyclic, the procedure will terminate.
 ///
 /// A key can be found by tracing it through the transitions in the automaton.
-/// For example, the key `aug` is known not be in the automaton by only
-/// visiting the first root state (because there is no `a` transition).
-/// For another example, the key `jax` is known not to be in the set only after
-/// moving through the transitions for `j` and `a`. Namely, after those
-/// transitions are followed, there are no transitions for `x`.
+/// For example, the key `aug` is known not to be in the automaton by only
+/// visiting the root state (because there is no `a` transition). For another
+/// example, the key `jax` is known not to be in the set only after moving
+/// through the transitions for `j` and `a`. Namely, after those transitions
+/// are followed, there are no transitions for `x`.
 ///
 /// Notice here that looking up a key is proportional the length of the key
 /// itself. Namely, lookup time is not affected by the number of keys in the
@@ -229,7 +229,7 @@ pub type CompiledAddr = usize;
 /// For any non-trivial sized set of keys, it is unlikely that this crate will
 /// produce a minimal transducer. As far as this author knows, guaranteeing a
 /// minimal transducer requires working memory proportional to the number of
-/// keys. This can be quite costly and is anathema to the main design goal of
+/// states. This can be quite costly and is anathema to the main design goal of
 /// this crate: provide the ability to work with gigantic sets of strings with
 /// constant memory overhead.
 ///
@@ -237,6 +237,10 @@ pub type CompiledAddr = usize;
 /// states. More frequently used states are cached and reused, which provides
 /// reasonably good compression ratios. (No comprehensive benchmarks exist to
 /// back up this claim.)
+///
+/// It is possible that this crate may expose a way to guarantee minimal
+/// construction of transducers at the expense of exorbitant memory
+/// requirements.
 ///
 /// # Bibliography
 ///

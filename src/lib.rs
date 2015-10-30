@@ -10,7 +10,7 @@ of compression on common prefixes and suffixes in the keys. Additionally,
 finite state machines can be efficiently queried with automata (like regular
 expressions or Levenshtein distance for fuzzy queries) or lexicographic ranges.
 
-To read more about the mechanics finite state transducers, including a
+To read more about the mechanics of finite state transducers, including a
 bibliography for algorithms used in this crate, see the docs for the
 [`raw::Fst`](raw/struct.Fst.html) type.
 

@@ -9,3 +9,6 @@ tmp
 *.csv.idx
 words
 98m*
+dict
+test
+months

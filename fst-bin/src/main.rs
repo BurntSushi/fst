@@ -1,8 +1,11 @@
 extern crate bit_set;
+extern crate chan;
 extern crate csv;
 extern crate docopt;
 extern crate fst;
+extern crate num_cpus;
 extern crate rustc_serialize;
+extern crate tempdir;
 
 use std::env;
 use std::error;
@@ -20,6 +23,7 @@ macro_rules! fail {
 }
 
 mod cmd;
+mod merge;
 mod util;
 
 pub type Error = Box<error::Error + Send + Sync>;

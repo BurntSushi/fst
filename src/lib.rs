@@ -284,6 +284,8 @@ data structures found in the standard library, such as `BTreeSet` and
    sets or maps tricky. One way to do it is to sort pieces of the data and
    build a set/map for each piece. This can be parallelized trivially. Once
    done, they can be merged together into one big set/map if desired.
+   An example of this procedure can be seen in `fst-bin/src/merge.rs` from the
+   root of this crate's repository.
 
 # Warning: regexes and Levenshtein automatons use a lot of memory
 

@@ -8,10 +8,13 @@ name = "fst"
 
 [dependencies]
 bit-set = "0.2"
+chan = "0.1"
 csv = "0.14"
 docopt = "0.6"
 fst = { path = "..", version = "0.1" }
+num_cpus = "0.2"
 rustc-serialize = "0.3"
+tempdir = "0.3"
 
 [profile.release]
 debug = true

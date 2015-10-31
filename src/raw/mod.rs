@@ -23,7 +23,7 @@ use std::fmt;
 use std::path::Path;
 
 use byteorder::{ReadBytesExt, LittleEndian};
-use memmap::{Mmap, Protection};
+use memmap::{Mmap, MmapViewSync, Protection};
 
 use automaton::{Automaton, AlwaysMatch};
 use error::Result;
@@ -244,6 +244,16 @@ pub type CompiledAddr = usize;
 ///
 /// # Bibliography
 ///
+/// I initially got the idea to use finite state tranducers to represent
+/// ordered sets/maps from
+/// [Michael
+/// McCandless'](http://blog.mikemccandless.com/2010/12/using-finite-state-transducers-in.html)
+/// work on incorporating transducers in Lucene.
+///
+/// However, my work would also not have been possible without the hard work
+/// of many academics, especially
+/// [Jan Daciuk](http://galaxy.eti.pg.gda.pl/katedry/kiw/pracownicy/Jan.Daciuk/personal/).
+///
 /// * [Incremental construction of minimal acyclic finite-state automata](http://www.mitpressjournals.org/doi/pdfplus/10.1162/089120100561601)
 ///   (Section 3 provides a decent overview of the algorithm used to construct
 ///   transducers in this crate, assuming all outputs are `0`.)
@@ -271,7 +281,20 @@ impl Fst {
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Fst::new(FstData::Mmap(try!(Mmap::open_path(path, Protection::Read))))
+        let mmap = try!(Mmap::open_path(path, Protection::Read));
+        Fst::from_mmap_view(mmap.into_view_sync())
+    }
+
+    /// Opens a transducer from a raw `memmap::MmapViewSync`.
+    ///
+    /// This is useful if a transducer is serialized to only a part of a file.
+    /// A `MmapViewSync` lets one control which region of the file is used for
+    /// the transducer.
+    ///
+    /// N.B. This method will likely change in the future, but something that
+    /// provides the same functionality will always exist.
+    pub fn from_mmap_view(mmap_view: MmapViewSync) -> Result<Self> {
+        Fst::new(FstData::Mmap(mmap_view))
     }
 
     /// Creates a transducer from its representation as a raw byte sequence.
@@ -285,9 +308,7 @@ impl Fst {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Fst::new(FstData::Owned(bytes))
     }
-}
 
-impl Fst {
     fn new(data: FstData) -> Result<Self> {
         if data.as_slice().len() < 32 {
             return Err(Error::Format.into());
@@ -551,6 +572,21 @@ impl Bound {
             Bound::Unbounded => false,
         }
     }
+
+    fn is_empty(&self) -> bool {
+        match *self {
+            Bound::Included(ref v) => v.is_empty(),
+            Bound::Excluded(ref v) => v.is_empty(),
+            Bound::Unbounded => true,
+        }
+    }
+
+    fn is_inclusive(&self) -> bool {
+        match *self {
+            Bound::Excluded(_) => false,
+            _ => true,
+        }
+    }
 }
 
 /// A lexicographically ordered stream of key-value pairs from an fst.
@@ -598,32 +634,26 @@ impl<'f, A: Automaton> Stream<'f, A> {
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
     fn seek_min(&mut self, min: Bound) {
-        let (key, inclusive) = match min {
-            Bound::Excluded(ref min) if min.is_empty() => {
-                self.stack = vec![StreamState {
-                    addr: self.fst.root_addr,
-                    trans: 0,
-                    out: Output::zero(),
-                    aut_state: self.aut.start(),
-                }];
-                return;
+        if min.is_empty() {
+            if min.is_inclusive() {
+                self.empty_output = self.fst.empty_final_output();
             }
+            self.stack = vec![StreamState {
+                addr: self.fst.root_addr,
+                trans: 0,
+                out: Output::zero(),
+                aut_state: self.aut.start(),
+            }];
+            return;
+        }
+        let (key, inclusive) = match min {
             Bound::Excluded(ref min) => {
                 (min, false)
             }
-            Bound::Included(ref min) if !min.is_empty() => {
+            Bound::Included(ref min) => {
                 (min, true)
             }
-            _ => {
-                self.empty_output = self.fst.empty_final_output();
-                self.stack = vec![StreamState {
-                    addr: self.fst.root_addr,
-                    trans: 0,
-                    out: Output::zero(),
-                    aut_state: self.aut.start(),
-                }];
-                return;
-            }
+            Bound::Unbounded => unreachable!(),
         };
         // At this point, we need to find the starting location of `min` in
         // the FST. However, as we search, we need to maintain a stack of
@@ -638,13 +668,13 @@ impl<'f, A: Automaton> Stream<'f, A> {
             match node.find_input(b) {
                 Some(i) => {
                     let t = node.transition(i);
-                    let next_state = self.aut.accept(&aut_state, b);
-                    aut_state = self.aut.accept(&aut_state, b);
+                    let prev_state = aut_state;
+                    aut_state = self.aut.accept(&prev_state, b);
                     self.stack.push(StreamState {
                         addr: node.addr(),
                         trans: i+1,
                         out: out,
-                        aut_state: next_state,
+                        aut_state: prev_state,
                     });
                     out = out.cat(t.out);
                     self.inp.push(b);
@@ -830,7 +860,7 @@ impl Output {
 
 enum FstData {
     Owned(Vec<u8>),
-    Mmap(Mmap),
+    Mmap(MmapViewSync),
 }
 
 impl FstData {

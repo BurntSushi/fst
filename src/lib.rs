@@ -2,8 +2,8 @@
 Crate `fst` is a library for efficiently storing and searching ordered sets or
 maps where the keys are byte strings. A key design goal of this crate is to
 support storing and searching *very large* sets or maps (i.e., billions). This
-means that much effort has gone in to making sure that no operation requires
-storing entire sets or maps in memory at once.
+means that much effort has gone in to making sure that all operations are
+memory efficient.
 
 Sets and maps are represented by a finite state machine, which acts as a form
 of compression on common prefixes and suffixes in the keys. Additionally,
@@ -13,6 +13,23 @@ expressions or Levenshtein distance for fuzzy queries) or lexicographic ranges.
 To read more about the mechanics of finite state transducers, including a
 bibliography for algorithms used in this crate, see the docs for the
 [`raw::Fst`](raw/struct.Fst.html) type.
+
+# Installation
+
+Simply add a corresponding entry to your `Cargo.toml` dependency list:
+
+```ignore
+[dependencies]
+fst = "0.1"
+```
+
+And add this to your crate root:
+
+```ignore
+extern crate fst;
+```
+
+The examples in this documentation will show the rest.
 
 # Overview of types and modules
 
@@ -221,6 +238,17 @@ methods for memory mapping a finite state transducer from disk.
 This is particularly important for long running processes that use this crate,
 since it enables the operating system to determine which regions of your
 finite state transducers are actually in memory.
+
+Of course, there are downsides to this approach. Namely, navigating a
+transducer during a key lookup or a search will likely follow a pattern
+approximating random access. Supporting random access when reading from disk
+can be very slow because of how often `seek` must be called (or, in the case
+of memory maps, page faults). This is somewhat mitigated by the prevalence of
+solid state drives where seek time is eliminated. Nevertheless, solid state
+drives are not ubiquitous and it is possible that the OS will not be smart
+enough to keep your memory mapped transducers in the page cache. In that case,
+it is advisable to load the entire transducer into your process's memory (e.g.,
+`Set::from_bytes`).
 
 # Streams
 

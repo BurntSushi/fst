@@ -15,6 +15,10 @@ macro_rules! w {
     ($($tt:tt)*) => {{ let _ = writeln!($($tt)*); }}
 }
 
+macro_rules! fail {
+    ($($tt:tt)*) => { return Err(From::from(format!($($tt)*))); }
+}
+
 mod cmd;
 mod util;
 
@@ -29,12 +33,13 @@ Usage:
 Commands:
     csv     Emit statistics about nodes or edges.
     dot     Emit a dot representation of an FST.
-    dupes   Emit info about frequency of duplicate nodes.
-    find    Search an FST.
-    mkmap   Create a new map of key-value pairs.
-    mkset   Create a new set of words.
+    dupes   Emit diagnostic info about frequency of duplicate nodes.
+    fuzzy   Run fuzzy queries based on edit distance.
+    grep    Search an FST with a regex.
+    map     Create a new map of key-value pairs.
+    range   Run range queries.
+    set     Create a new set of keys.
     union   Union two or more FSTs.
-    words   Emit all words in given set/map.
 
 Options:
     -h, --help     Show this help message.
@@ -51,25 +56,29 @@ enum Command {
     Csv,
     Dot,
     Dupes,
-    Find,
-    MkMap,
-    MkSet,
+    Fuzzy,
+    Grep,
+    Map,
+    Range,
+    Set,
     Union,
-    Words,
 }
 
 impl Command {
     fn run(self) -> Result<(), Error> {
+        use self::Command::*;
+
         let argv: Vec<String> = env::args().collect();
         match self {
-            Command::Csv => cmd::csv::run(argv),
-            Command::Dot => cmd::dot::run(argv),
-            Command::Dupes => cmd::dupes::run(argv),
-            Command::Find => cmd::find::run(argv),
-            Command::MkMap => cmd::mkmap::run(argv),
-            Command::MkSet => cmd::mkset::run(argv),
-            Command::Union => cmd::union::run(argv),
-            Command::Words => cmd::words::run(argv),
+            Csv => cmd::csv::run(argv),
+            Dot => cmd::dot::run(argv),
+            Dupes => cmd::dupes::run(argv),
+            Fuzzy => cmd::fuzzy::run(argv),
+            Grep => cmd::grep::run(argv),
+            Map => cmd::map::run(argv),
+            Range => cmd::range::run(argv),
+            Set => cmd::set::run(argv),
+            Union => cmd::union::run(argv),
         }
     }
 }

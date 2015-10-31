@@ -9,8 +9,17 @@ use util;
 use Error;
 
 const USAGE: &'static str = "
-Usage: fst csv edges <input> [<output>]
-       fst csv nodes <input> [<output>]
+Emit information in CSV format about the transducer.
+
+If <output> is not set, then CSV data is emitted to stdout.
+
+Usage:
+    fst csv edges <input> [<output>]
+    fst csv nodes <input> [<output>]
+    fst csv --help
+
+Options:
+    -h, --help       Display this message.
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -26,11 +35,11 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
                             .and_then(|d| d.argv(&argv).decode())
                             .unwrap_or_else(|e| e.exit());
 
-    let wtr = try!(util::get_writer(args.arg_output));
+    let wtr = try!(util::get_writer(args.arg_output.as_ref()));
     let mut wtr = csv::Writer::from_writer(wtr);
 
     let fst = try!(fst::Fst::from_file_path(args.arg_input));
-    let mut set = BitSet::with_capacity(fst.as_slice().len());
+    let mut set = BitSet::with_capacity(fst.len());
 
     if args.cmd_edges {
         try!(wtr.encode(("addr_in", "addr_out", "input", "output")));
@@ -69,6 +78,5 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
             )));
         }
     }
-    try!(wtr.flush());
-    Ok(())
+    wtr.flush().map_err(From::from)
 }

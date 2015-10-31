@@ -9,13 +9,32 @@ use util;
 use Error;
 
 const USAGE: &'static str = "
-Usage: fst dupes <input> [<output>]
+A simple way to show duplicate nodes.
+
+This is meant to be a diagnostic tool to view duplicate nodes in the
+transducer. Every duplicate node represents a missed opportunity for more
+compression. A minimal transducer should have precisely zero duplicate nodes.
+
+WARNING: This stores all nodes in the transducer in memory, decompressed. This
+may be expensive in both time and space depending on the size of your
+transducer.
+
+If <output> is omitted, then diagnostic data is emitted to stdout.
+
+Usage:
+    fst dupes [options] <input> [<output>]
+    fst dupes --help
+
+Options:
+    -h, --help       Display this message.
+    --limit ARG      Show this many duplicate nodes. [default: 10]
 ";
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
     arg_input: String,
     arg_output: Option<String>,
+    flag_limit: usize,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -40,7 +59,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
                             .and_then(|d| d.argv(&argv).decode())
                             .unwrap_or_else(|e| e.exit());
 
-    let mut wtr = try!(util::get_buf_writer(args.arg_output));
+    let mut wtr = try!(util::get_buf_writer(args.arg_output.as_ref()));
     let fst = try!(fst::Fst::from_file_path(args.arg_input));
     let mut set = BitSet::with_capacity(fst.as_slice().len());
     let mut node_counts = HashMap::with_capacity(10_000);
@@ -70,7 +89,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     w!(wtr, "Nodes with duplicates: {}", counts.len());
     w!(wtr, "----------------------------------");
 
-    for &(ref fnode, count) in counts.iter().take(10) {
+    for &(ref fnode, count) in counts.iter().take(args.flag_limit) {
         w!(wtr, "Duplicated {} times", count);
         w!(wtr, "{:#?}", fnode);
         w!(wtr, "----------------------------------");

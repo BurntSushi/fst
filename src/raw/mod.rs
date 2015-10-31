@@ -670,6 +670,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
                     let t = node.transition(i);
                     let prev_state = aut_state;
                     aut_state = self.aut.accept(&prev_state, b);
+                    self.inp.push(b);
                     self.stack.push(StreamState {
                         addr: node.addr(),
                         trans: i+1,
@@ -677,7 +678,6 @@ impl<'f, A: Automaton> Stream<'f, A> {
                         aut_state: prev_state,
                     });
                     out = out.cat(t.out);
-                    self.inp.push(b);
                     node = self.fst.node(t.addr);
                 }
                 None => {

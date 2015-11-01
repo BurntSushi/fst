@@ -28,6 +28,8 @@ Usage:
 Options:
     -h, --help       Display this message.
     --limit ARG      Show this many duplicate nodes. [default: 10]
+    --min ARG        Only show duplicate nodes with this many
+                     reoccurrences. [default: 20]
 ";
 
 #[derive(Debug, RustcDecodable)]
@@ -35,6 +37,7 @@ struct Args {
     arg_input: String,
     arg_output: Option<String>,
     flag_limit: usize,
+    flag_min: i32,
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -80,8 +83,9 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     let total = node_counts.values().fold(0, |n, c| n + c);
     let unique = node_counts.len();
+    let min = args.flag_min;
     let mut counts: Vec<(FullNode, i32)> =
-        node_counts.into_iter().filter(|&(_, c)| c > 1).collect();
+        node_counts.into_iter().filter(|&(_, c)| c > min).collect();
     counts.sort_by(|&(_, ref c1), &(_, ref c2)| c1.cmp(c2).reverse());
 
     w!(wtr, "Total nodes:           {}", total);

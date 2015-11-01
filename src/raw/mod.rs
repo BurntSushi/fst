@@ -46,6 +46,7 @@ mod node;
 mod ops;
 mod pack;
 mod registry;
+// mod registry_minimal;
 #[cfg(test)] mod tests;
 
 /// The API version of this crate.

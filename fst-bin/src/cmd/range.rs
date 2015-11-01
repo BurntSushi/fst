@@ -45,5 +45,5 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     if let Some(ref end) = args.flag_end {
         q = q.le(end);
     }
-    util::print_stream(&mut io::stdout(), args.flag_outputs, q)
+    util::print_stream(io::BufWriter::new(io::stdout()), args.flag_outputs, q)
 }

@@ -3,10 +3,14 @@ use std::io::{self, Write};
 use byteorder::{WriteBytesExt, LittleEndian};
 
 use error::Result;
-use raw::{VERSION, NONE_ADDRESS, CompiledAddr, FstType, Output, Transition};
+use raw::{
+    VERSION, EMPTY_ADDRESS, NONE_ADDRESS,
+    CompiledAddr, FstType, Output, Transition,
+};
 use raw::counting_writer::CountingWriter;
 use raw::error::Error;
 use raw::registry::{Registry, RegistryEntry};
+// use raw::registry_minimal::{Registry, RegistryEntry};
 use stream::{IntoStreamer, Streamer};
 
 /// A builder for creating a finite state transducer.
@@ -119,7 +123,7 @@ impl<W: io::Write> Builder<W> {
         Ok(Builder {
             wtr: wtr,
             unfinished: UnfinishedNodes::new(),
-            registry: Registry::new(5_000, 1),
+            registry: Registry::new(5_000, 5),
             last: None,
             last_addr: NONE_ADDRESS,
             len: 0,
@@ -245,6 +249,11 @@ impl<W: io::Write> Builder<W> {
     }
 
     fn compile(&mut self, node: &BuilderNode) -> Result<CompiledAddr> {
+        if node.is_final
+            && node.trans.is_empty()
+            && node.final_output.is_zero() {
+            return Ok(EMPTY_ADDRESS);
+        }
         let entry = self.registry.entry(&node);
         if let RegistryEntry::Found(ref addr) = entry {
             return Ok(*addr);

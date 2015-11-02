@@ -4,7 +4,12 @@
 // FST.
 //
 // This is really only meant to be used for debugging and experiments. It is
-// a memory hog.
+// a memory/CPU hog.
+//
+// One "easy" improvement here is to use an FNV hash instead of the super
+// expensive SipHasher.
+
+#![allow(dead_code)]
 
 use std::collections::hash_map::{Entry, HashMap};
 
@@ -27,7 +32,7 @@ pub enum RegistryEntry<'a> {
 pub struct RegistryCell(CompiledAddr);
 
 impl Registry {
-    pub fn new(table_size: usize, lru_size: usize) -> Registry {
+    pub fn new(table_size: usize, _lru_size: usize) -> Registry {
         Registry { table: HashMap::with_capacity(table_size) }
     }
 

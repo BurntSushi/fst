@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate bit_set;
 extern crate chan;
 extern crate csv;
@@ -15,7 +17,10 @@ use std::io::{self, Write};
 use docopt::Docopt;
 
 macro_rules! w {
-    ($($tt:tt)*) => {{ let _ = writeln!($($tt)*); }}
+    ($wtr:expr, $($tt:tt)*) => {{
+        use std::io::Write;
+        let _ = writeln!(&mut $wtr, $($tt)*);
+    }}
 }
 
 macro_rules! fail {
@@ -41,6 +46,7 @@ Commands:
     fuzzy   Run fuzzy queries based on edit distance.
     grep    Search an FST with a regex.
     map     Create a new map of key-value pairs.
+    node    Show a single node.
     range   Run range queries.
     set     Create a new set of keys.
     union   Union two or more FSTs.
@@ -63,6 +69,7 @@ enum Command {
     Fuzzy,
     Grep,
     Map,
+    Node,
     Range,
     Set,
     Union,
@@ -80,6 +87,7 @@ impl Command {
             Fuzzy => cmd::fuzzy::run(argv),
             Grep => cmd::grep::run(argv),
             Map => cmd::map::run(argv),
+            Node => cmd::node::run(argv),
             Range => cmd::range::run(argv),
             Set => cmd::set::run(argv),
             Union => cmd::union::run(argv),

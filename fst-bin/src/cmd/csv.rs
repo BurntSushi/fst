@@ -44,13 +44,13 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     if args.cmd_edges {
         try!(wtr.encode(("addr_in", "addr_out", "input", "output")));
         let mut stack = vec![fst.root().addr()];
+        set.insert(fst.root().addr());
         while let Some(addr) = stack.pop() {
-            if set.contains(&addr) {
-                continue;
-            }
-            set.insert(addr);
             for t in fst.node(addr).transitions() {
-                stack.push(t.addr);
+                if !set.contains(&t.addr) {
+                    stack.push(t.addr);
+                    set.insert(t.addr);
+                }
                 try!(wtr.encode((
                     addr, t.addr, t.inp as char, t.out.value(),
                 )));
@@ -62,20 +62,24 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
             "transitions", "final", "final_output",
         )));
         let mut stack = vec![fst.root().addr()];
+        set.insert(fst.root().addr());
         while let Some(addr) = stack.pop() {
-            if set.contains(&addr) {
-                continue;
-            }
-            set.insert(addr);
             let node = fst.node(addr);
             for t in node.transitions() {
-                stack.push(t.addr);
+                if !set.contains(&t.addr) {
+                    stack.push(t.addr);
+                    set.insert(t.addr);
+                }
             }
-            try!(wtr.encode((
-                node.addr(), node.state(),
-                node.as_slice().len(), node.len(),
-                node.is_final(), node.final_output().value(),
-            )));
+            let row = &[
+                node.addr().to_string(),
+                node.state().to_string(),
+                node.as_slice().len().to_string(),
+                node.len().to_string(),
+                node.is_final().to_string(),
+                node.final_output().value().to_string(),
+            ];
+            try!(wtr.write(row.iter()));
         }
     }
     wtr.flush().map_err(From::from)

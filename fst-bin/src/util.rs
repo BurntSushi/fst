@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{self, BufRead};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use csv;
 use fst::{IntoStreamer, Streamer};
@@ -8,34 +8,47 @@ use fst::raw::Output;
 
 use Error;
 
-pub fn get_buf_reader<T: AsRef<str>>(
+pub fn get_buf_reader<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<io::BufReader<Box<io::Read>>> {
+) -> io::Result<io::BufReader<Box<io::Read + Send + Sync + 'static>>> {
     Ok(io::BufReader::new(try!(get_reader(path))))
 }
 
-pub fn get_buf_writer<T: AsRef<str>>(
+pub fn get_buf_writer<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<io::BufWriter<Box<io::Write>>> {
+) -> io::Result<io::BufWriter<Box<io::Write + Send + Sync + 'static>>> {
     Ok(io::BufWriter::new(try!(get_writer(path))))
 }
 
-pub fn get_reader<T: AsRef<str>>(
+pub fn get_reader<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<Box<io::Read>> {
+) -> io::Result<Box<io::Read + Send + Sync + 'static>> {
     Ok(match to_stdio(path) {
         None => Box::new(io::stdin()),
         Some(path) => Box::new(try!(File::open(path))),
     })
 }
 
-pub fn get_writer<T: AsRef<str>>(
+pub fn get_writer<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<Box<io::Write>> {
+) -> io::Result<Box<io::Write + Send + Sync + 'static>> {
     Ok(match to_stdio(path) {
         None => Box::new(io::stdout()),
         Some(path) => Box::new(try!(File::create(path))),
     })
+}
+
+fn to_stdio<T: AsRef<Path>>(path: Option<T>) -> Option<PathBuf> {
+    match path {
+        None => None,
+        Some(s) => {
+            if s.as_ref().to_string_lossy() == "-" {
+                None
+            } else {
+                Some(s.as_ref().to_path_buf())
+            }
+        }
+    }
 }
 
 pub fn print_stream<'f, W, I, S>(
@@ -63,25 +76,12 @@ where W: io::Write,
     }
 }
 
-fn to_stdio<T: AsRef<str>>(path: Option<T>) -> Option<String> {
-    match path {
-        None => None,
-        Some(s) => {
-            if "-" == s.as_ref() {
-                None
-            } else {
-                Some(s.as_ref().to_owned())
-            }
-        }
-    }
-}
-
 pub struct ConcatLines {
     inputs: Vec<PathBuf>,
     cur: Option<Lines>,
 }
 
-type Lines = io::Lines<io::BufReader<File>>;
+type Lines = io::Lines<io::BufReader<Box<io::Read + Send + Sync + 'static>>>;
 
 impl ConcatLines {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatLines {
@@ -99,11 +99,11 @@ impl Iterator for ConcatLines {
                 match self.inputs.pop() {
                     None => return None,
                     Some(path) => {
-                        let f = match File::open(path) {
+                        let rdr = match get_buf_reader(Some(path)) {
                             Err(err) => return Some(Err(err)),
-                            Ok(f) => f,
+                            Ok(rdr) => rdr,
                         };
-                        self.cur = Some(io::BufReader::new(f).lines());
+                        self.cur = Some(rdr.lines());
                     }
                 }
             }
@@ -120,7 +120,7 @@ pub struct ConcatCsv {
     cur: Option<Rows>,
 }
 
-type Rows = csv::Reader<File>;
+type Rows = csv::Reader<Box<io::Read + Send + Sync + 'static>>;
 
 impl ConcatCsv {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatCsv {
@@ -166,11 +166,11 @@ impl Iterator for ConcatCsv {
                 match self.inputs.pop() {
                     None => return None,
                     Some(path) => {
-                        let f = match File::open(path) {
+                        let rdr = match get_reader(Some(path)) {
                             Err(err) => return Some(Err(From::from(err))),
-                            Ok(f) => f,
+                            Ok(rdr) => rdr,
                         };
-                        self.cur = Some(csv::Reader::from_reader(f));
+                        self.cur = Some(csv::Reader::from_reader(rdr));
                     }
                 }
             }

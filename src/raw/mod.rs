@@ -46,7 +46,7 @@ mod node;
 mod ops;
 mod pack;
 mod registry;
-// mod registry_minimal;
+mod registry_minimal;
 #[cfg(test)] mod tests;
 
 /// The API version of this crate.
@@ -60,6 +60,9 @@ mod registry;
 /// crate that is compatible with the serialized transducer. This particular
 /// behavior may be relaxed in future versions.
 pub const VERSION: u64 = 1;
+
+/// A sentinel value used to indicate an empty final state.
+const EMPTY_ADDRESS: CompiledAddr = 0;
 
 /// A sentinel value used to indicate an invalid state.
 ///
@@ -335,6 +338,23 @@ impl Fst {
             let mut last2 = &data.as_slice()[data.as_slice().len() - 16..];
             last2.read_u64::<LittleEndian>().unwrap()
         };
+        // The root node is always the last node written, so its address should
+        // be near the end. After the root node is written, we still have to
+        // write the root *address* and the number of nodes in the FST.
+        // That's 16 bytes. The extra byte comes from the fact that the root
+        // address points to the last byte in the root node, rather than the
+        // byte immediately following the root node.
+        //
+        // If this check passes, it is still possible that the FST is invalid
+        // but probably unlikely. If this check reports a false positive, then
+        // the program will probably panic. In the worst case, the FST will
+        // operate but be subtly wrong. (This would require the bytes to be in
+        // a format expected by an FST, which is incredibly unlikely.)
+        //
+        // This is essentially our own little checksum.
+        if root_addr + 17 != data.as_slice().len() as u64 {
+            return Err(Error::Format.into());
+        }
         Ok(Fst {
             data: data,
             root_addr: u64_to_usize(root_addr),

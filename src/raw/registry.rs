@@ -9,7 +9,7 @@ pub struct Registry {
 }
 
 #[derive(Debug)]
-struct RegistryMru<'a> {
+struct RegistryCache<'a> {
     cells: &'a mut [RegistryCell],
 }
 
@@ -44,7 +44,7 @@ impl Registry {
         let bucket = self.hash(node);
         let start = self.mru_size * bucket;
         let end = start + self.mru_size;
-        RegistryMru { cells: &mut self.table[start..end] }.entry(node)
+        RegistryCache { cells: &mut self.table[start..end] }.entry(node)
     }
 
     fn hash(&self, node: &BuilderNode) -> usize {
@@ -66,7 +66,7 @@ impl Registry {
     }
 }
 
-impl<'a> RegistryMru<'a> {
+impl<'a> RegistryCache<'a> {
     fn entry(mut self, node: &BuilderNode) -> RegistryEntry<'a> {
         if self.cells.len() == 1 {
             let cell = &mut self.cells[0];
@@ -84,10 +84,8 @@ impl<'a> RegistryMru<'a> {
                 RegistryEntry::Found(addr)
             } else {
                 let last = self.cells.len() - 1;
-                if self.cells[last].is_none() {
-                    self.promote(last);
-                }
-                self.cells[0].node.clone_from(node); // discard MRU
+                self.cells[last].node.clone_from(node); // discard LRU
+                self.promote(last);
                 RegistryEntry::NotFound(&mut self.cells[0])
             }
         }
@@ -124,7 +122,7 @@ mod tests {
     use raw::{Output, Transition};
     use raw::build::BuilderNode;
     use super::{
-        Registry, RegistryCell, RegistryEntry, RegistryMru,
+        Registry, RegistryCell, RegistryEntry, RegistryCache,
     };
 
     fn assert_rejected(entry: RegistryEntry) {
@@ -202,7 +200,7 @@ mod tests {
     }
 
     #[test]
-    fn mru_works() {
+    fn cache_works() {
         let mut reg = Registry::new(1, 1);
 
         let bnode1 = BuilderNode { is_final: true, ..BuilderNode::default() };
@@ -224,30 +222,30 @@ mod tests {
             RegistryCell { addr: 3, node: bn.clone() },
             RegistryCell { addr: 4, node: bn.clone() },
         ];
-        let mut mru = RegistryMru { cells: &mut bnodes };
+        let mut cache = RegistryCache { cells: &mut bnodes };
 
-        mru.promote(0);
-        assert_eq!(mru.cells[0].addr, 1);
-        assert_eq!(mru.cells[1].addr, 2);
-        assert_eq!(mru.cells[2].addr, 3);
-        assert_eq!(mru.cells[3].addr, 4);
+        cache.promote(0);
+        assert_eq!(cache.cells[0].addr, 1);
+        assert_eq!(cache.cells[1].addr, 2);
+        assert_eq!(cache.cells[2].addr, 3);
+        assert_eq!(cache.cells[3].addr, 4);
 
-        mru.promote(1);
-        assert_eq!(mru.cells[0].addr, 2);
-        assert_eq!(mru.cells[1].addr, 1);
-        assert_eq!(mru.cells[2].addr, 3);
-        assert_eq!(mru.cells[3].addr, 4);
+        cache.promote(1);
+        assert_eq!(cache.cells[0].addr, 2);
+        assert_eq!(cache.cells[1].addr, 1);
+        assert_eq!(cache.cells[2].addr, 3);
+        assert_eq!(cache.cells[3].addr, 4);
 
-        mru.promote(3);
-        assert_eq!(mru.cells[0].addr, 4);
-        assert_eq!(mru.cells[1].addr, 2);
-        assert_eq!(mru.cells[2].addr, 1);
-        assert_eq!(mru.cells[3].addr, 3);
+        cache.promote(3);
+        assert_eq!(cache.cells[0].addr, 4);
+        assert_eq!(cache.cells[1].addr, 2);
+        assert_eq!(cache.cells[2].addr, 1);
+        assert_eq!(cache.cells[3].addr, 3);
 
-        mru.promote(2);
-        assert_eq!(mru.cells[0].addr, 1);
-        assert_eq!(mru.cells[1].addr, 4);
-        assert_eq!(mru.cells[2].addr, 2);
-        assert_eq!(mru.cells[3].addr, 3);
+        cache.promote(2);
+        assert_eq!(cache.cells[0].addr, 1);
+        assert_eq!(cache.cells[1].addr, 4);
+        assert_eq!(cache.cells[2].addr, 2);
+        assert_eq!(cache.cells[3].addr, 3);
     }
 }

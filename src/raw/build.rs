@@ -116,14 +116,15 @@ impl<W: io::Write> Builder<W> {
     pub fn new_type(wtr: W, ty: FstType) -> Result<Builder<W>> {
         let mut wtr = CountingWriter::new(wtr);
         // Don't allow any nodes to have address 0-7. We use these to encode
-        // the API version.
+        // the API version. We also use addresses `0` and `1` as special
+        // sentinel values, so they should never correspond to a real node.
         try!(wtr.write_u64::<LittleEndian>(VERSION));
         // Similarly for 8-15 for the fst type.
         try!(wtr.write_u64::<LittleEndian>(ty));
         Ok(Builder {
             wtr: wtr,
             unfinished: UnfinishedNodes::new(),
-            registry: Registry::new(5_000, 5),
+            registry: Registry::new(10_000, 2),
             last: None,
             last_addr: NONE_ADDRESS,
             len: 0,

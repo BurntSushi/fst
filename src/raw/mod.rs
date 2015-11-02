@@ -332,11 +332,11 @@ impl Fst {
         let ty = (&data.as_slice()[8..]).read_u64::<LittleEndian>().unwrap();
         let root_addr = {
             let mut last = &data.as_slice()[data.as_slice().len() - 8..];
-            last.read_u64::<LittleEndian>().unwrap()
+            u64_to_usize(last.read_u64::<LittleEndian>().unwrap())
         };
         let len = {
             let mut last2 = &data.as_slice()[data.as_slice().len() - 16..];
-            last2.read_u64::<LittleEndian>().unwrap()
+            u64_to_usize(last2.read_u64::<LittleEndian>().unwrap())
         };
         // The root node is always the last node written, so its address should
         // be near the end. After the root node is written, we still have to
@@ -351,15 +351,22 @@ impl Fst {
         // operate but be subtly wrong. (This would require the bytes to be in
         // a format expected by an FST, which is incredibly unlikely.)
         //
+        // The special check for EMPTY_ADDRESS is needed since an empty FST
+        // has a root node that is empty and final, which means it has the
+        // special address `0`. In that case, the FST is the smallest it can
+        // be: the version, type, root address and number of nodes. That's
+        // 32 bytes (8 byte u64 each).
+        //
         // This is essentially our own little checksum.
-        if root_addr + 17 != data.as_slice().len() as u64 {
+        if (root_addr == EMPTY_ADDRESS && data.as_slice().len() != 32)
+            && root_addr + 17 != data.as_slice().len() {
             return Err(Error::Format.into());
         }
         Ok(Fst {
             data: data,
-            root_addr: u64_to_usize(root_addr),
+            root_addr: root_addr,
             ty: ty,
-            len: u64_to_usize(len),
+            len: len,
         })
     }
 

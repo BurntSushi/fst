@@ -90,10 +90,18 @@ where I: Iterator<Item=Result<(String, u64), Error>> + Send + 'static {
                 kvs: try!(kv_batch),
             });
         }
+        let mut results = sorters.results();
+
+        // Nothing? Create an empty FST and be done with it.
+        if results.is_empty() {
+            let wtr = io::BufWriter::new(try!(File::create(&self.output)));
+            let builder = try!(raw::Builder::new(wtr));
+            try!(builder.finish());
+            return Ok(());
+        }
 
         // Now union batches of FSTs until only one remains.
         // That one is our final FST with all key/values.
-        let mut results = sorters.results();
         let mut gen = 0;
         while results.len() > 1 {
             let batches = batcher(results, self.fd_limit, self.threads);

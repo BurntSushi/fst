@@ -459,7 +459,7 @@ fn levenshtein_simple() {
     use levenshtein::Levenshtein;
     let set = fst_set(vec!["woof", "wood", "banana"]);
     let q = Levenshtein::new("woog", 1).unwrap();
-    let vs = set.search(&q).into_stream().into_keys();
+    let vs = set.search(&q).into_stream().into_byte_keys();
     assert_eq!(vs, vec!["wood".as_bytes(), "woof".as_bytes()]);
 }
 
@@ -468,6 +468,6 @@ fn levenshtein_unicode() {
     use levenshtein::Levenshtein;
     let set = fst_set(vec!["woof", "wood", "banana", "☃snowman☃"]);
     let q = Levenshtein::new("snoman", 3).unwrap();
-    let vs = set.search(&q).into_stream().into_keys();
+    let vs = set.search(&q).into_stream().into_byte_keys();
     assert_eq!(vs, vec!["☃snowman☃".as_bytes()]);
 }

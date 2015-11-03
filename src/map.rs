@@ -551,6 +551,47 @@ impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     }
 }
 
+impl<'m, A: Automaton> Stream<'m, A> {
+    /// Convert this stream into a vector of byte strings and outputs.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_byte_vec(self) -> Vec<(Vec<u8>, u64)> {
+        self.0.into_byte_vec()
+    }
+
+    /// Convert this stream into a vector of Unicode strings and outputs.
+    ///
+    /// If any key is not valid UTF-8, then iteration on the stream is stopped
+    /// and a UTF-8 decoding error is returned.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_str_vec(self) -> Result<Vec<(String, u64)>> {
+        self.0.into_str_vec()
+    }
+
+    /// Convert this stream into a vector of byte strings.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_byte_keys(self) -> Vec<Vec<u8>> {
+        self.0.into_byte_keys()
+    }
+
+    /// Convert this stream into a vector of Unicode strings.
+    ///
+    /// If any key is not valid UTF-8, then iteration on the stream is stopped
+    /// and a UTF-8 decoding error is returned.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_str_keys(self) -> Result<Vec<String>> {
+        self.0.into_str_keys()
+    }
+
+    /// Convert this stream into a vector of outputs.
+    pub fn into_values(self) -> Vec<u64> {
+        self.0.into_values()
+    }
+}
+
 /// A lexicographically ordered stream of keys from a map.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.

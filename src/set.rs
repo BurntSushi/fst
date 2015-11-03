@@ -485,6 +485,23 @@ impl<'s, A: Automaton> Stream<'s, A> {
     pub fn new(fst_stream: raw::Stream<'s, A>) -> Self {
         Stream(fst_stream)
     }
+
+    /// Convert this stream into a vector of Unicode strings.
+    ///
+    /// If any key is not valid UTF-8, then iteration on the stream is stopped
+    /// and a UTF-8 decoding error is returned.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_strs(self) -> Result<Vec<String>> {
+        self.0.into_str_keys()
+    }
+
+    /// Convert this stream into a vector of byte strings.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_bytes(self) -> Vec<Vec<u8>> {
+        self.0.into_byte_keys()
+    }
 }
 
 impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {

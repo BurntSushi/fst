@@ -1,6 +1,7 @@
 use std::error;
 use std::fmt;
 use std::str;
+use std::string::FromUtf8Error;
 
 use raw::FstType;
 
@@ -54,12 +55,15 @@ pub enum Error {
         /// The type read from a finite state transducer.
         got: FstType,
     },
+    /// An error that occurred when trying to decode a UTF-8 byte key.
+    FromUtf8(FromUtf8Error),
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Error::*;
         match *self {
+            FromUtf8(ref err) => err.fmt(f),
             Version { expected, got } => {
                 write!(f, "\
 Error opening FST: expected API version {}, got API version {}.
@@ -87,6 +91,7 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         use self::Error::*;
         match *self {
+            FromUtf8(ref err) => err.description(),
             Version { .. } => "incompatible version found when opening FST",
             Format => "unknown invalid format found when opening FST",
             DuplicateKey { .. } => "duplicate key insertion",
@@ -96,7 +101,16 @@ impl error::Error for Error {
     }
 
     fn cause(&self) -> Option<&error::Error> {
-        None
+        match *self {
+            Error::FromUtf8(ref err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Self {
+        Error::FromUtf8(err)
     }
 }
 

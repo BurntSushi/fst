@@ -748,18 +748,33 @@ impl<'f, A: Automaton> Stream<'f, A> {
     /// Convert this stream into a vector of byte strings and outputs.
     ///
     /// Note that this creates a new allocation for every key in the stream.
-    pub fn into_vec(mut self) -> Vec<(Vec<u8>, Output)> {
+    pub fn into_byte_vec(mut self) -> Vec<(Vec<u8>, u64)> {
         let mut vs = vec![];
         while let Some((k, v)) = self.next() {
-            vs.push((k.to_vec(), v));
+            vs.push((k.to_vec(), v.value()));
         }
         vs
+    }
+
+    /// Convert this stream into a vector of Unicode strings and outputs.
+    ///
+    /// If any key is not valid UTF-8, then iteration on the stream is stopped
+    /// and a UTF-8 decoding error is returned.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_str_vec(mut self) -> Result<Vec<(String, u64)>> {
+        let mut vs = vec![];
+        while let Some((k, v)) = self.next() {
+            let k = try!(String::from_utf8(k.to_vec()).map_err(Error::from));
+            vs.push((k, v.value()));
+        }
+        Ok(vs)
     }
 
     /// Convert this stream into a vector of byte strings.
     ///
     /// Note that this creates a new allocation for every key in the stream.
-    pub fn into_keys(mut self) -> Vec<Vec<u8>> {
+    pub fn into_byte_keys(mut self) -> Vec<Vec<u8>> {
         let mut vs = vec![];
         while let Some((k, _)) = self.next() {
             vs.push(k.to_vec());
@@ -767,11 +782,26 @@ impl<'f, A: Automaton> Stream<'f, A> {
         vs
     }
 
+    /// Convert this stream into a vector of Unicode strings.
+    ///
+    /// If any key is not valid UTF-8, then iteration on the stream is stopped
+    /// and a UTF-8 decoding error is returned.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_str_keys(mut self) -> Result<Vec<String>> {
+        let mut vs = vec![];
+        while let Some((k, _)) = self.next() {
+            let k = try!(String::from_utf8(k.to_vec()).map_err(Error::from));
+            vs.push(k);
+        }
+        Ok(vs)
+    }
+
     /// Convert this stream into a vector of outputs.
-    pub fn into_values(mut self) -> Vec<Output> {
+    pub fn into_values(mut self) -> Vec<u64> {
         let mut vs = vec![];
         while let Some((_, v)) = self.next() {
-            vs.push(v);
+            vs.push(v.value());
         }
         vs
     }

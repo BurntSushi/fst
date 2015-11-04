@@ -18,12 +18,18 @@ use raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
 pub struct Node<'f> {
     data: &'f [u8],
     state: State,
+    start: CompiledAddr,
+    end: usize,
+    is_final: bool,
+    ntrans: usize,
+    sizes: PackSizes,
+    final_output: Output,
 }
 
 impl<'f> fmt::Debug for Node<'f> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(f, "NODE@{}", self.start_addr()));
-        try!(writeln!(f, "  end_addr: {}", self.end_addr()));
+        try!(writeln!(f, "NODE@{}", self.start));
+        try!(writeln!(f, "  end_addr: {}", self.end));
         try!(writeln!(f, "  size: {} bytes", self.as_slice().len()));
         try!(writeln!(f, "  state: {:?}", self.state));
         try!(writeln!(f, "  is_final: {}", self.is_final()));
@@ -44,15 +50,62 @@ impl<'f> fmt::Debug for Node<'f> {
 /// This is a free function so that we can export it to parent modules, but
 /// not to consumers of this crate.
 pub fn node_new(addr: CompiledAddr, data: &[u8]) -> Node {
-    if addr == EMPTY_ADDRESS {
-        Node {
-            data: &[],
-            state: State::EmptyFinal,
+    use self::State::*;
+    let state = State::new(data, addr);
+    match state {
+        EmptyFinal => {
+            Node {
+                data: &[],
+                state: State::EmptyFinal,
+                start: EMPTY_ADDRESS,
+                end: EMPTY_ADDRESS,
+                is_final: true,
+                ntrans: 0,
+                sizes: PackSizes::new(),
+                final_output: Output::zero(),
+            }
         }
-    } else {
-        Node {
-            data: &data[..addr + 1],
-            state: State::from_u8(data[addr]),
+        OneTransNext(s) => {
+            let data = &data[..addr + 1];
+            Node {
+                data: data,
+                state: state,
+                start: addr,
+                end: s.end_addr(data),
+                is_final: false,
+                sizes: PackSizes::new(),
+                ntrans: 1,
+                final_output: Output::zero(),
+            }
+        }
+        OneTrans(s) => {
+            let data = &data[..addr + 1];
+            let sizes = s.sizes(data);
+            Node {
+                data: data,
+                state: state,
+                start: addr,
+                end: s.end_addr(data, sizes),
+                is_final: false,
+                ntrans: 1,
+                sizes: sizes,
+                final_output: Output::zero(),
+            }
+        }
+        AnyTrans(s) => {
+            let data = &data[..addr + 1];
+            let sizes = s.sizes(data);
+            let ntrans = s.ntrans(data);
+            Node {
+                data: data,
+                state: state,
+                start: addr,
+                end: s.end_addr(data, sizes, ntrans),
+                is_final: s.is_final_state(),
+                ntrans: ntrans,
+                sizes: sizes,
+                final_output: s.final_output(data, sizes, ntrans),
+            }
         }
     }
 }
@@ -66,79 +119,82 @@ impl<'f> Node<'f> {
 
     /// Returns the transition at index `i`.
     pub fn transition(&self, i: usize) -> Transition {
-        Transition {
-            inp: self.input(i),
-            out: self.output(i),
-            addr: self.transition_addr(i),
+        use self::State::*;
+        match self.state {
+            OneTransNext(s) => {
+                assert!(i == 0);
+                Transition {
+                    inp: s.input(self),
+                    out: Output::zero(),
+                    addr: s.trans_addr(self),
+                }
+            }
+            OneTrans(s) => {
+                assert!(i == 0);
+                Transition {
+                    inp: s.input(self),
+                    out: s.output(self),
+                    addr: s.trans_addr(self),
+                }
+            }
+            AnyTrans(s) => {
+                Transition {
+                    inp: s.input(self, i),
+                    out: s.output(self, i),
+                    addr: s.trans_addr(self, i),
+                }
+            }
+            EmptyFinal => panic!("out of bounds"),
         }
-    }
-
-    /// Returns the input byte at transition `i`.
-    fn input(&self, i: usize) -> u8 {
-        self.state.input(self, i)
-    }
-
-    /// Returns the output value at transition `i`.
-    fn output(&self, i: usize) -> Output {
-        self.state.output(self, i)
-    }
-
-    /// Returns the transition address pointed to by transition `i`.
-    fn transition_addr(&self, i: usize) -> CompiledAddr {
-        self.state.trans_addr(self, i)
     }
 
     /// Finds the `i`th transition corresponding to the given input byte.
     ///
     /// If no transition for this byte exists, then `None` is returned.
     pub fn find_input(&self, b: u8) -> Option<usize> {
-        self.state.find_input(self, b)
+        use self::State::*;
+        match self.state {
+            OneTransNext(s) if s.input(self) == b => Some(0),
+            OneTransNext(_) => None,
+            OneTrans(s) if s.input(self) == b => Some(0),
+            OneTrans(_) => None,
+            AnyTrans(s) => s.find_input(self, b),
+            EmptyFinal => None,
+        }
     }
 
     /// If this node is final and has a terminal output value, then it is
     /// returned. Otherwise, a zero output is returned.
     pub fn final_output(&self) -> Output {
-        self.state.final_output(self)
+        self.final_output
     }
 
     /// Returns true if and only if this node corresponds to a final or "match"
     /// state in the finite state transducer.
     pub fn is_final(&self) -> bool {
-        self.state.is_final()
+        self.is_final
     }
 
     /// Returns the number of transitions in this node.
     ///
     /// The maximum number of transitions is 256.
     pub fn len(&self) -> usize {
-        self.state.ntrans(self)
+        self.ntrans
     }
 
     /// Returns true if and only if this node has zero transitions.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.ntrans == 0
     }
 
     /// Return the address of this node.
     pub fn addr(&self) -> CompiledAddr {
-        self.start_addr() as CompiledAddr
-    }
-
-    fn start_addr(&self) -> usize {
-        if self.data.len() == 0 {
-            EMPTY_ADDRESS
-        } else {
-            self.data.len() - 1
-        }
-    }
-
-    fn end_addr(&self) -> usize {
-        self.state.end_addr(self)
+        self.start
     }
 
     #[doc(hidden)]
     pub fn as_slice(&self) -> &[u8] {
-        &self.data[self.end_addr()..]
+        &self.data[self.end..]
     }
 
     #[doc(hidden)]
@@ -149,45 +205,6 @@ impl<'f> Node<'f> {
             OneTrans(_) => "OT",
             AnyTrans(_) => "AT",
             EmptyFinal => "EF",
-        }
-    }
-}
-
-impl BuilderNode {
-    pub fn compile_to<W: io::Write>(
-        &self, wtr: W, last_addr: CompiledAddr, addr: CompiledAddr,
-    ) -> io::Result<()> {
-        assert!(self.trans.len() <= ::std::u8::MAX as usize);
-        State::compile(wtr, last_addr, addr, self)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-enum State {
-    OneTransNext(StateOneTransNext),
-    OneTrans(StateOneTrans),
-    AnyTrans(StateAnyTrans),
-    EmptyFinal,
-}
-
-// one trans flag (1), next flag (1), common input
-#[derive(Clone, Copy, Debug)]
-struct StateOneTransNext(u8);
-// one trans flag (1), next flag (0), common input
-#[derive(Clone, Copy, Debug)]
-struct StateOneTrans(u8);
-// one trans flag (0), final flag, # transitions
-#[derive(Clone, Copy, Debug)]
-struct StateAnyTrans(u8);
-
-impl State {
-    #[inline]
-    fn from_u8(v: u8) -> State {
-        use self::State::*;
-        match (v & 0b11_000000) >> 6 {
-            0b11 => OneTransNext(StateOneTransNext(v)),
-            0b10 => OneTrans(StateOneTrans(v)),
-            _ => AnyTrans(StateAnyTrans(v)),
         }
     }
 
@@ -214,85 +231,46 @@ impl State {
             }
         }
     }
+}
 
-    fn is_final(&self) -> bool {
-        use self::State::*;
-        match *self {
-            OneTransNext(_) | OneTrans(_) => false,
-            AnyTrans(s) => s.is_final_state(),
-            EmptyFinal => true,
-        }
+impl BuilderNode {
+    pub fn compile_to<W: io::Write>(
+        &self, wtr: W, last_addr: CompiledAddr, addr: CompiledAddr,
+    ) -> io::Result<()> {
+        assert!(self.trans.len() <= ::std::u8::MAX as usize);
+        Node::compile(wtr, last_addr, addr, self)
     }
+}
 
-    fn ntrans(&self, node: &Node) -> usize {
+#[derive(Clone, Copy, Debug)]
+enum State {
+    OneTransNext(StateOneTransNext),
+    OneTrans(StateOneTrans),
+    AnyTrans(StateAnyTrans),
+    EmptyFinal,
+}
+
+// one trans flag (1), next flag (1), common input
+#[derive(Clone, Copy, Debug)]
+struct StateOneTransNext(u8);
+// one trans flag (1), next flag (0), common input
+#[derive(Clone, Copy, Debug)]
+struct StateOneTrans(u8);
+// one trans flag (0), final flag, # transitions
+#[derive(Clone, Copy, Debug)]
+struct StateAnyTrans(u8);
+
+impl State {
+    fn new(data: &[u8], addr: CompiledAddr) -> State {
         use self::State::*;
-        match *self {
-            OneTransNext(_)
-            | OneTrans(_) => 1,
-            AnyTrans(s) => s.ntrans(node),
-            EmptyFinal => 0,
+        if addr == EMPTY_ADDRESS {
+            return EmptyFinal;
         }
-    }
-
-    fn input(&self, node: &Node, i: usize) -> u8 {
-        use self::State::*;
-        match *self {
-            OneTransNext(s) => { assert!(i == 0); s.input(node) }
-            OneTrans(s) => { assert!(i == 0); s.input(node) }
-            AnyTrans(s) => s.input(node, i),
-            EmptyFinal => panic!("out of bounds"),
-        }
-    }
-
-    fn find_input(&self, node: &Node, b: u8) -> Option<usize> {
-        use self::State::*;
-        match *self {
-            OneTransNext(s) if s.input(node) == b => Some(0),
-            OneTransNext(_) => None,
-            OneTrans(s) if s.input(node) == b => Some(0),
-            OneTrans(_) => None,
-            AnyTrans(s) => s.find_input(node, b),
-            EmptyFinal => None,
-        }
-    }
-
-    fn output(&self, node: &Node, i: usize) -> Output {
-        use self::State::*;
-        match *self {
-            OneTransNext(_) => { assert!(i == 0); Output::zero() }
-            OneTrans(s) => { assert!(i == 0); s.output(node) }
-            AnyTrans(s) => s.output(node, i),
-            EmptyFinal => Output::zero(),
-        }
-    }
-
-    fn final_output(&self, node: &Node) -> Output {
-        use self::State::*;
-        match *self {
-            OneTransNext(_)
-            | OneTrans(_) => Output::zero(),
-            AnyTrans(s) => s.final_output(node),
-            EmptyFinal => Output::zero(),
-        }
-    }
-
-    fn trans_addr(&self, node: &Node, i: usize) -> CompiledAddr {
-        use self::State::*;
-        match *self {
-            OneTransNext(s) => { assert!(i == 0); s.trans_addr(node) }
-            OneTrans(s) => { assert!(i == 0); s.trans_addr(node) }
-            AnyTrans(s) => s.trans_addr(node, i),
-            EmptyFinal => panic!("out of bounds"),
-        }
-    }
-
-    fn end_addr(&self, node: &Node) -> usize {
-        use self::State::*;
-        match *self {
-            OneTransNext(s) => s.end_addr(node),
-            OneTrans(s) => s.end_addr(node),
-            AnyTrans(s) => s.end_addr(node),
-            EmptyFinal => EMPTY_ADDRESS,
+        let v = data[addr];
+        match (v & 0b11_000000) >> 6 {
+            0b11 => OneTransNext(StateOneTransNext(v)),
+            0b10 => OneTrans(StateOneTrans(v)),
+            _ => AnyTrans(StateAnyTrans(v)),
         }
     }
 }
@@ -309,17 +287,14 @@ impl StateOneTransNext {
         wtr.write_u8(state.0).map_err(From::from)
     }
 
-    #[inline]
     fn new() -> Self {
         StateOneTransNext(0b11_000000)
     }
 
-    #[inline]
     fn set_common_input(&mut self, input: u8) {
         self.0 = (self.0 & 0b11_000000) | common_idx(input, 0b111111);
     }
 
-    #[inline]
     fn common_input(&self) -> Option<u8> {
         common_input(self.0 & 0b00_111111)
     }
@@ -328,20 +303,20 @@ impl StateOneTransNext {
         if self.common_input().is_none() { 1 } else { 0 }
     }
 
+    fn end_addr(&self, data: &[u8]) -> usize {
+        data.len() - 1 - self.input_len()
+    }
+
     fn input(&self, node: &Node) -> u8 {
         if let Some(inp) = self.common_input() {
             inp
         } else {
-            node.data[node.start_addr() - 1]
+            node.data[node.start - 1]
         }
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
-        self.end_addr(node) as CompiledAddr - 1
-    }
-
-    fn end_addr(&self, node: &Node) -> usize {
-        node.start_addr() - self.input_len()
+        node.end as CompiledAddr - 1
     }
 }
 
@@ -370,17 +345,14 @@ impl StateOneTrans {
         wtr.write_u8(state.0).map_err(From::from)
     }
 
-    #[inline]
     fn new() -> Self {
         StateOneTrans(0b10_000000)
     }
 
-    #[inline]
     fn set_common_input(&mut self, input: u8) {
         self.0 = (self.0 & 0b10_000000) | common_idx(input, 0b111111);
     }
 
-    #[inline]
     fn common_input(&self) -> Option<u8> {
         common_input(self.0 & 0b00_111111)
     }
@@ -389,26 +361,36 @@ impl StateOneTrans {
         if self.common_input().is_none() { 1 } else { 0 }
     }
 
-    fn sizes(&self, node: &Node) -> PackSizes {
-        let i = node.start_addr() - self.input_len() - 1;
-        PackSizes::decode(node.data[i])
+    fn sizes(&self, data: &[u8]) -> PackSizes {
+        let i = data.len() - 1
+                - self.input_len()
+                - 1;
+        PackSizes::decode(data[i])
+    }
+
+    fn end_addr(&self, data: &[u8], sizes: PackSizes) -> usize {
+        data.len() - 1
+        - self.input_len()
+        - 1 // pack size
+        - sizes.transition_pack_size()
+        - sizes.output_pack_size()
     }
 
     fn input(&self, node: &Node) -> u8 {
         if let Some(inp) = self.common_input() {
             inp
         } else {
-            node.data[node.start_addr() - 1]
+            node.data[node.start - 1]
         }
     }
 
     fn output(&self, node: &Node) -> Output {
-        let osize = self.sizes(node).output_pack_size();
+        let osize = node.sizes.output_pack_size();
         if osize == 0 {
             return Output::zero();
         }
-        let tsize = self.sizes(node).transition_pack_size();
-        let i = node.start_addr()
+        let tsize = node.sizes.transition_pack_size();
+        let i = node.start
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize;
@@ -416,21 +398,12 @@ impl StateOneTrans {
     }
 
     fn trans_addr(&self, node: &Node) -> CompiledAddr {
-        let tsize = self.sizes(node).transition_pack_size();
-        let i = node.start_addr()
+        let tsize = node.sizes.transition_pack_size();
+        let i = node.start
                 - self.input_len()
                 - 1 // pack size
                 - tsize;
-        unpack_delta(&node.data[i..], tsize, self.end_addr(node))
-    }
-
-    fn end_addr(&self, node: &Node) -> usize {
-        let tsize = self.sizes(node).transition_pack_size();
-        let osize = self.sizes(node).output_pack_size();
-        node.start_addr()
-        - self.input_len()
-        - 1 // pack size
-        - tsize - osize
+        unpack_delta(&node.data[i..], tsize, node.end)
     }
 }
 
@@ -482,31 +455,26 @@ impl StateAnyTrans {
         wtr.write_u8(state.0).map_err(From::from)
     }
 
-    #[inline]
     fn new() -> Self {
         StateAnyTrans(0b00_000000)
     }
 
-    #[inline]
     fn set_final_state(&mut self, yes: bool) {
         if yes {
             self.0 |= 0b01_000000;
         }
     }
 
-    #[inline]
     fn is_final_state(&self) -> bool {
         self.0 & 0b01_000000 == 0b01_000000
     }
 
-    #[inline]
     fn set_state_ntrans(&mut self, n: u8) {
         if n <= 0b00_111111 {
             self.0 = (self.0 & 0b11_000000) | n;
         }
     }
 
-    #[inline]
     fn state_ntrans(&self) -> Option<u8> {
         let n = self.0 & 0b00_111111;
         if n == 0 {
@@ -516,25 +484,77 @@ impl StateAnyTrans {
         }
     }
 
-    fn sizes(&self, node: &Node) -> PackSizes {
-        let i = node.start_addr() - self.ntrans_len() - 1;
-        PackSizes::decode(node.data[i])
+    fn sizes(&self, data: &[u8]) -> PackSizes {
+        let i = data.len() - 1
+                - self.ntrans_len()
+                - 1;
+        PackSizes::decode(data[i])
     }
 
     fn ntrans_len(&self) -> usize {
         if self.state_ntrans().is_none() { 1 } else { 0 }
     }
 
-    fn ntrans(&self, node: &Node) -> usize {
+    fn ntrans(&self, data: &[u8]) -> usize {
         if let Some(n) = self.state_ntrans() {
             n as usize
         } else {
-            node.data[node.start_addr() - 1] as usize
+            data[data.len() - 2] as usize
         }
     }
 
+    fn final_output(
+        &self,
+        data: &[u8],
+        sizes: PackSizes,
+        ntrans: usize,
+    ) -> Output {
+        let osize = sizes.output_pack_size();
+        if osize == 0 || !self.is_final_state() {
+            return Output::zero();
+        }
+        let tsize = sizes.transition_pack_size();
+        let at = data.len() - 1
+                 - self.ntrans_len()
+                 - 1 // pack size
+                 - ntrans // inputs
+                 - (ntrans * tsize) // transition addresses
+                 - (ntrans * osize) // output values
+                 - osize; // the desired output value
+        Output::new(unpack_uint(&data[at..], osize as u8).unwrap())
+    }
+
+    fn end_addr(&self, data: &[u8], sizes: PackSizes, ntrans: usize) -> usize {
+        let osize = sizes.output_pack_size();
+        let final_osize = if !self.is_final_state() {
+            0
+        } else {
+            osize
+        };
+        let tsize = sizes.transition_pack_size();
+        data.len() - 1
+        - self.ntrans_len()
+        - 1 // pack size
+        - ntrans // inputs
+        - (ntrans * tsize) // transition addresses
+        - (ntrans * osize) // output values
+        - final_osize // final output
+    }
+
+    fn trans_addr(&self, node: &Node, i: usize) -> CompiledAddr {
+        assert!(i < node.ntrans);
+        let tsize = node.sizes.transition_pack_size();
+        let at = node.start
+                 - self.ntrans_len()
+                 - 1 // pack size
+                 - node.ntrans // inputs
+                 - (i * tsize) // the previous transition addresses
+                 - tsize; // the desired transition address
+        unpack_delta(&node.data[at..], tsize, node.end)
+    }
+
     fn input(&self, node: &Node, i: usize) -> u8 {
-        let at = node.start_addr()
+        let at = node.start
                  - self.ntrans_len()
                  - 1 // pack size
                  - i
@@ -543,78 +563,28 @@ impl StateAnyTrans {
     }
 
     fn find_input(&self, node: &Node, b: u8) -> Option<usize> {
-        let ntrans = self.ntrans(node);
-        let start = node.start_addr()
+        let start = node.start
                     - self.ntrans_len()
                     - 1 // pack size
-                    - ntrans; // inputs
-        let end = start + ntrans;
-        memchr(b, &node.data[start..end]).map(|i| ntrans - i - 1)
+                    - node.ntrans; // inputs
+        let end = start + node.ntrans;
+        memchr(b, &node.data[start..end]).map(|i| node.ntrans - i - 1)
     }
 
     fn output(&self, node: &Node, i: usize) -> Output {
-        let osize = self.sizes(node).output_pack_size();
+        let osize = node.sizes.output_pack_size();
         if osize == 0 {
             return Output::zero();
         }
-        let tsize = self.sizes(node).transition_pack_size();
-        let ntrans = self.ntrans(node);
-        let at = node.start_addr()
+        let tsize = node.sizes.transition_pack_size();
+        let at = node.start
                  - self.ntrans_len()
                  - 1 // pack size
-                 - ntrans // inputs
-                 - (ntrans * tsize) // transition addresses
+                 - node.ntrans // inputs
+                 - (node.ntrans * tsize) // transition addresses
                  - (i * osize) // the previous outputs
                  - osize; // the desired output value
         Output::new(unpack_uint(&node.data[at..], osize as u8).unwrap())
-    }
-
-    fn final_output(&self, node: &Node) -> Output {
-        let osize = self.sizes(node).output_pack_size();
-        if !self.is_final_state() || osize == 0 {
-            return Output::zero();
-        }
-        let tsize = self.sizes(node).transition_pack_size();
-        let ntrans = self.ntrans(node);
-        let at = node.start_addr()
-                 - self.ntrans_len()
-                 - 1 // pack size
-                 - ntrans // inputs
-                 - (ntrans * tsize) // transition addresses
-                 - (ntrans * osize) // output values
-                 - osize; // the desired output value
-        Output::new(unpack_uint(&node.data[at..], osize as u8).unwrap())
-    }
-
-    fn trans_addr(&self, node: &Node, i: usize) -> CompiledAddr {
-        assert!(i < self.ntrans(node));
-        let tsize = self.sizes(node).transition_pack_size();
-        let ntrans = self.ntrans(node);
-        let at = node.start_addr()
-                 - self.ntrans_len()
-                 - 1 // pack size
-                 - ntrans // inputs
-                 - (i * tsize) // the previous transition addresses
-                 - tsize; // the desired transition address
-        unpack_delta(&node.data[at..], tsize, self.end_addr(node))
-    }
-
-    fn end_addr(&self, node: &Node) -> usize {
-        let osize = self.sizes(node).output_pack_size();
-        let final_osize = if !self.is_final_state() {
-            0
-        } else {
-            osize
-        };
-        let tsize = self.sizes(node).transition_pack_size();
-        let ntrans = self.ntrans(node);
-        node.start_addr()
-        - self.ntrans_len()
-        - 1 // pack size
-        - ntrans // inputs
-        - (ntrans * tsize) // transition addresses
-        - (ntrans * osize) // output values
-        - final_osize // final output
     }
 }
 
@@ -626,7 +596,6 @@ impl StateAnyTrans {
 struct PackSizes(u8);
 
 impl PackSizes {
-    #[inline]
     fn new() -> Self {
         PackSizes(0)
     }

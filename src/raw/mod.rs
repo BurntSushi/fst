@@ -628,13 +628,13 @@ pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
     aut: A,
     inp: Vec<u8>,
     empty_output: Option<Output>,
-    stack: Vec<StreamState<A::State>>,
+    stack: Vec<StreamState<'f, A::State>>,
     end_at: Bound,
 }
 
 #[derive(Clone, Debug)]
-struct StreamState<S> {
-    addr: CompiledAddr,
+struct StreamState<'f, S> {
+    node: Node<'f>,
     trans: usize,
     out: Output,
     aut_state: S,
@@ -667,7 +667,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
                 self.empty_output = self.fst.empty_final_output();
             }
             self.stack = vec![StreamState {
-                addr: self.fst.root_addr,
+                node: self.fst.root(),
                 trans: 0,
                 out: Output::zero(),
                 aut_state: self.aut.start(),
@@ -700,7 +700,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
                     aut_state = self.aut.accept(&prev_state, b);
                     self.inp.push(b);
                     self.stack.push(StreamState {
-                        addr: node.addr(),
+                        node: node,
                         trans: i+1,
                         out: out,
                         aut_state: prev_state,
@@ -715,7 +715,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
                     // first transition in this node that proceeds the current
                     // input byte.
                     self.stack.push(StreamState {
-                        addr: node.addr(),
+                        node: node,
                         trans: node.transitions()
                                    .position(|t| t.inp > b)
                                    .unwrap_or(node.len()),
@@ -732,11 +732,10 @@ impl<'f, A: Automaton> Stream<'f, A> {
                 self.stack[last].trans -= 1;
                 self.inp.pop();
             } else {
-                let addr = self.stack[last].addr;
+                let node = self.stack[last].node;
                 let trans = self.stack[last].trans;
-                let node = self.fst.node(addr);
                 self.stack.push(StreamState {
-                    addr: node.transition(trans - 1).addr,
+                    node: self.fst.node(node.transition(trans - 1).addr),
                     trans: 0,
                     out: out,
                     aut_state: aut_state,
@@ -821,27 +820,24 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             }
         }
         while let Some(state) = self.stack.pop() {
-            let node = self.fst.node(state.addr);
-            if state.trans >= node.len()
+            if state.trans >= state.node.len()
                     || !self.aut.can_match(&state.aut_state) {
-                if node.addr() != self.fst.root_addr {
+                if state.node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
                 }
                 continue;
             }
-            let trans = node.transition(state.trans);
+            let trans = state.node.transition(state.trans);
             let out = state.out.cat(trans.out);
             let next_state = self.aut.accept(&state.aut_state, trans.inp);
             let is_match = self.aut.is_match(&next_state);
+            let next_node = self.fst.node(trans.addr);
             self.inp.push(trans.inp);
             self.stack.push(StreamState {
-                addr: state.addr,
-                trans: state.trans + 1,
-                out: state.out,
-                aut_state: state.aut_state,
+                trans: state.trans + 1, .. state
             });
             self.stack.push(StreamState {
-                addr: trans.addr,
+                node: next_node,
                 trans: 0,
                 out: out,
                 aut_state: next_state,
@@ -851,7 +847,6 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
                 self.stack.clear();
                 return None;
             }
-            let next_node = self.fst.node(trans.addr);
             if next_node.is_final() && is_match {
                 return Some((&self.inp, out.cat(next_node.final_output())));
             }
@@ -922,6 +917,7 @@ enum FstData {
 }
 
 impl FstData {
+    #[inline]
     fn as_slice(&self) -> &[u8] {
         match *self {
             FstData::Owned(ref v) => &**v,

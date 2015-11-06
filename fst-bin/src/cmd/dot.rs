@@ -23,17 +23,39 @@ If your transducer contains output values, then they are shown as labels on
 transitions. Zero output values are omitted.
 
 Usage:
-    fst dot <input> [<output>]
+    fst dot [options] <input> [<output>]
     fst dot --help
 
 Options:
     -h, --help       Show this help message.
+    --state-names    When set, states will be labeled with arbitrary number.
 ";
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
     arg_input: String,
     arg_output: Option<String>,
+    flag_state_names: bool,
+}
+
+impl Args {
+    fn dot_state(
+        &self,
+        node: &fst::Node,
+        i: usize,
+        addr: fst::CompiledAddr,
+    ) -> String {
+        let label = if self.flag_state_names {
+            i.to_string()
+        } else {
+            "".to_owned()
+        };
+        if node.is_final() {
+            format!("    {} [label=\"{}\",peripheries=2];", addr, label)
+        } else {
+            format!("    {} [label=\"{}\"];", addr, label)
+        }
+    }
 }
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
@@ -42,7 +64,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
                             .unwrap_or_else(|e| e.exit());
 
     let mut wtr = try!(util::get_buf_writer(args.arg_output.as_ref()));
-    let fst = try!(fst::Fst::from_file_path(args.arg_input));
+    let fst = try!(fst::Fst::from_file_path(&args.arg_input));
     let mut set = BitSet::with_capacity(fst.len());
 
     let mut stack = vec![fst.root().addr()];
@@ -53,6 +75,7 @@ digraph automaton {{
     labeljust="l";
     rankdir="LR";
 "#).unwrap();
+    let mut state_num = 0;
     while let Some(addr) = stack.pop() {
         if set.contains(&addr) {
             continue;
@@ -60,11 +83,7 @@ digraph automaton {{
         set.insert(addr);
 
         let node = fst.node(addr);
-        if node.is_final() {
-            writeln!(wtr, "    {} [label=\"\",peripheries=2];", addr).unwrap();
-        } else {
-            writeln!(wtr, "    {} [label=\"\"];", addr).unwrap();
-        }
+        writeln!(wtr, "{}", args.dot_state(&node, state_num, addr)).unwrap();
         for t in node.transitions() {
             stack.push(t.addr);
             let inp = (t.inp as char).to_string();
@@ -74,6 +93,7 @@ digraph automaton {{
             writeln!(wtr, "    {} -> {} [label=\"{}{}\"];",
                      addr, t.addr, inp, out).unwrap();
         }
+        state_num += 1;
     }
     writeln!(wtr, "}}").unwrap();
     try!(wtr.flush());

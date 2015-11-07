@@ -1,7 +1,6 @@
 use std::io;
-use std::mem;
 
-use byteorder::{ReadBytesExt, LittleEndian};
+use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian};
 
 /// pack_uint packs the given integer in the smallest number of bytes possible,
 /// and writes it to the given writer. The number of bytes written is returned
@@ -21,9 +20,7 @@ pub fn pack_uint_in<W: io::Write>(
     n: u64,
     nbytes: u8,
 ) -> io::Result<()> {
-    assert!(pack_size(n) <= nbytes && nbytes <= 8);
-    let n: [u8; 8] = unsafe { mem::transmute(n.to_le()) };
-    wtr.write_all(&n[0..nbytes as usize])
+    wtr.write_uint::<LittleEndian>(n, nbytes as usize).map_err(From::from)
 }
 
 /// unpack_uint is the dual of pack_uint. It unpacks the integer at the current
@@ -31,25 +28,24 @@ pub fn pack_uint_in<W: io::Write>(
 ///
 /// `nbytes` must be >= 1 and <= 8.
 pub fn unpack_uint<R: io::Read>(mut rdr: R, nbytes: u8) -> io::Result<u64> {
-    assert!(1 <= nbytes && nbytes <= 8);
     rdr.read_uint::<LittleEndian>(nbytes as usize).map_err(From::from)
 }
 
 /// pack_size returns the smallest number of bytes that can encode `n`.
 pub fn pack_size(n: u64) -> u8 {
-    if n < 1 << 8 as u64 {
+    if n < 1 << 8 {
         1
-    } else if n < 1 << 16 as u64 {
+    } else if n < 1 << 16 {
         2
-    } else if n < 1 << 24 as u64 {
+    } else if n < 1 << 24 {
         3
-    } else if n < 1 << 32 as u64 {
+    } else if n < 1 << 32 {
         4
-    } else if n < 1 << 40 as u64 {
+    } else if n < 1 << 40 {
         5
-    } else if n < 1 << 48 as u64 {
+    } else if n < 1 << 48 {
         6
-    } else if n < 1 << 56 as u64 {
+    } else if n < 1 << 56 {
         7
     } else {
         8

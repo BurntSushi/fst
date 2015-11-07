@@ -873,31 +873,37 @@ pub struct Output(u64);
 
 impl Output {
     /// Create a new output from a `u64`.
+    #[inline]
     pub fn new(v: u64) -> Output {
         Output(v)
     }
 
     /// Create a zero output.
+    #[inline]
     pub fn zero() -> Output {
         Output(0)
     }
 
     /// Retrieve the value inside this output.
+    #[inline]
     pub fn value(self) -> u64 {
         self.0
     }
 
     /// Returns true if this is a zero output.
+    #[inline]
     pub fn is_zero(self) -> bool {
         self.0 == 0
     }
 
     /// Returns the prefix of this output and `o`.
+    #[inline]
     pub fn prefix(self, o: Output) -> Output {
         Output(cmp::min(self.0, o.0))
     }
 
     /// Returns the concatenation of this output and `o`.
+    #[inline]
     pub fn cat(self, o: Output) -> Output {
         Output(self.0 + o.0)
     }
@@ -905,6 +911,7 @@ impl Output {
     /// Returns the subtraction of `o` from this output.
     ///
     /// This function panics if `self > o`.
+    #[inline]
     pub fn sub(self, o: Output) -> Output {
         Output(self.0.checked_sub(o.0)
                      .expect("BUG: underflow subtraction not allowed"))

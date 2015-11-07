@@ -5,6 +5,7 @@ extern crate chan;
 extern crate csv;
 extern crate docopt;
 extern crate fst;
+extern crate lines;
 extern crate num_cpus;
 extern crate rustc_serialize;
 extern crate tempdir;

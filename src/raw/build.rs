@@ -215,8 +215,11 @@ impl<W: io::Write> Builder<W> {
             self.unfinished.set_root_output(out);
             return Ok(());
         }
-        let (prefix_len, out) =
-            self.unfinished.find_common_prefix_and_set_output(bs, out);
+        let (prefix_len, out) = if out.is_zero() {
+            (self.unfinished.find_common_prefix(bs), out)
+        } else {
+            self.unfinished.find_common_prefix_and_set_output(bs, out)
+        };
         if prefix_len == bs.len() {
             // If the prefix found consumes the entire set of bytes, then
             // the prefix *equals* the bytes given. This means it is a
@@ -352,16 +355,25 @@ impl UnfinishedNodes {
         self.push_empty(true);
     }
 
+    fn find_common_prefix(&mut self, bs: &[u8]) -> usize {
+        bs
+        .iter()
+        .zip(&self.stack)
+        .take_while(|&(&b, ref node)| {
+            node.last.as_ref().map(|t| t.inp == b).unwrap_or(false)
+        })
+        .count()
+    }
+
     fn find_common_prefix_and_set_output(
         &mut self,
-        mut bs: &[u8],
+        bs: &[u8],
         mut out: Output,
     ) -> (usize, Output) {
         let mut i = 0;
-        while !bs.is_empty() {
+        while i < bs.len() {
             let add_prefix = match self.stack[i].last.as_mut() {
-                Some(ref mut t) if t.inp == bs[0] => {
-                    bs = &bs[1..];
+                Some(ref mut t) if t.inp == bs[i] => {
                     i += 1;
                     let common_pre = t.out.prefix(out);
                     let add_prefix = t.out.sub(common_pre);
@@ -371,7 +383,9 @@ impl UnfinishedNodes {
                 }
                 _ => break,
             };
-            self.stack[i].add_output_prefix(add_prefix);
+            if !add_prefix.is_zero() {
+                self.stack[i].add_output_prefix(add_prefix);
+            }
         }
         (i, out)
     }

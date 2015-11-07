@@ -4,6 +4,7 @@ use std::path::Path;
 
 use docopt::Docopt;
 use fst::SetBuilder;
+use lines::linereader::LineReader;
 
 use merge::Merger;
 use util;
@@ -76,8 +77,18 @@ fn run_sorted(args: &Args) -> Result<(), Error> {
     let mut set = try!(SetBuilder::new(wtr));
     for input in &args.arg_input {
         let rdr = try!(util::get_buf_reader(Some(input)));
-        for line in rdr.lines() {
-            try!(set.insert(try!(line)));
+        let mut lines = LineReader::new(rdr);
+        loop {
+            let line = try!(lines.read_line());
+            if line.is_empty() {
+                break;
+            }
+            let off = if line.len() >= 2 && line[line.len()-2] == b'\r' {
+                2
+            } else {
+                1
+            };
+            try!(set.insert(&line[0..line.len()-off]));
         }
     }
     set.finish().map_err(From::from)

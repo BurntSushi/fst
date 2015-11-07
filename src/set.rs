@@ -423,7 +423,7 @@ impl<W: io::Write> SetBuilder<W> {
     /// Create a builder that builds a set by writing it to `wtr` in a
     /// streaming fashion.
     pub fn new(wtr: W) -> Result<SetBuilder<W>> {
-        raw::Builder::new_type(wtr, 1).map(SetBuilder)
+        raw::Builder::new_type(wtr, 0).map(SetBuilder)
     }
 
     /// Insert a new key into the set.

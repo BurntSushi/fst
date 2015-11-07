@@ -477,7 +477,7 @@ impl<W: io::Write> MapBuilder<W> {
     /// Create a builder that builds a map by writing it to `wtr` in a
     /// streaming fashion.
     pub fn new(wtr: W) -> Result<MapBuilder<W>> {
-        raw::Builder::new_type(wtr, 1).map(MapBuilder)
+        raw::Builder::new_type(wtr, 0).map(MapBuilder)
     }
 
     /// Insert a new key-value pair into the map.

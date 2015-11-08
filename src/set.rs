@@ -289,6 +289,11 @@ impl Set {
                   S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
         self.0.is_superset(StreamZeroOutput(stream.into_stream()))
     }
+
+    /// Returns a reference to the underlying raw finite state transducer.
+    pub fn as_fst(&self) -> &raw::Fst {
+        &self.0
+    }
 }
 
 impl fmt::Debug for Set {

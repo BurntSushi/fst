@@ -337,6 +337,11 @@ impl Map {
     pub fn op(&self) -> OpBuilder {
         OpBuilder::new().add(self)
     }
+
+    /// Returns a reference to the underlying raw finite state transducer.
+    pub fn as_fst(&self) -> &raw::Fst {
+        &self.0
+    }
 }
 
 impl fmt::Debug for Map {

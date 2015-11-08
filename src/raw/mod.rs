@@ -429,6 +429,11 @@ impl Fst {
         self.len == 0
     }
 
+    /// Returns the number of bytes used by this fst.
+    pub fn size(&self) -> usize {
+        self.data.len()
+    }
+
     /// Creates a new fst operation with this fst added to it.
     ///
     /// The `OpBuilder` type can be used to add additional fst streams

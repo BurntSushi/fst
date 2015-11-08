@@ -449,7 +449,14 @@ impl StateAnyTrans {
         }
         try!(wtr.write_u8(pack_sizes.encode()));
         if state.state_ntrans().is_none() {
-            try!(wtr.write_u8(node.trans.len() as u8));
+            if node.trans.len() == 256 {
+                // 256 can't be represented in a u8, so we abuse the fact that
+                // the # of transitions can never be 1 here, since 1 is always
+                // encoded in the state byte.
+                try!(wtr.write_u8(1));
+            } else {
+                try!(wtr.write_u8(node.trans.len() as u8));
+            }
         }
         wtr.write_u8(state.0).map_err(From::from)
     }
@@ -499,7 +506,9 @@ impl StateAnyTrans {
             n as usize
         } else {
             let n = data[data.len() - 2] as usize;
-            if n == 0 {
+            if n == 1 {
+                // "1" is never a normal legal value here, because if there
+                // is only 1 transition, then it is encoded in the state byte.
                 256
             } else {
                 n

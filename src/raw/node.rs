@@ -214,7 +214,7 @@ impl<'f> Node<'f> {
         addr: CompiledAddr,
         node: &BuilderNode,
     ) -> io::Result<()> {
-        assert!(node.trans.len() <= ::std::u8::MAX as usize);
+        assert!(node.trans.len() <= 256);
         if node.trans.is_empty()
             && node.is_final
             && node.final_output.is_zero() {
@@ -237,7 +237,6 @@ impl BuilderNode {
     pub fn compile_to<W: io::Write>(
         &self, wtr: W, last_addr: CompiledAddr, addr: CompiledAddr,
     ) -> io::Result<()> {
-        assert!(self.trans.len() <= ::std::u8::MAX as usize);
         Node::compile(wtr, last_addr, addr, self)
     }
 }
@@ -411,7 +410,7 @@ impl StateAnyTrans {
     fn compile<W: io::Write>(
         mut wtr: W, addr: CompiledAddr, node: &BuilderNode,
     ) -> io::Result<()> {
-        assert!(node.trans.len() <= ::std::u8::MAX as usize);
+        assert!(node.trans.len() <= 256);
 
         let mut tsize = 0;
         let mut osize = pack_size(node.final_output.value());

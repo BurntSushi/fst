@@ -498,7 +498,12 @@ impl StateAnyTrans {
         if let Some(n) = self.state_ntrans() {
             n as usize
         } else {
-            data[data.len() - 2] as usize
+            let n = data[data.len() - 2] as usize;
+            if n == 0 {
+                256
+            } else {
+                n
+            }
         }
     }
 

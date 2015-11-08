@@ -41,7 +41,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     let mut sets = vec![];
     for set_path in &args.arg_input {
-        sets.push(try!(fst::Set::from_file_path(set_path)));
+        sets.push(try!(fst::Set::from_path(set_path)));
     }
     let union = sets.iter().collect::<fst::set::OpBuilder>().union();
     try!(merged.extend_stream(union));

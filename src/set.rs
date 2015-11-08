@@ -16,7 +16,7 @@ use Result;
 ///
 /// A key feature of `Set` is that it can be serialized to disk compactly. Its
 /// underlying representation is built such that the `Set` can be memory mapped
-/// (`Set::from_file_path`) and searched without necessarily loading the entire
+/// (`Set::from_path`) and searched without necessarily loading the entire
 /// set into memory.
 ///
 /// It supports most common operations associated with sets, such as
@@ -37,8 +37,8 @@ impl Set {
     /// transducer builder (`SetBuilder` qualifies). If the format is invalid
     /// or if there is a mismatch between the API version of this library
     /// and the set, then an error is returned.
-    pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        raw::Fst::from_file_path(path).map(Set)
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        raw::Fst::from_path(path).map(Set)
     }
 
     /// Creates a set from its representation as a raw byte sequence.
@@ -400,7 +400,7 @@ impl<'s, 'a> IntoStreamer<'a> for &'s Set {
 /// build.finish().unwrap();
 ///
 /// // At this point, the set has been constructed, but here's how to read it.
-/// let set = Set::from_file_path("set.fst").unwrap();
+/// let set = Set::from_path("set.fst").unwrap();
 /// let mut stream = set.into_stream();
 /// let mut keys = vec![];
 /// while let Some(key) = stream.next() {

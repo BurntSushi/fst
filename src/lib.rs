@@ -111,7 +111,7 @@ try!(build.finish());
 // At this point, the map has been constructed. Now we'd like to search it.
 // This creates a memory map, which enables searching the map without loading
 // all of it into memory.
-let map = try!(Map::from_file_path("map.fst"));
+let map = try!(Map::from_path("map.fst"));
 
 // Query for keys that are greater than or equal to clarence.
 let mut stream = map.range().ge("clarence").into_stream();

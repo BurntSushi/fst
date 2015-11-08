@@ -63,8 +63,8 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
                             .unwrap_or_else(|e| e.exit());
 
     let mut wtr = try!(util::get_buf_writer(args.arg_output.as_ref()));
-    let fst = try!(fst::Fst::from_file_path(args.arg_input));
-    let mut set = BitSet::with_capacity(fst.as_slice().len());
+    let fst = try!(fst::Fst::from_path(args.arg_input));
+    let mut set = BitSet::with_capacity(fst.len());
     let mut node_counts = HashMap::with_capacity(10_000);
 
     let mut stack = vec![fst.root().addr()];

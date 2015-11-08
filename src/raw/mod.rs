@@ -18,12 +18,13 @@ option of specifying a merge strategy for output values.
 
 Most of the rest of the types are streams from set operations.
 */
+use std::borrow::Cow;
 use std::cmp;
 use std::fmt;
+use std::ops::Deref;
 use std::path::Path;
 
 use byteorder::{ReadBytesExt, LittleEndian};
-use memmap::{Mmap, MmapViewSync, Protection};
 
 use automaton::{Automaton, AlwaysMatch};
 use error::Result;
@@ -32,6 +33,7 @@ use stream::{IntoStreamer, Streamer};
 pub use self::build::Builder;
 pub use self::error::Error;
 pub use self::node::{Node, Transitions};
+pub use self::mmap::MmapReadOnly;
 use self::node::node_new;
 pub use self::ops::{
     IndexedValue, OpBuilder,
@@ -42,6 +44,7 @@ mod build;
 mod common_inputs;
 mod counting_writer;
 mod error;
+mod mmap;
 mod node;
 mod ops;
 mod pack;
@@ -284,21 +287,17 @@ impl Fst {
     /// transducer builder (`Builder` qualifies). If the format is invalid or
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
-    pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mmap = try!(Mmap::open_path(path, Protection::Read));
-        Fst::from_mmap_view(mmap.into_view_sync())
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Fst::from_mmap(try!(MmapReadOnly::open_path(path)))
     }
 
-    /// Opens a transducer from a raw `memmap::MmapViewSync`.
+    /// Opens a transducer from a `MmapReadOnly`.
     ///
     /// This is useful if a transducer is serialized to only a part of a file.
-    /// A `MmapViewSync` lets one control which region of the file is used for
+    /// A `MmapReadOnly` lets one control which region of the file is used for
     /// the transducer.
-    ///
-    /// N.B. This method will likely change in the future, but something that
-    /// provides the same functionality will always exist.
-    pub fn from_mmap_view(mmap_view: MmapViewSync) -> Result<Self> {
-        Fst::new(FstData::Mmap(mmap_view))
+    pub fn from_mmap(mmap: MmapReadOnly) -> Result<Self> {
+        Fst::new(FstData::Mmap(mmap))
     }
 
     /// Creates a transducer from its representation as a raw byte sequence.
@@ -310,11 +309,19 @@ impl Fst {
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Fst::new(FstData::Owned(bytes))
+        Fst::new(FstData::Cow(Cow::Owned(bytes)))
+    }
+
+    /// Creates a transducer from its representation as a raw byte sequence.
+    ///
+    /// This accepts a static byte slice, which may be useful if the Fst
+    /// is embedded into source code.
+    pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
+        Fst::new(FstData::Cow(Cow::Borrowed(bytes)))
     }
 
     fn new(data: FstData) -> Result<Self> {
-        if data.as_slice().len() < 32 {
+        if data.len() < 32 {
             return Err(Error::Format.into());
         }
         // The read_u64 unwraps below are OK because they can never fail.
@@ -322,20 +329,20 @@ impl Fst {
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
         // N bytes (no unexpected EOF).
-        let version = data.as_slice().read_u64::<LittleEndian>().unwrap();
+        let version = (&*data).read_u64::<LittleEndian>().unwrap();
         if version != VERSION {
             return Err(Error::Version {
                 expected: VERSION,
                 got: version,
             }.into());
         }
-        let ty = (&data.as_slice()[8..]).read_u64::<LittleEndian>().unwrap();
+        let ty = (&data[8..]).read_u64::<LittleEndian>().unwrap();
         let root_addr = {
-            let mut last = &data.as_slice()[data.as_slice().len() - 8..];
+            let mut last = &data[data.len() - 8..];
             u64_to_usize(last.read_u64::<LittleEndian>().unwrap())
         };
         let len = {
-            let mut last2 = &data.as_slice()[data.as_slice().len() - 16..];
+            let mut last2 = &data[data.len() - 16..];
             u64_to_usize(last2.read_u64::<LittleEndian>().unwrap())
         };
         // The root node is always the last node written, so its address should
@@ -358,8 +365,8 @@ impl Fst {
         // 32 bytes (8 byte u64 each).
         //
         // This is essentially our own little checksum.
-        if (root_addr == EMPTY_ADDRESS && data.as_slice().len() != 32)
-            && root_addr + 17 != data.as_slice().len() {
+        if (root_addr == EMPTY_ADDRESS && data.len() != 32)
+            && root_addr + 17 != data.len() {
             return Err(Error::Format.into());
         }
         Ok(Fst {
@@ -495,12 +502,7 @@ impl Fst {
     ///
     /// Node addresses can be obtained by reading transitions on `Node` values.
     pub fn node(&self, addr: CompiledAddr) -> Node {
-        node_new(addr, &self.data.as_slice())
-    }
-
-    /// Return the raw byte representation of the underlying fst.
-    pub fn as_slice(&self) -> &[u8] {
-        self.data.as_slice()
+        node_new(addr, &self.data)
     }
 
     fn empty_final_output(&self) -> Option<Output> {
@@ -919,25 +921,17 @@ impl Output {
 }
 
 enum FstData {
-    Owned(Vec<u8>),
-    Mmap(MmapViewSync),
+    Cow(Cow<'static, [u8]>),
+    Mmap(MmapReadOnly),
 }
 
-impl FstData {
-    #[inline]
-    fn as_slice(&self) -> &[u8] {
+impl Deref for FstData {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
         match *self {
-            FstData::Owned(ref v) => &**v,
-            // I find it slightly difficult to articulate an argument for
-            // safety here. My understanding is that `as_slice` is unsafe
-            // because there could be some other *process* modifying the
-            // underlying data? In particular, the mmap is opened in shared
-            // mode, so if some other process modifies the underlying data,
-            // is it observable from this slice? And if so, does that imply
-            // unsafety?
-            //
-            // If this is *not* safe to do, then what is the alternative?
-            FstData::Mmap(ref v) => unsafe { v.as_slice() }
+            FstData::Cow(ref v) => &**v,
+            FstData::Mmap(ref v) => unsafe { v.as_slice() },
         }
     }
 }

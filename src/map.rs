@@ -17,7 +17,7 @@ use Result;
 ///
 /// A key feature of `Map` is that it can be serialized to disk compactly. Its
 /// underlying representation is built such that the `Map` can be memory mapped
-/// (`Map::from_file_path`) and searched without necessarily loading the entire
+/// (`Map::from_path`) and searched without necessarily loading the entire
 /// map into memory.
 ///
 /// It supports most common operations associated with maps, such as key
@@ -62,8 +62,8 @@ impl Map {
     /// transducer builder (`MapBuilder` qualifies). If the format is invalid
     /// or if there is a mismatch between the API version of this library
     /// and the map, then an error is returned.
-    pub fn from_file_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        raw::Fst::from_file_path(path).map(Map)
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        raw::Fst::from_path(path).map(Map)
     }
 
     /// Creates a map from its representation as a raw byte sequence.
@@ -452,7 +452,7 @@ impl<'m, 'a> IntoStreamer<'a> for &'m Map {
 /// build.finish().unwrap();
 ///
 /// // At this point, the map has been constructed, but here's how to read it.
-/// let map = Map::from_file_path("map.fst").unwrap();
+/// let map = Map::from_path("map.fst").unwrap();
 /// let mut stream = map.into_stream();
 /// let mut kvs = vec![];
 /// while let Some((k, v)) = stream.next() {

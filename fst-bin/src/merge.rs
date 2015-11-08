@@ -245,7 +245,7 @@ impl Batchable for UnionBatch {
 
         let mut fsts = vec![];
         for path in &self.fsts {
-            fsts.push(try!(raw::Fst::from_file_path(path)));
+            fsts.push(try!(raw::Fst::from_path(path)));
         }
         let mut union = fsts.iter().collect::<raw::OpBuilder>().union();
         while let Some((key, outputs)) = union.next() {

@@ -67,17 +67,8 @@ let lev = try!(Levenshtein::new("foo", 1));
 // Apply our fuzzy query to the set we built.
 let mut stream = set.search(lev).into_stream();
 
-// Iterate over the stream and collect the matching keys.
-let mut keys = vec![];
-while let Some(key) = stream.next() {
-    keys.push(key.to_vec());
-}
-assert_eq!(keys, vec![
-    "fo".as_bytes(),   // 1 deletion
-    "fob".as_bytes(),  // 1 substitution
-    "foo".as_bytes(),  // 0 insertions/deletions/substitutions
-    "food".as_bytes(), // 1 insertion
-]);
+let keys = try!(stream.into_strs());
+assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
 # Ok(())
 # }
 # example().unwrap();
@@ -116,14 +107,10 @@ let map = try!(Map::from_path("map.fst"));
 // Query for keys that are greater than or equal to clarence.
 let mut stream = map.range().ge("clarence").into_stream();
 
-// Iterate over the stream and collect the matching keys.
-let mut kvs = vec![];
-while let Some((k, v)) = stream.next() {
-    kvs.push((k.to_vec(), v));
-}
+let kvs = try!(stream.into_str_vec());
 assert_eq!(kvs, vec![
-    (b"clarence".to_vec(), 2),
-    (b"stevie".to_vec(), 3),
+    ("clarence".to_owned(), 2),
+    ("stevie".to_owned(), 3),
 ]);
 # Ok(())
 # }
@@ -145,16 +132,8 @@ let set = try!(Set::from_iter(&["FoO", "Foo", "fOO", "foo"]));
 let re = try!(Regex::new("(?i)foo"));
 let mut stream = set.search(&re).into_stream();
 
-let mut keys = vec![];
-while let Some(key) = stream.next() {
-    keys.push(key.to_vec());
-}
-assert_eq!(keys, vec![
-    "FoO".as_bytes(),
-    "Foo".as_bytes(),
-    "fOO".as_bytes(),
-    "foo".as_bytes(),
-]);
+let keys = try!(stream.into_strs());
+assert_eq!(keys, vec!["FoO", "Foo", "fOO", "foo"]);
 # Ok(())
 # }
 # example().unwrap();

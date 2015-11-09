@@ -4,7 +4,6 @@ use std::io;
 use std::ops::Range;
 
 use byteorder::WriteBytesExt;
-use memchr::memchr;
 
 use raw::{EMPTY_ADDRESS, CompiledAddr, Output, Transition, u64_to_usize};
 use raw::build::BuilderNode;
@@ -144,6 +143,23 @@ impl<'f> Node<'f> {
                     addr: s.trans_addr(self, i),
                 }
             }
+            EmptyFinal => panic!("out of bounds"),
+        }
+    }
+
+    /// Returns the transition address of the `i`th transition.
+    pub fn transition_addr(&self, i: usize) -> CompiledAddr {
+        use self::State::*;
+        match self.state {
+            OneTransNext(s) => {
+                assert!(i == 0);
+                s.trans_addr(self)
+            }
+            OneTrans(s) => {
+                assert!(i == 0);
+                s.trans_addr(self)
+            }
+            AnyTrans(s) => s.trans_addr(self, i),
             EmptyFinal => panic!("out of bounds"),
         }
     }
@@ -581,7 +597,12 @@ impl StateAnyTrans {
                     - 1 // pack size
                     - node.ntrans; // inputs
         let end = start + node.ntrans;
-        memchr(b, &node.data[start..end]).map(|i| node.ntrans - i - 1)
+        let inputs = &node.data[start..end];
+        // Unbelievably, this is actually faster than memchr in
+        // microbenchmarks. I'm not sure why. Perhaps memchr has some overhead
+        // associated with it that doesn't work well with very very short
+        // searches.
+        inputs.iter().position(|&b2| b == b2).map(|i| node.ntrans - i - 1)
     }
 
     fn output(&self, node: &Node, i: usize) -> Output {

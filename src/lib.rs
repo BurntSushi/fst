@@ -281,7 +281,6 @@ will be returned if the automaton gets too big (tens of MB in heap usage).
 #![deny(missing_docs)]
 
 extern crate byteorder;
-extern crate memchr;
 extern crate memmap;
 #[cfg(test)] extern crate quickcheck;
 #[cfg(test)] extern crate rand;

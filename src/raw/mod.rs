@@ -400,6 +400,18 @@ impl Fst {
         }
     }
 
+    /// Returns true if and only if the given key is in this FST.
+    pub fn contains<B: AsRef<[u8]>>(&self, key: B) -> bool {
+        let mut node = self.root();
+        for &b in key.as_ref() {
+            node = match node.find_input(b) {
+                None => return false,
+                Some(i) => self.node(node.transition_addr(i)),
+            }
+        }
+        node.is_final()
+    }
+
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
     pub fn stream(&self) -> Stream {

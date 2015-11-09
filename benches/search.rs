@@ -25,7 +25,7 @@ fn search_fst_one(b: &mut Bencher) {
     let mut i = 0;
     b.iter(|| {
         i = (i + 1) % words.len();
-        assert!(fst.find(&words[i]).is_some());
+        assert!(fst.contains(&words[i]));
     })
 }
 

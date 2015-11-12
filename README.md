@@ -4,8 +4,8 @@ This crate provides a fast implementation of ordered sets and maps using finite
 state machines. In particular, it makes use of finite state transducers to map
 keys to values as the machine is executed. Using finite state machines as data
 structures enables us to store keys in a compact format that is also easily
-searchable. For example, this crate also provides range queries, regular
-expression queries and Levenshtein (edit) distance queries.
+searchable. For example, this crate levages memory maps to make range queries,
+regular expression queries and Levenshtein (edit) distance queries very fast.
 
 Check out my blog post
 [Index 1,600,000,000 Keys with Automata and

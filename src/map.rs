@@ -107,7 +107,7 @@ impl Map {
     /// assert_eq!(map.contains_key("z"), false);
     /// ```
     pub fn contains_key<K: AsRef<[u8]>>(&self, key: K) -> bool {
-        self.0.find(key).is_some()
+        self.0.contains_key(key)
     }
 
     /// Retrieves the value associated with a key.
@@ -125,7 +125,7 @@ impl Map {
     /// assert_eq!(map.get("z"), None);
     /// ```
     pub fn get<K: AsRef<[u8]>>(&self, key: K) -> Option<u64> {
-        self.0.find(key).map(|output| output.value())
+        self.0.get(key).map(|output| output.value())
     }
 
     /// Return a lexicographically ordered stream of all key-value pairs in

@@ -82,7 +82,7 @@ impl Set {
     /// assert_eq!(set.contains("z"), false);
     /// ```
     pub fn contains<K: AsRef<[u8]>>(&self, key: K) -> bool {
-        self.0.find(key).is_some()
+        self.0.contains_key(key)
     }
 
     /// Return a lexicographically ordered stream of all keys in this set.

@@ -380,7 +380,7 @@ impl Fst {
     /// Retrieves the value associated with a key.
     ///
     /// If the key does not exist, then `None` is returned.
-    pub fn find<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
+    pub fn get<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
         let mut node = self.root();
         let mut out = Output::zero();
         for &b in key.as_ref() {
@@ -401,7 +401,7 @@ impl Fst {
     }
 
     /// Returns true if and only if the given key is in this FST.
-    pub fn contains<B: AsRef<[u8]>>(&self, key: B) -> bool {
+    pub fn contains_key<B: AsRef<[u8]>>(&self, key: B) -> bool {
         let mut node = self.root();
         for &b in key.as_ref() {
             node = match node.find_input(b) {

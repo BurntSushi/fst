@@ -6,7 +6,6 @@ use std::string::FromUtf8Error;
 use raw::FstType;
 
 /// An error that occurred while using a finite state transducer.
-#[derive(Debug)]
 pub enum Error {
     /// A version mismatch occurred while reading a finite state transducer.
     ///
@@ -84,6 +83,12 @@ format_bytes(&*got), format_bytes(&*previous)),
             WrongType { expected, got } => write!(f, "\
 Error opening FST: expected type {}, got type {}.", expected, got),
         }
+    }
+}
+
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
     }
 }
 

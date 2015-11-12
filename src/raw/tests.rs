@@ -65,7 +65,7 @@ macro_rules! test_set {
             }
             assert_eq!(rdr.next(), None);
             for item in &items {
-                assert!(fst.find(item).is_some());
+                assert!(fst.get(item).is_some());
             }
         }
     }
@@ -102,7 +102,7 @@ fn fst_set_100000() {
     let fst = fst_set(words.clone());
     assert_eq!(words, fst_inputs(&fst));
     for word in &words {
-        assert!(fst.find(word).is_some(),
+        assert!(fst.get(word).is_some(),
                 "failed to find word: {}",
                 ::std::str::from_utf8(word).unwrap());
     }
@@ -120,7 +120,7 @@ macro_rules! test_map {
             })*
             assert_eq!(rdr.next(), None);
             $({
-                assert_eq!(fst.find($s.as_bytes()), Some(Output::new($o)));
+                assert_eq!(fst.get($s.as_bytes()), Some(Output::new($o)));
             })*
         }
     }
@@ -167,7 +167,7 @@ fn fst_map_100000_increments() {
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
     for &(ref word, out) in &words {
-        assert_eq!(fst.find(word), Some(Output::new(out)));
+        assert_eq!(fst.get(word), Some(Output::new(out)));
     }
 }
 
@@ -180,7 +180,7 @@ fn fst_map_100000_lengths() {
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
     for &(ref word, out) in &words {
-        assert_eq!(fst.find(word), Some(Output::new(out)));
+        assert_eq!(fst.get(word), Some(Output::new(out)));
     }
 }
 

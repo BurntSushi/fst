@@ -53,16 +53,16 @@ impl Registry {
         //
         // In unscientific experiments, this provides the same compression
         // as `std::hash::SipHasher` but is much much faster.
-        const FNV_PRIME: usize = 1099511628211;
+        const FNV_PRIME: u64 = 1099511628211;
         let mut h = 14695981039346656037;
-        h = (h ^ (node.is_final as usize)).wrapping_mul(FNV_PRIME);
-        h = (h ^ (node.final_output.value() as usize)).wrapping_mul(FNV_PRIME);
+        h = (h ^ (node.is_final as u64)).wrapping_mul(FNV_PRIME);
+        h = (h ^ node.final_output.value()).wrapping_mul(FNV_PRIME);
         for t in &node.trans {
-            h = (h ^ (t.inp as usize)).wrapping_mul(FNV_PRIME);
-            h = (h ^ (t.out.value() as usize)).wrapping_mul(FNV_PRIME);
-            h = (h ^ (t.addr as usize)).wrapping_mul(FNV_PRIME);
+            h = (h ^ (t.inp as u64)).wrapping_mul(FNV_PRIME);
+            h = (h ^ t.out.value()).wrapping_mul(FNV_PRIME);
+            h = (h ^ (t.addr as u64)).wrapping_mul(FNV_PRIME);
         }
-        h % self.table_size
+        (h as usize) % self.table_size
     }
 }
 

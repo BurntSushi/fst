@@ -60,7 +60,7 @@
 /// scary monster:
 ///
 /// ```ignore
-/// fn takes_stream<'f, I, S>(s: S)
+/// fn takes_stream<'f, I, S>(s: I)
 ///     where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
 ///           S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)>
 /// {

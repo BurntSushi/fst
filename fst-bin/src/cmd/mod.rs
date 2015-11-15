@@ -6,6 +6,7 @@ pub mod grep;
 pub mod map;
 pub mod node;
 pub mod range;
+pub mod rust;
 pub mod set;
 pub mod union;
 

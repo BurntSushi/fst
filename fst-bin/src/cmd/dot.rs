@@ -1,4 +1,3 @@
-use std::ascii;
 use std::io::Write;
 
 use bit_set::BitSet;
@@ -91,15 +90,11 @@ digraph automaton {{
                 format!("/{}", t.out.value().to_string())
             };
             writeln!(wtr, "    {} -> {} [label=\"{}{}\"];",
-                     addr, t.addr, escape_input(t.inp), out).unwrap();
+                     addr, t.addr, util::escape_input(t.inp), out).unwrap();
         }
         state_num += 1;
     }
     writeln!(wtr, "}}").unwrap();
     try!(wtr.flush());
     Ok(())
-}
-
-fn escape_input(b: u8) -> String {
-    String::from_utf8(ascii::escape_default(b).collect::<Vec<_>>()).unwrap()
 }

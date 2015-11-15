@@ -1,3 +1,5 @@
+use self::StartsWithStateInternal::*;
+
 /// Automaton describes types that behave as a finite automaton.
 ///
 /// All implementators of this trait are represented by *byte based* automata.
@@ -41,10 +43,49 @@ pub trait Automaton {
     ///
     /// If this returns `true` even when no match is possible, then behavior
     /// will be correct, but callers may be forced to do additional work.
-    fn can_match(&self, state: &Self::State) -> bool;
+    fn can_match(&self, _state: &Self::State) -> bool {
+        true
+    }
+
+    /// Returns true if and only if `state` matches and must match no matter what
+    /// steps are taken.
+    ///
+    /// If this returns `true`, then every sequence of inputs from this state
+    /// produces a match. If this does not follow, then those match states may
+    /// never be reached. In other words, behavior may be incorrect.
+    ///
+    /// If this returns `false` even when every sequence of inputs will lead to
+    /// a match, then behavior will be correct, but callers may be forced to do
+    /// additional work.
+    fn must_match(&self, _state: &Self::State) -> bool {
+        false
+    }
 
     /// Return the next state given `state` and an input.
     fn accept(&self, state: &Self::State, byte: u8) -> Self::State;
+
+    /// Returns an automaton that matches the strings that start with something
+    /// this automaton matches.
+    fn starts_with(self) -> StartsWith<Self> where Self: Sized {
+        StartsWith(self)
+    }
+
+    /// Returns an automaton that matches the strings matched by either this or
+    /// the other automaton.
+    fn union<Rhs: Automaton>(self, rhs: Rhs) -> Union<Self, Rhs> where Self: Sized {
+        Union(self, rhs)
+    }
+
+    /// Returns an automaton that matches the strings matched by both this and
+    /// the other automaton.
+    fn intersection<Rhs: Automaton>(self, rhs: Rhs) -> Intersection<Self, Rhs> where Self: Sized {
+        Intersection(self, rhs)
+    }
+
+    /// Returns an automaton that matches the strings not matched by this automaton.
+    fn complement(self) -> Complement<Self> where Self: Sized {
+        Complement(self)
+    }
 }
 
 impl<'a, T: Automaton> Automaton for &'a T {
@@ -60,6 +101,10 @@ impl<'a, T: Automaton> Automaton for &'a T {
 
     fn can_match(&self, state: &Self::State) -> bool {
         (*self).can_match(state)
+    }
+
+    fn must_match(&self, state: &Self::State) -> bool {
+        (*self).must_match(state)
     }
 
     fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
@@ -79,5 +124,171 @@ impl Automaton for AlwaysMatch {
     fn start(&self) -> () { () }
     fn is_match(&self, _: &()) -> bool { true }
     fn can_match(&self, _: &()) -> bool { true }
+    fn must_match(&self, _: &()) -> bool { true }
     fn accept(&self, _: &(), _: u8) -> () { () }
+}
+
+/// An automaton that matches and string that begins with something that the
+/// wrapped automaton matches.
+pub struct StartsWith<A>(A);
+
+/// The `Automaton` state for `StartsWith<A>`.
+pub struct StartsWithState<A: Automaton>(StartsWithStateInternal<A>);
+
+enum StartsWithStateInternal<A: Automaton> {
+    Done,
+    Running(A::State)
+}
+
+impl<A: Automaton> Automaton for StartsWith<A> {
+    type State = StartsWithState<A>;
+    fn start(&self) -> StartsWithState<A> {
+        StartsWithState({
+            let inner = self.0.start();
+            if self.0.is_match(&inner) {
+                Done
+            } else {
+                Running(inner)
+            }
+        })
+    }
+
+    fn is_match(&self, state: &StartsWithState<A>) -> bool {
+        match state.0 {
+            Done => true,
+            Running(_) => false
+        }
+    }
+
+    fn can_match(&self, state: &StartsWithState<A>) -> bool {
+        match state.0 {
+            Done => true,
+            Running(ref inner) => self.0.can_match(inner)
+        }
+    }
+
+    fn must_match(&self, state: &StartsWithState<A>) -> bool {
+        match state.0 {
+            Done => true,
+            Running(_) => false
+        }
+    }
+
+    fn accept(&self, state: &StartsWithState<A>, byte: u8) -> StartsWithState<A> {
+        StartsWithState(
+            match state.0 {
+                Done => Done,
+                Running(ref inner) => {
+                    let next_inner = self.0.accept(inner, byte);
+                    if self.0.is_match(&next_inner) {
+                        Done
+                    } else {
+                        Running(next_inner)
+                    }
+                }
+            }
+        )
+    } 
+}
+
+/// An automaton that matches when one of its component automata match.
+pub struct Union<A, B>(A, B);
+
+/// The `Automaton` state for `Union<A, B>`.
+pub struct UnionState<A: Automaton, B: Automaton>(A::State, B::State);
+
+impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
+    type State = UnionState<A, B>;
+
+    fn start(&self) -> UnionState<A, B> {
+        UnionState(
+            self.0.start(),
+            self.1.start()
+        )
+    }
+
+    fn is_match(&self, state: &UnionState<A, B>) -> bool {
+        self.0.is_match(&state.0) || self.1.is_match(&state.1)
+    }
+
+    fn can_match(&self, state: &UnionState<A, B>) -> bool {
+        self.0.can_match(&state.0) || self.1.can_match(&state.1)
+    }
+
+    fn must_match(&self, state: &UnionState<A, B>) -> bool {
+        self.0.must_match(&state.0) || self.1.must_match(&state.1)
+    }
+
+    fn accept(&self, state: &UnionState<A, B>, byte: u8) -> UnionState<A, B> {
+        UnionState(
+            self.0.accept(&state.0, byte),
+            self.1.accept(&state.1, byte)
+        )
+    }
+}
+
+/// An automaton that matches when both of its component automata match.
+pub struct Intersection<A, B>(A, B);
+
+/// The `Automaton` state for `Intersection<A, B>`.
+pub struct IntersectionState<A: Automaton, B: Automaton>(A::State, B::State);
+
+impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
+    type State = IntersectionState<A, B>;
+
+    fn start(&self) -> IntersectionState<A, B> {
+        IntersectionState(
+            self.0.start(),
+            self.1.start()
+        )
+    }
+
+    fn is_match(&self, state: &IntersectionState<A, B>) -> bool {
+        self.0.is_match(&state.0) && self.1.is_match(&state.1)
+    }
+
+    fn can_match(&self, state: &IntersectionState<A, B>) -> bool {
+        self.0.can_match(&state.0) && self.1.can_match(&state.1)
+    }
+
+    fn must_match(&self, state: &IntersectionState<A, B>) -> bool {
+        self.0.must_match(&state.0) && self.1.must_match(&state.1)
+    }
+
+    fn accept(&self, state: &IntersectionState<A, B>, byte: u8) -> IntersectionState<A, B> {
+        IntersectionState(
+            self.0.accept(&state.0, byte),
+            self.1.accept(&state.1, byte)
+        )
+    }
+}
+
+/// An automaton that matches exactly when the automaton it wraps does not.
+pub struct Complement<A>(A);
+
+/// The `Automaton` state for `Complement<A>`.
+pub struct ComplementState<A: Automaton>(A::State);
+
+impl<A: Automaton> Automaton for Complement<A> {
+    type State = ComplementState<A>;
+
+    fn start(&self) -> ComplementState<A> {
+        ComplementState(self.0.start())
+    }
+
+    fn is_match(&self, state: &ComplementState<A>) -> bool {
+        !self.0.is_match(&state.0)
+    }
+
+    fn can_match(&self, state: &ComplementState<A>) -> bool {
+        !self.0.must_match(&state.0)
+    }
+
+    fn must_match(&self, state: &ComplementState<A>) -> bool {
+        !self.0.can_match(&state.0)
+    }
+
+    fn accept(&self, state: &ComplementState<A>, byte: u8) -> ComplementState<A> {
+        ComplementState(self.0.accept(&state.0, byte))
+    }
 }

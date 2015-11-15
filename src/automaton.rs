@@ -1,4 +1,5 @@
 use self::StartsWithStateInternal::*;
+use std::usize;
 
 /// Automaton describes types that behave as a finite automaton.
 ///
@@ -88,7 +89,7 @@ pub trait Automaton {
     }
 }
 
-impl<'a, T: Automaton> Automaton for &'a T {
+impl<'a, T: Automaton + ?Sized> Automaton for &'a T {
     type State = T::State;
 
     fn start(&self) -> Self::State {
@@ -109,6 +110,68 @@ impl<'a, T: Automaton> Automaton for &'a T {
 
     fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
         (*self).accept(state, byte)
+    }
+}
+
+/// The `Automaton` state for `str`.
+pub struct StringState(usize);
+
+impl Automaton for str {
+    type State = StringState;
+
+    fn start(&self) -> StringState {
+        StringState(0)
+    }
+
+    fn is_match(&self, state: &StringState) -> bool {
+        state.0 == self.len()
+    }
+
+    fn can_match(&self, state: &StringState) -> bool {
+        state.0 <= self.len()
+    }
+
+    fn will_always_match(&self, _state: &StringState) -> bool {
+        false
+    }
+
+    fn accept(&self, state: &StringState, byte: u8) -> StringState {
+        if state.0 < self.len() && self.as_bytes()[state.0] == byte {
+            StringState(state.0 + 1)
+        } else {
+            StringState(usize::MAX)
+        }
+    }
+}
+
+/// The `Automaton` state for `[u8]`.
+pub struct BytesState(usize);
+
+impl Automaton for [u8] {
+    type State = BytesState;
+
+    fn start(&self) -> BytesState {
+        BytesState(0)
+    }
+
+    fn is_match(&self, state: &BytesState) -> bool {
+        state.0 == self.len()
+    }
+
+    fn can_match(&self, state: &BytesState) -> bool {
+        state.0 <= self.len()
+    }
+
+    fn will_always_match(&self, _state: &BytesState) -> bool {
+        false
+    }
+
+    fn accept(&self, state: &BytesState, byte: u8) -> BytesState {
+        if state.0 < self.len() && self[state.0] == byte {
+            BytesState(state.0 + 1)
+        } else {
+            BytesState(usize::MAX)
+        }
     }
 }
 
@@ -302,6 +365,26 @@ mod test {
 
     fn get_set() -> Set {
         Set::from_iter(WORDS.lines()).unwrap()
+    }
+
+    #[test]
+    fn str_small() {
+        let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+        let set = Set::from_iter(keys).unwrap();
+        let stream = set.search("foo").into_stream();
+
+        let keys = stream.into_strs().unwrap();
+        assert_eq!(keys, vec!["foo"]);
+    }
+
+    #[test]
+    fn u8_slice_small() {
+        let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+        let set = Set::from_iter(keys).unwrap();
+        let stream = set.search("foo".as_bytes()).into_stream();
+
+        let keys = stream.into_strs().unwrap();
+        assert_eq!(keys, vec!["foo"]);
     }
 
     #[test]

@@ -49,6 +49,7 @@ Commands:
     map     Create a new map of key-value pairs.
     node    Show a single node.
     range   Run range queries.
+    rust    Emit a Rust source code for this FST.
     set     Create a new set of keys.
     union   Union two or more FSTs.
 
@@ -72,6 +73,7 @@ enum Command {
     Map,
     Node,
     Range,
+    Rust,
     Set,
     Union,
 }
@@ -90,6 +92,7 @@ impl Command {
             Map => cmd::map::run(argv),
             Node => cmd::node::run(argv),
             Range => cmd::range::run(argv),
+            Rust => cmd::rust::run(argv),
             Set => cmd::set::run(argv),
             Union => cmd::union::run(argv),
         }

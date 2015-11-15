@@ -1,3 +1,4 @@
+use std::ascii;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
@@ -7,6 +8,10 @@ use fst::{IntoStreamer, Streamer};
 use fst::raw::Output;
 
 use Error;
+
+pub fn escape_input(b: u8) -> String {
+    String::from_utf8(ascii::escape_default(b).collect::<Vec<_>>()).unwrap()
+}
 
 pub fn get_buf_reader<T: AsRef<Path>>(
     path: Option<T>,

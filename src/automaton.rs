@@ -57,7 +57,7 @@ pub trait Automaton {
     /// If this returns `false` even when every sequence of inputs will lead to
     /// a match, then behavior will be correct, but callers may be forced to do
     /// additional work.
-    fn must_match(&self, _state: &Self::State) -> bool {
+    fn will_always_match(&self, _state: &Self::State) -> bool {
         false
     }
 
@@ -103,8 +103,8 @@ impl<'a, T: Automaton> Automaton for &'a T {
         (*self).can_match(state)
     }
 
-    fn must_match(&self, state: &Self::State) -> bool {
-        (*self).must_match(state)
+    fn will_always_match(&self, state: &Self::State) -> bool {
+        (*self).will_always_match(state)
     }
 
     fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
@@ -124,7 +124,7 @@ impl Automaton for AlwaysMatch {
     fn start(&self) -> () { () }
     fn is_match(&self, _: &()) -> bool { true }
     fn can_match(&self, _: &()) -> bool { true }
-    fn must_match(&self, _: &()) -> bool { true }
+    fn will_always_match(&self, _: &()) -> bool { true }
     fn accept(&self, _: &(), _: u8) -> () { () }
 }
 
@@ -167,7 +167,7 @@ impl<A: Automaton> Automaton for StartsWith<A> {
         }
     }
 
-    fn must_match(&self, state: &StartsWithState<A>) -> bool {
+    fn will_always_match(&self, state: &StartsWithState<A>) -> bool {
         match state.0 {
             Done => true,
             Running(_) => false
@@ -215,8 +215,8 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
         self.0.can_match(&state.0) || self.1.can_match(&state.1)
     }
 
-    fn must_match(&self, state: &UnionState<A, B>) -> bool {
-        self.0.must_match(&state.0) || self.1.must_match(&state.1)
+    fn will_always_match(&self, state: &UnionState<A, B>) -> bool {
+        self.0.will_always_match(&state.0) || self.1.will_always_match(&state.1)
     }
 
     fn accept(&self, state: &UnionState<A, B>, byte: u8) -> UnionState<A, B> {
@@ -251,8 +251,8 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
         self.0.can_match(&state.0) && self.1.can_match(&state.1)
     }
 
-    fn must_match(&self, state: &IntersectionState<A, B>) -> bool {
-        self.0.must_match(&state.0) && self.1.must_match(&state.1)
+    fn will_always_match(&self, state: &IntersectionState<A, B>) -> bool {
+        self.0.will_always_match(&state.0) && self.1.will_always_match(&state.1)
     }
 
     fn accept(&self, state: &IntersectionState<A, B>, byte: u8) -> IntersectionState<A, B> {
@@ -281,10 +281,10 @@ impl<A: Automaton> Automaton for Complement<A> {
     }
 
     fn can_match(&self, state: &ComplementState<A>) -> bool {
-        !self.0.must_match(&state.0)
+        !self.0.will_always_match(&state.0)
     }
 
-    fn must_match(&self, state: &ComplementState<A>) -> bool {
+    fn will_always_match(&self, state: &ComplementState<A>) -> bool {
         !self.0.can_match(&state.0)
     }
 

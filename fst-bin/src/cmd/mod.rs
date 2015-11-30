@@ -2,6 +2,7 @@ pub mod csv;
 pub mod dot;
 pub mod dupes;
 pub mod fuzzy;
+pub mod hamming;
 pub mod grep;
 pub mod map;
 pub mod node;

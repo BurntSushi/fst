@@ -45,6 +45,7 @@ Commands:
     dot     Emit a dot representation of an FST.
     dupes   Emit diagnostic info about frequency of duplicate nodes.
     fuzzy   Run fuzzy queries based on edit distance.
+    hamming Run fuzzy queries based on Hamming distance.
     grep    Search an FST with a regex.
     map     Create a new map of key-value pairs.
     node    Show a single node.
@@ -69,6 +70,7 @@ enum Command {
     Dot,
     Dupes,
     Fuzzy,
+    Hamming,
     Grep,
     Map,
     Node,
@@ -88,6 +90,7 @@ impl Command {
             Dot => cmd::dot::run(argv),
             Dupes => cmd::dupes::run(argv),
             Fuzzy => cmd::fuzzy::run(argv),
+            Hamming => cmd::hamming::run(argv),
             Grep => cmd::grep::run(argv),
             Map => cmd::map::run(argv),
             Node => cmd::node::run(argv),

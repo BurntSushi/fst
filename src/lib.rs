@@ -291,6 +291,7 @@ pub use automaton::Automaton;
 pub use error::{Error, Result};
 pub use levenshtein::Error as LevenshteinError;
 pub use levenshtein::Levenshtein;
+pub use hamming::Hamming;
 pub use map::{Map, MapBuilder};
 pub use regex::Error as RegexError;
 pub use regex::Regex;
@@ -300,6 +301,7 @@ pub use stream::{IntoStreamer, Streamer};
 mod automaton;
 mod error;
 mod levenshtein;
+mod hamming;
 #[path = "map.rs"]
 mod inner_map;
 pub mod raw;

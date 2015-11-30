@@ -9,7 +9,7 @@ use automaton::Automaton;
 /// let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
 /// let set = Set::from_iter(keys).unwrap();
 ///
-/// let ham = Hamming::new(String::from("foo"), 1);
+/// let ham = Hamming::new("foo", 1);
 /// let mut stream = set.search(&ham).into_stream();
 ///
 /// let mut keys = vec![];
@@ -79,9 +79,9 @@ impl Automaton for Hamming {
 impl Hamming {
     ///
     /// New Hamming automaton matching strings similar to `query`.
-    pub fn new(query: &String, max_mismatches: u32) -> Hamming {
+    pub fn new(query: &str, max_mismatches: u32) -> Hamming {
         Hamming {
-            query: query.clone(),
+            query: query.to_owned(),
             max_mismatches: max_mismatches,
         }
     }
@@ -103,12 +103,13 @@ impl Hamming {
 
 #[test]
 fn test() {
-    assert!(Hamming::new(String::from("AGATA"), 2).accepts("GAATA"));
-    assert!(Hamming::new(String::from("AGATA"), 2).accepts("AAATA"));
-    assert!(Hamming::new(String::from("AGATA"), 2).accepts("AGATA"));
-    assert!(Hamming::new(String::from("AGATA"), 2).accepts("AGATC"));
+    let aut = Hamming::new("AGATA", 2);
+    assert!(aut.accepts("GAATA"));
+    assert!(aut.accepts("AAATA"));
+    assert!(aut.accepts("AGATA"));
+    assert!(aut.accepts("AGATC"));
 
-    assert!(!Hamming::new(String::from("AGATA"), 2).accepts("CCCTA"));
-    assert!(!Hamming::new(String::from("AGATA"), 2).accepts("GAAT"));
-    assert!(!Hamming::new(String::from("AGATA"), 2).accepts("GAATAA"));
+    assert!(!aut.accepts("CCCTA"));
+    assert!(!aut.accepts("GAAT"));
+    assert!(!aut.accepts("GAATAA"));
 }

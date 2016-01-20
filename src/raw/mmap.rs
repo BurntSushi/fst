@@ -31,6 +31,13 @@ impl MmapReadOnly {
         MmapReadOnly::open(&try!(fs::File::open(path)))
     }
 
+    /// Returns the size in byte of the memory map.
+    ///
+    /// If it is a range, the size is the size of the range.
+    pub fn len(&self,) -> usize {
+        self.len
+    }
+
     /// Slice this memory map to a new `offset` and `len`.
     ///
     /// If the new range is outside the bounds of `self`, then this method
@@ -47,6 +54,16 @@ impl MmapReadOnly {
     /// Read the memory map as a `&[u8]`.
     pub unsafe fn as_slice(&self) -> &[u8] {
         self.map.as_slice()
+    }
+}
+
+impl Clone for MmapReadOnly {
+    fn clone(&self) -> MmapReadOnly {
+        MmapReadOnly{
+            map: self.map.clone(),
+            offset: self.offset,
+            len: self.len,
+        }
     }
 }
 

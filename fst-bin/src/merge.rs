@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::thread;
 
 use chan;
-use fst::{Streamer, raw};
+use fst::{self, Streamer, raw};
 use num_cpus;
 use tempdir::TempDir;
 
@@ -221,7 +221,11 @@ impl Batchable for KvBatch {
         let wtr = io::BufWriter::new(try!(File::create(&path)));
         let mut builder = try!(raw::Builder::new(wtr));
         for &(ref k, v) in &self.kvs {
-            try!(builder.insert(k, v));
+            match builder.insert(k, v) {
+                Ok(_) => {}
+                Err(fst::Error::Fst(fst::raw::Error::DuplicateKey { .. })) => {}
+                Err(err) => return Err(From::from(err)),
+            }
         }
         try!(builder.finish());
         Ok(path)

@@ -24,7 +24,6 @@ impl Compiler {
     }
 
     fn c(&mut self, ast: &Expr) -> Result<()> {
-        use regex::Inst::*;
         match *ast {
             Expr::StartLine
             | Expr::EndLine

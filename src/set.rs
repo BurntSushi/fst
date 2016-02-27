@@ -328,6 +328,13 @@ impl<'s, 'a> IntoStreamer<'a> for &'s Set {
     }
 }
 
+// Construct a set from an Fst object.
+impl From<raw::Fst> for Set {
+    fn from(fst: raw::Fst) -> Set {
+        Set(fst)
+    }
+}
+
 /// A builder for creating a set.
 ///
 /// This is not your average everyday builder. It has two important qualities

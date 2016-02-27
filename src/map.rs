@@ -360,6 +360,13 @@ impl fmt::Debug for Map {
     }
 }
 
+// Construct a map from an Fst object.
+impl From<raw::Fst> for Map {
+    fn from(fst: raw::Fst) -> Map {
+        Map(fst)
+    }
+}
+
 /// Returns the underlying finite state transducer.
 impl AsRef<raw::Fst> for Map {
     fn as_ref(&self) -> &raw::Fst {

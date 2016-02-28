@@ -53,7 +53,7 @@ impl MmapReadOnly {
 
     /// Read the memory map as a `&[u8]`.
     pub unsafe fn as_slice(&self) -> &[u8] {
-        self.map.as_slice()
+        &self.map.as_slice()[self.offset..self.offset + self.len]
     }
 }
 

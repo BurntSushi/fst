@@ -18,7 +18,6 @@ option of specifying a merge strategy for output values.
 
 Most of the rest of the types are streams from set operations.
 */
-use std::borrow::Cow;
 use std::cmp;
 use std::fmt;
 use std::ops::Deref;
@@ -30,6 +29,7 @@ use automaton::{Automaton, AlwaysMatch};
 use error::Result;
 use stream::{IntoStreamer, Streamer};
 
+pub use self::shared_vector_slice::SharedVectorSlice;
 pub use self::build::Builder;
 pub use self::error::Error;
 pub use self::node::{Node, Transitions};
@@ -50,6 +50,7 @@ mod ops;
 mod pack;
 mod registry;
 mod registry_minimal;
+mod shared_vector_slice;
 #[cfg(test)] mod tests;
 
 /// The API version of this crate.
@@ -309,7 +310,7 @@ impl Fst {
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Fst::new(FstData::Cow(Cow::Owned(bytes)))
+        Fst::new(FstData::SharedVector(SharedVectorSlice::from(bytes)))
     }
 
     /// Creates a transducer from its representation as a raw byte sequence.
@@ -317,7 +318,7 @@ impl Fst {
     /// This accepts a static byte slice, which may be useful if the Fst
     /// is embedded into source code.
     pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
-        Fst::new(FstData::Cow(Cow::Borrowed(bytes)))
+        Fst::new(FstData::Static(bytes))
     }
 
     fn new(data: FstData) -> Result<Self> {
@@ -937,9 +938,14 @@ impl Output {
     }
 }
 
-enum FstData {
-    Cow(Cow<'static, [u8]>),
+/// Represent the data source for an FST>
+pub enum FstData {
+    /// Static bytearray
+    Static(&'static [u8]),
+    /// Mmap object
     Mmap(MmapReadOnly),
+    /// Source backed by a Vec<u8>
+    SharedVector(SharedVectorSlice),
 }
 
 impl Deref for FstData {
@@ -947,8 +953,9 @@ impl Deref for FstData {
 
     fn deref(&self) -> &[u8] {
         match *self {
-            FstData::Cow(ref v) => &**v,
+            FstData::Static(ref v) => v,
             FstData::Mmap(ref v) => unsafe { v.as_slice() },
+            FstData::SharedVector(ref v) => unsafe { v.as_slice() },
         }
     }
 }

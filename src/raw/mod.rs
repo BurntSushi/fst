@@ -938,9 +938,13 @@ impl Output {
     }
 }
 
-enum FstData {
+/// Represent the data source for an FST>
+pub enum FstData {
+    /// Static bytearray
     Static(&'static [u8]),
+    /// Mmap object
     Mmap(MmapReadOnly),
+    /// Source backed by a Vec<u8>
     SharedVector(SharedVectorSlice),
 }
 

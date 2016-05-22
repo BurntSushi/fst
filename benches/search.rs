@@ -1,4 +1,3 @@
-#![feature(hashmap_hasher)]
 #![feature(test)]
 
 extern crate fnv;
@@ -22,7 +21,7 @@ macro_rules! search {
     ($name:ident, $keys:expr) => {
         mod $name {
             use std::collections::{BTreeSet, HashSet};
-            use std::collections::hash_state::DefaultState;
+            use std::hash::BuildHasherDefault;
 
             use fnv::FnvHasher;
             use fst::raw::{Builder, Fst};
@@ -49,8 +48,9 @@ macro_rules! search {
 
             #[bench]
             fn hash_fnv_contains(b: &mut Bencher) {
+                type Fnv = BuildHasherDefault<FnvHasher>;
                 lazy_static! {
-                    static ref SET: HashSet<String, DefaultState<FnvHasher>> = {
+                    static ref SET: HashSet<String, Fnv> = {
                         $keys.clone().into_iter().collect()
                     };
                 }

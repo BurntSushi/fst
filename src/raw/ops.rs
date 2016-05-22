@@ -280,12 +280,14 @@ impl<'a, 'f> Streamer<'a> for Difference<'f> {
                     });
                 }
             };
-            let mut popped: usize = 0;
-            while let Some(slot) = self.heap.pop_if_equal(&self.key) {
+            let mut unique = true;
+            while let Some(slot) = self.heap.pop_if_le(&self.key) {
+                if slot.input() == &*self.key {
+                    unique = false;
+                }
                 self.heap.refill(slot);
-                popped += 1;
             }
-            if popped == 0 {
+            if unique {
                 return Some((&self.key, &self.outs))
             }
         }
@@ -362,6 +364,14 @@ impl<'f> StreamHeap<'f> {
 
     fn pop_if_equal(&mut self, key: &[u8]) -> Option<Slot> {
         if self.peek_is_duplicate(key) {
+            self.pop()
+        } else {
+            None
+        }
+    }
+
+    fn pop_if_le(&mut self, key: &[u8]) -> Option<Slot> {
+        if self.heap.peek().map(|s| s.input() <= key).unwrap_or(false) {
             self.pop()
         } else {
             None
@@ -587,6 +597,21 @@ mod tests {
             vec!["a"],
         ]);
         assert_eq!(v, vec!["c"]);
+    }
+
+    #[test]
+    fn difference2() {
+        // Regression test: https://github.com/BurntSushi/fst/issues/19
+        let v = fst_difference(vec![
+            vec!["a", "c"],
+            vec!["b", "c"],
+        ]);
+        assert_eq!(v, vec!["a"]);
+        let v = fst_difference(vec![
+            vec!["bar", "foo"],
+            vec!["baz", "foo"],
+        ]);
+        assert_eq!(v, vec!["bar"]);
     }
 
     #[test]

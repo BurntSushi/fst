@@ -1,6 +1,8 @@
 use std::num::Wrapping;
 
-/// An abelian group; that is, a type `T` with the
+/// An [abelian group](https://ncatlab.org/nlab/show/abelian+group).
+///
+/// This is a type `T` with the
 /// [functionally pure](https://en.wikipedia.org/wiki/Pure_function)
 /// methods `identity`, `plus`, and `minus` such that the following
 /// equations are obeyed:

@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use self::StartsWithStateInternal::*;
 
 /// Automaton describes types that behave as a finite automaton.
@@ -24,6 +25,9 @@ use self::StartsWithStateInternal::*;
 pub trait Automaton {
     /// The type of the state used in the automaton.
     type State;
+
+    /// The type of input token the automaton accepts.
+    type Token;
 
     /// Returns a single start state for this automaton.
     ///
@@ -62,7 +66,7 @@ pub trait Automaton {
     }
 
     /// Return the next state given `state` and an input.
-    fn accept(&self, state: &Self::State, byte: u8) -> Self::State;
+    fn accept(&self, state: &Self::State, token: Self::Token) -> Self::State;
 
     /// Returns an automaton that matches the strings that start with something
     /// this automaton matches.
@@ -98,6 +102,8 @@ pub trait Automaton {
 impl<'a, T: Automaton> Automaton for &'a T {
     type State = T::State;
 
+    type Token = T::Token;
+
     fn start(&self) -> Self::State {
         (*self).start()
     }
@@ -114,8 +120,8 @@ impl<'a, T: Automaton> Automaton for &'a T {
         (*self).will_always_match(state)
     }
 
-    fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
-        (*self).accept(state, byte)
+    fn accept(&self, state: &Self::State, token: Self::Token) -> Self::State {
+        (*self).accept(state, token)
     }
 }
 
@@ -123,16 +129,26 @@ impl<'a, T: Automaton> Automaton for &'a T {
 ///
 /// This is useful in a generic context as a way to express that no automaton
 /// should be used.
-pub struct AlwaysMatch;
+pub struct AlwaysMatch<K = u8> {
+    phantom_k_input: PhantomData<Fn(K) -> ()>
+}
 
-impl Automaton for AlwaysMatch {
+impl<K> Default for AlwaysMatch<K> {
+    fn default() -> AlwaysMatch<K> {
+        AlwaysMatch { phantom_k_input: PhantomData }
+    }
+}
+
+impl<K> Automaton for AlwaysMatch<K> {
     type State = ();
+
+    type Token = K;
 
     fn start(&self) -> () { () }
     fn is_match(&self, _: &()) -> bool { true }
     fn can_match(&self, _: &()) -> bool { true }
     fn will_always_match(&self, _: &()) -> bool { true }
-    fn accept(&self, _: &(), _: u8) -> () { () }
+    fn accept(&self, _: &(), _: K) -> () { () }
 }
 
 /// An automaton that matches any string that begins with something that the
@@ -149,6 +165,9 @@ enum StartsWithStateInternal<A: Automaton> {
 
 impl<A: Automaton> Automaton for StartsWith<A> {
     type State = StartsWithState<A>;
+
+    type Token = A::Token;
+    
     fn start(&self) -> StartsWithState<A> {
         StartsWithState({
             let inner = self.0.start();
@@ -181,12 +200,12 @@ impl<A: Automaton> Automaton for StartsWith<A> {
         }
     }
 
-    fn accept(&self, state: &StartsWithState<A>, byte: u8) -> StartsWithState<A> {
+    fn accept(&self, state: &StartsWithState<A>, token: A::Token) -> StartsWithState<A> {
         StartsWithState(
             match state.0 {
                 Done => Done,
                 Running(ref inner) => {
-                    let next_inner = self.0.accept(inner, byte);
+                    let next_inner = self.0.accept(inner, token);
                     if self.0.is_match(&next_inner) {
                         Done
                     } else {
@@ -202,10 +221,13 @@ impl<A: Automaton> Automaton for StartsWith<A> {
 pub struct Union<A, B>(A, B);
 
 /// The `Automaton` state for `Union<A, B>`.
-pub struct UnionState<A: Automaton, B: Automaton>(A::State, B::State);
+pub struct UnionState<A: Automaton, B: Automaton<Token = A::Token>>(A::State, B::State);
 
-impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
+impl<A: Automaton, B: Automaton<Token = A::Token>> Automaton for Union<A, B>
+    where A::Token: Clone {
     type State = UnionState<A, B>;
+
+    type Token = A::Token;
 
     fn start(&self) -> UnionState<A, B> {
         UnionState(
@@ -226,10 +248,10 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
         self.0.will_always_match(&state.0) || self.1.will_always_match(&state.1)
     }
 
-    fn accept(&self, state: &UnionState<A, B>, byte: u8) -> UnionState<A, B> {
+    fn accept(&self, state: &UnionState<A, B>, token: A::Token) -> UnionState<A, B> {
         UnionState(
-            self.0.accept(&state.0, byte),
-            self.1.accept(&state.1, byte)
+            self.0.accept(&state.0, token.clone()),
+            self.1.accept(&state.1, token)
         )
     }
 }
@@ -238,10 +260,13 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
 pub struct Intersection<A, B>(A, B);
 
 /// The `Automaton` state for `Intersection<A, B>`.
-pub struct IntersectionState<A: Automaton, B: Automaton>(A::State, B::State);
+pub struct IntersectionState<A: Automaton, B: Automaton<Token = A::Token>>(A::State, B::State);
 
-impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
+impl<A: Automaton, B: Automaton<Token = A::Token>> Automaton for Intersection<A, B>
+    where A::Token: Clone {
     type State = IntersectionState<A, B>;
+
+    type Token = A::Token;
 
     fn start(&self) -> IntersectionState<A, B> {
         IntersectionState(
@@ -262,10 +287,10 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
         self.0.will_always_match(&state.0) && self.1.will_always_match(&state.1)
     }
 
-    fn accept(&self, state: &IntersectionState<A, B>, byte: u8) -> IntersectionState<A, B> {
+    fn accept(&self, state: &IntersectionState<A, B>, token: A::Token) -> IntersectionState<A, B> {
         IntersectionState(
-            self.0.accept(&state.0, byte),
-            self.1.accept(&state.1, byte)
+            self.0.accept(&state.0, token.clone()),
+            self.1.accept(&state.1, token)
         )
     }
 }
@@ -278,6 +303,8 @@ pub struct ComplementState<A: Automaton>(A::State);
 
 impl<A: Automaton> Automaton for Complement<A> {
     type State = ComplementState<A>;
+
+    type Token = A::Token;
 
     fn start(&self) -> ComplementState<A> {
         ComplementState(self.0.start())
@@ -295,8 +322,8 @@ impl<A: Automaton> Automaton for Complement<A> {
         !self.0.can_match(&state.0)
     }
 
-    fn accept(&self, state: &ComplementState<A>, byte: u8) -> ComplementState<A> {
-        ComplementState(self.0.accept(&state.0, byte))
+    fn accept(&self, state: &ComplementState<A>, token: A::Token) -> ComplementState<A> {
+        ComplementState(self.0.accept(&state.0, token))
     }
 }
 

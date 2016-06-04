@@ -429,7 +429,7 @@ impl Fst {
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
     pub fn stream(&self) -> Stream {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
+        StreamBuilder::new(self, AlwaysMatch::default()).into_stream()
     }
 
     /// Return a builder for range queries.
@@ -437,7 +437,7 @@ impl Fst {
     /// A range query returns a subset of key-value pairs in this fst in a
     /// range given in lexicographic order.
     pub fn range(&self) -> StreamBuilder {
-        StreamBuilder::new(self, AlwaysMatch)
+        StreamBuilder::new(self, AlwaysMatch::default())
     }
 
     /// Executes an automaton on the keys of this map.
@@ -551,7 +551,7 @@ impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
     type Into = Stream<'f>;
 
     fn into_stream(self) -> Self::Into {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
+        StreamBuilder::new(self, AlwaysMatch::default()).into_stream()
     }
 }
 
@@ -609,7 +609,8 @@ impl<'f, A: Automaton> StreamBuilder<'f, A> {
     }
 }
 
-impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'a, 'f, A: Automaton<Token = u8>> IntoStreamer<'a> for StreamBuilder<'f, A> {
     type Item = (&'a [u8], Output);
     type Into = Stream<'f, A>;
 
@@ -673,7 +674,8 @@ struct StreamState<'f, S> {
     aut_state: S,
 }
 
-impl<'f, A: Automaton> Stream<'f, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'f, A: Automaton<Token = u8>> Stream<'f, A> {
     fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
         let mut rdr = Stream {
             fst: fst,
@@ -839,7 +841,8 @@ impl<'f, A: Automaton> Stream<'f, A> {
     }
 }
 
-impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'f, 'a, A: Automaton<Token = u8>> Streamer<'a> for Stream<'f, A> {
     type Item = (&'a [u8], Output);
 
     fn next(&'a mut self) -> Option<Self::Item> {

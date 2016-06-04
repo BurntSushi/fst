@@ -126,6 +126,8 @@ impl Regex {
 impl Automaton for Regex {
     type State = Option<usize>;
 
+    type Token = u8;
+
     fn start(&self) -> Option<usize> { Some(0) }
 
     fn is_match(&self, state: &Option<usize>) -> bool {

@@ -135,7 +135,7 @@ impl Automaton for AlwaysMatch {
     fn accept(&self, _: &(), _: u8) -> () { () }
 }
 
-/// An automaton that matches and string that begins with something that the
+/// An automaton that matches any string that begins with something that the
 /// wrapped automaton matches.
 pub struct StartsWith<A>(A);
 

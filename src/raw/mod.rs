@@ -660,7 +660,7 @@ impl Bound {
 pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
     fst: &'f Fst,
     aut: A,
-    inp: Vec<u8>,
+    inp: Vec<A::Token>,
     empty_output: Option<Output>,
     stack: Vec<StreamState<'f, A::State>>,
     end_at: Bound,

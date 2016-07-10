@@ -1,4 +1,4 @@
-use regex_syntax::{Expr, Repeater, CharClass, ClassRange};
+use regex_syntax::{Expr, Repeater, CharClass, ByteClass, ClassRange, ByteRange};
 use utf8_ranges::{Utf8Sequences, Utf8Sequence};
 
 use regex::{Error, Inst};
@@ -57,15 +57,42 @@ impl Compiler {
                     }
                 }
             }
+            Expr::LiteralBytes { ref bytes, casei } => {
+                for &b in bytes {
+                    if casei {
+                        try!(self.c(&Expr::ClassBytes(ByteClass::new(vec![
+                            ByteRange { start: b, end: b },
+                        ]).case_fold())));
+                    } else {
+                        // One scalar value, so we're guaranteed to get a
+                        // single byte sequence.
+                        for seq in Utf8Sequences::new(b as char, b as char) {
+                            self.compile_utf8_ranges(&seq);
+                        }
+                    }
+                }
+            }
             Expr::AnyChar => try!(self.c(&Expr::Class(CharClass::new(vec![
                 ClassRange { start: '\u{0}', end: '\u{10FFFF}' },
+            ])))),
+            Expr::AnyByte => try!(self.c(&Expr::ClassBytes(ByteClass::new(vec![
+                ByteRange { start: 0x0u8, end: 0xFFu8 },
             ])))),
             Expr::AnyCharNoNL => try!(self.c(&Expr::Class(CharClass::new(vec![
                 ClassRange { start: '\u{0}', end: '\u{09}' },
                 ClassRange { start: '\u{0B}', end: '\u{10FFFF}' },
             ])))),
+            Expr::AnyByteNoNL => try!(self.c(&Expr::ClassBytes(ByteClass::new(vec![
+                ByteRange { start: 0x0u8, end: 0x09u8 },
+                ByteRange { start: 0x0Bu8, end: 0xFFu8 },
+            ])))),
             Expr::Class(ref cls) => {
                 try!(self.compile_class(cls));
+            }
+            Expr::ClassBytes(ref cls) => {
+                try!(self.compile_class(&CharClass::new(cls.into_iter().map(|rng| {
+                    ClassRange { start: rng.start as char, end: rng.end as char }
+                }).collect())));
             }
             Expr::Group { ref e, .. } => try!(self.c(e)),
             Expr::Concat(ref es) => {

@@ -26,7 +26,7 @@ test = false
 bench = true
 
 [dependencies]
-byteorder = "0.4"
+byteorder = "0.5"
 memmap = "0.2"
 regex-syntax = "0.2"
 utf8-ranges = "0.1"

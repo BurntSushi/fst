@@ -2,7 +2,6 @@ use std::error;
 use std::fmt;
 use std::io;
 
-use byteorder;
 use regex_syntax;
 
 use raw;
@@ -52,12 +51,6 @@ impl From<raw::Error> for Error {
 impl From<regex_syntax::Error> for Error {
     fn from(err: regex_syntax::Error) -> Error {
         Error::Regex(RegexError::Syntax(err))
-    }
-}
-
-impl From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Error {
-        Error::Io(From::from(err))
     }
 }
 

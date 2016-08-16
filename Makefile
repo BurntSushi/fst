@@ -12,7 +12,3 @@ docs:
 install:
 	cargo build --manifest-path ./fst-bin/Cargo.toml --release
 	cp fst-bin/target/release/fst $(CARGO_INSTALL_ROOT)/bin/
-
-push:
-	git push origin master
-	git push github master

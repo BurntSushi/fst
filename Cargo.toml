@@ -27,15 +27,15 @@ bench = true
 
 [dependencies]
 byteorder = "0.5"
-memmap = "0.4.0"
+memmap = "0.4"
 regex-syntax = "0.3"
 utf8-ranges = "0.1"
 
 [dev-dependencies]
-fnv = "1.0.3"
-lazy_static = "0.2.1"
-quickcheck = "0.3.1"
-rand = "0.3.14"
+fnv = "1.0"
+lazy_static = "0.2"
+quickcheck = "0.3"
+rand = "0.3"
 
 [profile.release]
 debug = true

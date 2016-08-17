@@ -32,10 +32,10 @@ regex-syntax = "0.3"
 utf8-ranges = "0.1"
 
 [dev-dependencies]
-fnv = "1.0"
-lazy_static = "0.1"
-quickcheck = "0.2"
-rand = "0.3"
+fnv = "1.0.2"
+lazy_static = "0.2.1"
+quickcheck = "0.2.27"
+rand = "0.3.14"
 
 [profile.release]
 debug = true

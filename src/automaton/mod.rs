@@ -305,7 +305,7 @@ mod test {
     use ::{IntoStreamer, Streamer, Levenshtein, Regex, Set, Automaton};
     use set::OpBuilder;
 
-    static WORDS: &'static str = include_str!("../data/words-10000");
+    static WORDS: &'static str = include_str!("../../data/words-10000");
 
     fn get_set() -> Set {
         Set::from_iter(WORDS.lines()).unwrap()

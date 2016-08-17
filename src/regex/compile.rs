@@ -30,8 +30,16 @@ impl Compiler {
             | Expr::StartText
             | Expr::EndText => return Err(From::from(Error::NoEmpty)),
             Expr::WordBoundary
-            | Expr::NotWordBoundary => {
+            | Expr::NotWordBoundary
+            | Expr::WordBoundaryAscii
+            | Expr::NotWordBoundaryAscii => {
                 return Err(From::from(Error::NoWordBoundary));
+            }
+            Expr::LiteralBytes { .. }
+            | Expr::AnyByte
+            | Expr::AnyByteNoNL
+            | Expr::ClassBytes(..) => {
+                return Err(From::from(Error::NoBytes));
             }
             Expr::Empty => {},
             Expr::Literal { ref chars, casei } => {

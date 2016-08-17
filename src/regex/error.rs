@@ -33,6 +33,10 @@ pub enum Error {
     ///
     /// This restriction may be lifted in the future.
     NoEmpty,
+    /// Byte literals such as `(?-u:\xff)` are not allowed.
+    ///
+    /// This restriction may be lifted in the future.
+    NoBytes,
 }
 
 impl From<regex_syntax::Error> for Error {
@@ -60,6 +64,7 @@ impl fmt::Display for Error {
                                            allowed."),
             NoEmpty => write!(f, "Empty match operators are not allowed \
                                   (hopefully temporary)."),
+            NoBytes => write!(f, "Byte literals are not allowed."),
         }
     }
 }
@@ -74,6 +79,7 @@ impl error::Error for Error {
             NoLazy => "lazy repetition operators are not allowed",
             NoWordBoundary => "word boundary operators are not allowed",
             NoEmpty => "empty match operators are not allowed",
+            NoBytes => "byte literals are not allowed",
         }
     }
 

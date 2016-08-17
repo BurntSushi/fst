@@ -297,7 +297,8 @@ pub use regex::Regex;
 pub use set::{Set, SetBuilder};
 pub use stream::{IntoStreamer, Streamer};
 
-mod automaton;
+#[path = "automaton/mod.rs"]
+mod inner_automaton;
 mod error;
 mod levenshtein;
 #[path = "map.rs"]
@@ -307,6 +308,14 @@ mod regex;
 #[path = "set.rs"]
 mod inner_set;
 mod stream;
+
+/// Automaton implementations for finite state transducers.
+///
+/// This module defines a trait, `Automaton`, with several implementations
+/// including, but not limited to, union, intersection and complement.
+pub mod automaton {
+    pub use inner_automaton::*;
+}
 
 /// Map operations implemented by finite state transducers.
 ///

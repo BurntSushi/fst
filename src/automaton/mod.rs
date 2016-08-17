@@ -2,7 +2,7 @@ use self::StartsWithStateInternal::*;
 
 /// Automaton describes types that behave as a finite automaton.
 ///
-/// All implementators of this trait are represented by *byte based* automata.
+/// All implementors of this trait are represented by *byte based* automata.
 /// Stated differently, all transitions in the automata correspond to a single
 /// byte in the input.
 ///
@@ -72,17 +72,24 @@ pub trait Automaton {
 
     /// Returns an automaton that matches the strings matched by either this or
     /// the other automaton.
-    fn union<Rhs: Automaton>(self, rhs: Rhs) -> Union<Self, Rhs> where Self: Sized {
+    fn union<Rhs: Automaton>(
+        self,
+        rhs: Rhs,
+    ) -> Union<Self, Rhs> where Self: Sized {
         Union(self, rhs)
     }
 
     /// Returns an automaton that matches the strings matched by both this and
     /// the other automaton.
-    fn intersection<Rhs: Automaton>(self, rhs: Rhs) -> Intersection<Self, Rhs> where Self: Sized {
+    fn intersection<Rhs: Automaton>(
+        self,
+        rhs: Rhs,
+    ) -> Intersection<Self, Rhs> where Self: Sized {
         Intersection(self, rhs)
     }
 
-    /// Returns an automaton that matches the strings not matched by this automaton.
+    /// Returns an automaton that matches the strings not matched by this
+    /// automaton.
     fn complement(self) -> Complement<Self> where Self: Sized {
         Complement(self)
     }
@@ -188,7 +195,7 @@ impl<A: Automaton> Automaton for StartsWith<A> {
                 }
             }
         )
-    } 
+    }
 }
 
 /// An automaton that matches when one of its component automata match.

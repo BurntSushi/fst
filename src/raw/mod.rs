@@ -23,6 +23,7 @@ use std::cmp;
 use std::fmt;
 use std::ops::Deref;
 use std::path::Path;
+use std::sync::Arc;
 
 use byteorder::{ReadBytesExt, LittleEndian};
 
@@ -318,6 +319,19 @@ impl Fst {
     /// is embedded into source code.
     pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
         Fst::new(FstData::Cow(Cow::Borrowed(bytes)))
+    }
+
+    /// Creates a transducer from a shared vector at the given offset and
+    /// length.
+    ///
+    /// This permits creating multiple transducers from a single region of
+    /// owned memory.
+    pub fn from_shared_bytes(
+        bytes: Arc<Vec<u8>>,
+        offset: usize,
+        len: usize,
+    ) -> Result<Self> {
+        Fst::new(FstData::Shared { vec: bytes, offset: offset, len: len })
     }
 
     fn new(data: FstData) -> Result<Self> {
@@ -939,6 +953,11 @@ impl Output {
 
 enum FstData {
     Cow(Cow<'static, [u8]>),
+    Shared {
+        vec: Arc<Vec<u8>>,
+        offset: usize,
+        len: usize,
+    },
     Mmap(MmapReadOnly),
 }
 
@@ -948,6 +967,9 @@ impl Deref for FstData {
     fn deref(&self) -> &[u8] {
         match *self {
             FstData::Cow(ref v) => &**v,
+            FstData::Shared { ref vec, offset, len } => {
+                &vec[offset..offset + len]
+            }
             FstData::Mmap(ref v) => unsafe { v.as_slice() },
         }
     }

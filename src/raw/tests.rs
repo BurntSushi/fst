@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use automaton::AlwaysMatch;
 use error::Error;
 use raw::{self, Builder, Bound, Fst, Stream, Output};
@@ -470,4 +472,25 @@ fn levenshtein_unicode() {
     let q = Levenshtein::new("snoman", 3).unwrap();
     let vs = set.search(&q).into_stream().into_byte_keys();
     assert_eq!(vs, vec!["☃snowman☃".as_bytes()]);
+}
+
+#[test]
+fn one_vec_multiple_fsts() {
+    let mut bfst1 = Builder::memory();
+    bfst1.add(b"bar").unwrap();
+    bfst1.add(b"baz").unwrap();
+    let bytes = bfst1.into_inner().unwrap();
+    let fst1_len = bytes.len();
+
+    let mut bfst2 = Builder::new(bytes).unwrap();
+    bfst2.add(b"bar").unwrap();
+    bfst2.add(b"foo").unwrap();
+    let bytes = Arc::new(bfst2.into_inner().unwrap());
+
+    let fst1 = Fst::from_shared_bytes(bytes.clone(), 0, fst1_len).unwrap();
+    let fst2 = Fst::from_shared_bytes(
+        bytes.clone(), fst1_len, bytes.len() - fst1_len).unwrap();
+
+    assert_eq!(fst_inputs(&fst1), vec![b"bar".to_vec(), b"baz".to_vec()]);
+    assert_eq!(fst_inputs(&fst2), vec![b"bar".to_vec(), b"foo".to_vec()]);
 }

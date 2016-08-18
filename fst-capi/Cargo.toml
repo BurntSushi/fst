@@ -1,0 +1,21 @@
+[package]
+name = "fst-capi"
+version = "0.1.0"  #:version
+authors = ["Andrew Gallant <jamslam@gmail.com>"]
+license = "Unlicense/MIT"
+readme = "README.md"
+repository = "https://github.com/BurntSushi/fst"
+documentation = "https://github.com/BurntSushi/fst/tree/master/fst-capi"
+homepage = "https://github.com/BurntSushi/fst"
+description = """
+A C API for the finite state transducer (FST) library.
+"""
+keywords = ["search", "information", "retrieval", "dictionary", "map"]
+
+[lib]
+name = "fst"
+crate-type = ["staticlib", "dylib"]
+
+[dependencies]
+libc = "0.2"
+fst = { version = "0.1.34", path = ".." }

@@ -3,6 +3,7 @@
 set -ex
 
 cargo build --manifest-path ../Cargo.toml
-gcc -DDEBUG -o test test.c -ansi -Wall -I../include -L../target/debug -lfst
-# If you're using librure.a, then you'll need to link other stuff:
-# -lutil -ldl -lpthread -lgcc_s -lc -lm -lrt -lutil -lrure
+# gcc -DDEBUG -o test test.c -ansi -Wall -I../include -L../target/debug -lfst
+gcc -DDEBUG -o test test.c ../target/debug/libfst.a \
+  -ansi -Wall -Werror -I../include -L../target/debug \
+  -lutil -ldl -lpthread -lgcc_s -lc -lm -lrt -lutil

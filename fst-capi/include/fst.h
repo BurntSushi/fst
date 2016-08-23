@@ -11,6 +11,8 @@ extern "C" {
 
 typedef struct fst fst;
 
+typedef struct fst_stream fst_stream;
+
 typedef struct fst_builder_memory fst_builder_memory;
 
 typedef struct fst_error fst_error;
@@ -26,6 +28,13 @@ fst *fst_builder_memory_finish(fst_builder_memory *builder,
 bool fst_get(fst *fst, const uint8_t *key, size_t key_len, uint64_t *value);
 
 bool fst_contains_key(fst *fst, const uint8_t *key, size_t key_len);
+
+fst_stream *fst_stream_new(fst *fst);
+
+bool fst_stream_next(fst_stream *stream, const uint8_t **key, size_t *key_len,
+                     uint64_t *value);
+
+void fst_stream_free(fst_stream *stream);
 
 size_t fst_len(fst *fst);
 

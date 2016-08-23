@@ -119,6 +119,30 @@ impl<'a, T: Automaton> Automaton for &'a T {
     }
 }
 
+impl<T> Automaton for Box<Automaton<State=T>> {
+    type State = T;
+
+    fn start(&self) -> Self::State {
+        (**self).start()
+    }
+
+    fn is_match(&self, state: &Self::State) -> bool {
+        (**self).is_match(state)
+    }
+
+    fn can_match(&self, state: &Self::State) -> bool {
+        (**self).can_match(state)
+    }
+
+    fn will_always_match(&self, state: &Self::State) -> bool {
+        (**self).will_always_match(state)
+    }
+
+    fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
+        (**self).accept(state, byte)
+    }
+}
+
 /// An automaton that always matches.
 ///
 /// This is useful in a generic context as a way to express that no automaton

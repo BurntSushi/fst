@@ -14,6 +14,7 @@ pub struct Error {
 #[derive(Debug)]
 pub enum ErrorKind {
     None,
+    Str(str::Utf8Error),
     Fst(fst::Error),
 }
 
@@ -28,7 +29,7 @@ impl Error {
     pub fn is_err(&self) -> bool {
         match self.kind {
             ErrorKind::None => false,
-            ErrorKind::Fst(_) => true,
+            ErrorKind::Str(_) | ErrorKind::Fst(_) => true,
         }
     }
 }
@@ -37,6 +38,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
             ErrorKind::None => write!(f, "no error"),
+            ErrorKind::Str(ref e) => e.fmt(f),
             ErrorKind::Fst(ref e) => e.fmt(f),
         }
     }

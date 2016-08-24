@@ -13,21 +13,31 @@ typedef struct fst fst;
 
 typedef struct fst_stream fst_stream;
 
+typedef struct fst_stream_builder fst_stream_builder;
+
 typedef struct fst_builder_memory fst_builder_memory;
+
+typedef struct fst_automaton fst_automaton;
 
 typedef struct fst_error fst_error;
 
-fst_builder_memory *fst_builder_memory_new();
+fst *fst_new_from_bytes(const uint8_t *buf, size_t buf_len, fst_error *error);
 
-bool fst_builder_memory_add(fst_builder_memory *builder,
-                             const uint8_t *key, size_t key_len);
-
-fst *fst_builder_memory_finish(fst_builder_memory *builder,
-                               fst_error *error);
+void fst_free(fst *Fst);
 
 bool fst_get(fst *fst, const uint8_t *key, size_t key_len, uint64_t *value);
 
 bool fst_contains_key(fst *fst, const uint8_t *key, size_t key_len);
+
+size_t fst_len(fst *fst);
+
+size_t fst_size(fst *fst);
+
+bool fst_is_disjoint(fst *fst, fst_stream *stream);
+
+bool fst_is_subset(fst *fst, fst_stream *stream);
+
+bool fst_is_superset(fst *fst, fst_stream *stream);
 
 fst_stream *fst_stream_new(fst *fst);
 
@@ -36,11 +46,51 @@ bool fst_stream_next(fst_stream *stream, const uint8_t **key, size_t *key_len,
 
 void fst_stream_free(fst_stream *stream);
 
-size_t fst_len(fst *fst);
+fst_stream_builder *fst_stream_builder_new(fst *fst);
 
-size_t fst_size(fst *fst);
+fst_stream *fst_stream_builder_finish(fst_stream_builder *sb);
 
-void fst_free(fst *Fst);
+void fst_stream_builder_automaton(fst_stream_builder *sb, fst_automaton *aut);
+
+void fst_stream_builder_ge(fst_stream_builder *sb,
+                           const uint8_t *bound, size_t bound_len);
+
+void fst_stream_builder_ge_nul(fst_stream_builder *sb, const char *bound);
+
+void fst_stream_builder_gt(fst_stream_builder *sb,
+                           const uint8_t *bound, size_t bound_len);
+
+void fst_stream_builder_gt_nul(fst_stream_builder *sb, const char *bound);
+
+void fst_stream_builder_le(fst_stream_builder *sb,
+                           const uint8_t *bound, size_t bound_len);
+
+void fst_stream_builder_le_nul(fst_stream_builder *sb, const char *bound);
+
+void fst_stream_builder_lt(fst_stream_builder *sb,
+                           const uint8_t *bound, size_t bound_len);
+
+void fst_stream_builder_lt_nul(fst_stream_builder *sb, const char *bound);
+
+fst_builder_memory *fst_builder_memory_new();
+
+bool fst_builder_memory_add(fst_builder_memory *builder,
+                            const uint8_t *key,
+                            size_t key_len,
+                            uint64_t value,
+                            fst_error *error);
+
+fst *fst_builder_memory_finish(fst_builder_memory *builder,
+                               fst_error *error);
+
+void fst_automaton_free(fst_automaton *aut);
+
+fst_automaton *fst_automaton_regex_new(const uint8_t *pattern,
+                                       size_t pattern_len,
+                                       fst_error *error);
+
+fst_automaton *fst_automaton_regex_new_nul(const char *pattern,
+                                           fst_error *error);
 
 /*
  * fst_error_new allocates space for an error.

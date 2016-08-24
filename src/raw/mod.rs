@@ -584,6 +584,24 @@ impl<'f, A: Automaton> StreamBuilder<'f, A> {
         }
     }
 
+    /// Specify the automaton used for generating the stream from the
+    /// underlying FST. Specifically, the automaton is intersected with the
+    /// underlying FST.
+    ///
+    /// Calling `fst.range().automaton(...)` is equivalent to calling
+    /// `fst.search(...)`.
+    pub fn automaton<B: Automaton>(
+        self,
+        automaton: B,
+    ) -> StreamBuilder<'f, B> {
+        StreamBuilder {
+            fst: self.fst,
+            aut: automaton,
+            min: self.min,
+            max: self.max,
+        }
+    }
+
     /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(mut self, bound: T) -> Self {
         self.min = Bound::Included(bound.as_ref().to_owned());

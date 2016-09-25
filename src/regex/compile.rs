@@ -1,4 +1,4 @@
-use regex_syntax::{Expr, Repeater, CharClass, ClassRange};
+use regex_syntax::{Expr, Repeater, CharClass, ByteClass, ClassRange, ByteRange};
 use utf8_ranges::{Utf8Sequences, Utf8Sequence};
 
 use regex::{Error, Inst};

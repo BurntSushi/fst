@@ -489,7 +489,8 @@ impl<W: io::Write> SetBuilder<W> {
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
 pub struct Stream<'s, A=AlwaysMatch>(raw::Stream<'s, A>) where A: Automaton;
 
-impl<'s, A: Automaton> Stream<'s, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'s, A: Automaton<Token = u8>> Stream<'s, A> {
     /// Creates a new set stream from an fst stream.
     ///
     /// Not part of the public API, but useful in sibling module `map`.
@@ -516,7 +517,8 @@ impl<'s, A: Automaton> Stream<'s, A> {
     }
 }
 
-impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'a, 's, A: Automaton<Token = u8>> Streamer<'a> for Stream<'s, A> {
     type Item = &'a [u8];
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -560,7 +562,8 @@ impl<'s, A: Automaton> StreamBuilder<'s, A> {
     }
 }
 
-impl<'s, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'s, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'s, 'a, A: Automaton<Token = u8>> IntoStreamer<'a> for StreamBuilder<'s, A> {
     type Item = &'a [u8];
     type Into = Stream<'s, A>;
 

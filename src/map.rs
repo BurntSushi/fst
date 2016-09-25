@@ -555,7 +555,8 @@ impl<W: io::Write> MapBuilder<W> {
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
 pub struct Stream<'m, A=AlwaysMatch>(raw::Stream<'m, A>) where A: Automaton;
 
-impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'a, 'm, A: Automaton<Token = u8>> Streamer<'a> for Stream<'m, A> {
     type Item = (&'a [u8], u64);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -563,7 +564,8 @@ impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     }
 }
 
-impl<'m, A: Automaton> Stream<'m, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'m, A: Automaton<Token = u8>> Stream<'m, A> {
     /// Convert this stream into a vector of byte strings and outputs.
     ///
     /// Note that this creates a new allocation for every key in the stream.
@@ -667,7 +669,8 @@ impl<'m, A: Automaton> StreamBuilder<'m, A> {
     }
 }
 
-impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
+// FIXME: generalize from u8 to arbitrary tokens
+impl<'m, 'a, A: Automaton<Token = u8>> IntoStreamer<'a> for StreamBuilder<'m, A> {
     type Item = (&'a [u8], u64);
     type Into = Stream<'m, A>;
 

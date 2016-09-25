@@ -358,3 +358,9 @@ pub mod map {
 pub mod set {
     pub use inner_set::*;
 }
+
+/// A module that contains definitions from abstract algebra that help this
+/// library's functionality.
+///
+/// The only type this module currently contains is `AbelianGroup`.
+pub mod algebra;

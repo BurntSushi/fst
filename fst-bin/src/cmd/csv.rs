@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use bit_set::BitSet;
 use csv;
 use docopt::Docopt;

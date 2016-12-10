@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::BufRead;
 use std::path::Path;
 
 use docopt::Docopt;

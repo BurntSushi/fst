@@ -37,6 +37,7 @@ impl Set {
     /// transducer builder (`SetBuilder` qualifies). If the format is invalid
     /// or if there is a mismatch between the API version of this library
     /// and the set, then an error is returned.
+    #[cfg(feature = "mmap")]
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         raw::Fst::from_path(path).map(Set)
     }

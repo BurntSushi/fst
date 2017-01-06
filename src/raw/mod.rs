@@ -34,7 +34,7 @@ use stream::{IntoStreamer, Streamer};
 pub use self::build::Builder;
 pub use self::error::Error;
 pub use self::node::{Node, Transitions};
-pub use self::mmap::MmapReadOnly;
+#[cfg(feature = "mmap")] pub use self::mmap::MmapReadOnly;
 use self::node::node_new;
 pub use self::ops::{
     IndexedValue, OpBuilder,
@@ -45,7 +45,7 @@ mod build;
 mod common_inputs;
 mod counting_writer;
 mod error;
-mod mmap;
+#[cfg(feature = "mmap")] mod mmap;
 mod node;
 mod ops;
 mod pack;
@@ -288,6 +288,7 @@ impl Fst {
     /// transducer builder (`Builder` qualifies). If the format is invalid or
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
+    #[cfg(feature = "mmap")] 
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         Fst::from_mmap(try!(MmapReadOnly::open_path(path)))
     }
@@ -297,6 +298,7 @@ impl Fst {
     /// This is useful if a transducer is serialized to only a part of a file.
     /// A `MmapReadOnly` lets one control which region of the file is used for
     /// the transducer.
+    #[cfg(feature = "mmap")]
     pub fn from_mmap(mmap: MmapReadOnly) -> Result<Self> {
         Fst::new(FstData::Mmap(mmap))
     }
@@ -958,6 +960,7 @@ enum FstData {
         offset: usize,
         len: usize,
     },
+    #[cfg(feature = "mmap")]
     Mmap(MmapReadOnly),
 }
 
@@ -970,6 +973,7 @@ impl Deref for FstData {
             FstData::Shared { ref vec, offset, len } => {
                 &vec[offset..offset + len]
             }
+            #[cfg(feature = "mmap")]
             FstData::Mmap(ref v) => unsafe { v.as_slice() },
         }
     }

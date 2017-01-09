@@ -29,12 +29,9 @@ path = "./benches/search.rs"
 test = false
 bench = true
 
-[dependencies.memmap]
-version = "0.4.0"
-optional = true
-
 [dependencies]
 byteorder = "0.5"
+mmap = { version = "0.4.0", optional = true }
 regex-syntax = "0.3"
 utf8-ranges = "0.1"
 

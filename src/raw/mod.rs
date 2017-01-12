@@ -363,7 +363,7 @@ impl Fst {
         };
         // The root node is always the last node written, so its address should
         // be near the end. After the root node is written, we still have to
-        // write the root *address* and the number of nodes in the FST.
+        // write the root *address* and the number of keys in the FST.
         // That's 16 bytes. The extra byte comes from the fact that the root
         // address points to the last byte in the root node, rather than the
         // byte immediately following the root node.

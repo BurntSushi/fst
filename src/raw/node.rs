@@ -113,7 +113,7 @@ impl<'f> Node<'f> {
     /// Returns an iterator over all transitions in this node in lexicographic
     /// order.
     pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
-        Transitions { node: self, range: 0..self.len() as u8 }
+        Transitions { node: self, range: 0..self.len() }
     }
 
     /// Returns the transition at index `i`.
@@ -667,14 +667,14 @@ impl PackSizes {
 /// the underlying `Node`.
 pub struct Transitions<'f: 'n, 'n> {
     node: &'n Node<'f>,
-    range: Range<u8>,
+    range: Range<usize>,
 }
 
 impl<'f, 'n> Iterator for Transitions<'f, 'n> {
     type Item = Transition;
 
     fn next(&mut self) -> Option<Transition> {
-        self.range.next().map(|i| self.node.transition(i as usize))
+        self.range.next().map(|i| self.node.transition(i))
     }
 }
 
@@ -869,6 +869,20 @@ mod tests {
         let (addr, buf) = compile(&bnode);
         let node = node_new(addr, &buf);
         assert_eq!(node.as_slice().len(), 14);
+        roundtrip(&bnode);
+    }
+
+    #[test]
+    fn node_max_trans() {
+        let bnode = BuilderNode {
+            is_final: false,
+            final_output: Output::zero(),
+            trans: (0..256).map(|i| trans(0, i as u8)).collect(),
+        };
+        let (addr, buf) = compile(&bnode);
+        let node = node_new(addr, &buf);
+        assert_eq!(node.transitions().count(), 256);
+        assert_eq!(node.len(), node.transitions().count());
         roundtrip(&bnode);
     }
 }

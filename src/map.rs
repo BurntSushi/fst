@@ -546,6 +546,17 @@ impl<W: io::Write> MapBuilder<W> {
     pub fn into_inner(self) -> Result<W> {
         self.0.into_inner()
     }
+
+    /// Gets a reference to the underlying writer.
+    pub fn get_ref(&self) -> &W {
+        self.0.get_ref()
+    }
+
+    /// Returns the number of bytes written to the underlying writer
+    pub fn bytes_written(&self) -> u64 {
+        self.0.bytes_written()
+    }
+
 }
 
 /// A lexicographically ordered stream of key-value pairs from a map.

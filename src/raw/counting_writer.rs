@@ -27,6 +27,12 @@ impl<W: io::Write> CountingWriter<W> {
     pub fn into_inner(self) -> W {
         self.wtr
     }
+
+    /// Gets a reference to the underlying writer.
+    pub fn get_ref(&self) -> &W {
+        &self.wtr
+    }
+
 }
 
 impl<W: io::Write> io::Write for CountingWriter<W> {

@@ -291,6 +291,16 @@ impl<W: io::Write> Builder<W> {
         }
         Ok(())
     }
+
+    /// Gets a reference to the underlying writer.
+    pub fn get_ref(&self) -> &W {
+        self.wtr.get_ref()
+    }
+
+    /// Returns the number of bytes written to the underlying writer
+    pub fn bytes_written(&self) -> u64 {
+        self.wtr.count()
+    }
 }
 
 impl UnfinishedNodes {

@@ -494,3 +494,15 @@ fn one_vec_multiple_fsts() {
     assert_eq!(fst_inputs(&fst1), vec![b"bar".to_vec(), b"baz".to_vec()]);
     assert_eq!(fst_inputs(&fst2), vec![b"bar".to_vec(), b"foo".to_vec()]);
 }
+
+#[test]
+fn bytes_written() {
+    let mut bfst1 = Builder::memory();
+    bfst1.add(b"bar").unwrap();
+    bfst1.add(b"baz").unwrap();
+    let counted_len = bfst1.bytes_written();
+    let bytes = bfst1.into_inner().unwrap();
+    let fst1_len = bytes.len() as u64;
+    let footer_size = 24;
+    assert_eq!(counted_len + footer_size, fst1_len);
+}

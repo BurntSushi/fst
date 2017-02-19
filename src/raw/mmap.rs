@@ -69,9 +69,15 @@ impl Clone for MmapReadOnly {
 
 impl From<Mmap> for MmapReadOnly {
     fn from(mmap: Mmap) -> MmapReadOnly {
-        let len = mmap.len();
+        From::from(Arc::new(mmap))
+    }
+}
+
+impl From<Arc<Mmap>> for MmapReadOnly {
+    fn from(mmap_arc: Arc<Mmap>) -> MmapReadOnly {
+        let len = mmap_arc.len();
         MmapReadOnly {
-            map: Arc::new(mmap),
+            map: mmap_arc,
             offset: 0,
             len: len,
         }

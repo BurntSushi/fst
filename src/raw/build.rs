@@ -135,7 +135,7 @@ impl<W: io::Write> Builder<W> {
     pub fn add<B>(&mut self, bs: B) -> Result<()>
             where B: AsRef<[u8]> {
         try!(self.check_last_key(bs.as_ref(), false));
-        self.insert_output(bs, Output::zero())
+        self.insert_output(bs, None)
     }
 
     /// Insert a new key-value pair into the fst.
@@ -150,7 +150,7 @@ impl<W: io::Write> Builder<W> {
     pub fn insert<B>(&mut self, bs: B, val: u64) -> Result<()>
             where B: AsRef<[u8]> {
         try!(self.check_last_key(bs.as_ref(), true));
-        self.insert_output(bs, Output::new(val))
+        self.insert_output(bs, Some(Output::new(val)))
     }
 
     /// Calls insert on each item in the iterator.
@@ -207,18 +207,18 @@ impl<W: io::Write> Builder<W> {
         Ok(self.wtr.into_inner())
     }
 
-    fn insert_output<B>(&mut self, bs: B, out: Output) -> Result<()>
+    fn insert_output<B>(&mut self, bs: B, out: Option<Output>) -> Result<()>
             where B: AsRef<[u8]> {
         let bs = bs.as_ref();
         if bs.is_empty() {
             self.len = 1; // must be first key, so length is always 1
-            self.unfinished.set_root_output(out);
+            self.unfinished.set_root_output(out.unwrap_or(Output::zero()));
             return Ok(());
         }
-        let (prefix_len, out) = if out.is_zero() {
-            (self.unfinished.find_common_prefix(bs), out)
-        } else {
+        let (prefix_len, out) = if let Some(out) = out {
             self.unfinished.find_common_prefix_and_set_output(bs, out)
+        } else {
+            (self.unfinished.find_common_prefix(bs), Output::zero())
         };
         if prefix_len == bs.len() {
             // If the prefix found consumes the entire set of bytes, then

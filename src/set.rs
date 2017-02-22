@@ -454,8 +454,10 @@ impl<W: io::Write> SetBuilder<W> {
     /// and the error is returned.
     pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
             where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
-        self.0.extend_iter(iter.into_iter()
-                               .map(|key| (key, raw::Output::zero())))
+        for key in iter {
+            try!(self.0.add(key));
+        }
+        Ok(())
     }
 
     /// Calls insert on each item in the stream.

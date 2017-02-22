@@ -152,6 +152,7 @@ test_map!(
     "a", 34786, "ab", 26, "abc", 58976, "abcd", 25,
     "z", 58, "zabc", 6798
 );
+test_map!(fst_map_many3, "a", 1, "ab", 0, "abc", 0);
 
 test_map_fail!(fst_map_dupe_empty, "", 0, "", 0);
 test_map_fail!(fst_map_dupe1, "a", 0, "a", 0);

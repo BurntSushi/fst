@@ -22,6 +22,7 @@ use std::borrow::Cow;
 use std::cmp;
 use std::fmt;
 use std::ops::Deref;
+#[cfg(feature = "mmap")]
 use std::path::Path;
 use std::sync::Arc;
 
@@ -288,7 +289,7 @@ impl Fst {
     /// transducer builder (`Builder` qualifies). If the format is invalid or
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
-    #[cfg(feature = "mmap")] 
+    #[cfg(feature = "mmap")]
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         Fst::from_mmap(try!(MmapReadOnly::open_path(path)))
     }

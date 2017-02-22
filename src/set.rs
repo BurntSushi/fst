@@ -1,6 +1,7 @@
 use std::fmt;
 use std::iter::FromIterator;
 use std::io;
+#[cfg(feature = "mmap")]
 use std::path::Path;
 
 use automaton::{Automaton, AlwaysMatch};

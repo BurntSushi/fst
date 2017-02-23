@@ -28,14 +28,14 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 
 Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
-```ignore
+```toml,ignore
 [dependencies]
 fst = "0.1"
 ```
 
 And add this to your crate root:
 
-```ignore
+```rust,ignore
 extern crate fst;
 ```
 

@@ -3,6 +3,7 @@ pub mod dot;
 pub mod dupes;
 pub mod fuzzy;
 pub mod grep;
+pub mod hamming;
 pub mod map;
 pub mod node;
 pub mod range;

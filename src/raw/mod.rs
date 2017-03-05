@@ -383,7 +383,7 @@ impl Fst {
         //
         // This is essentially our own little checksum.
         if (root_addr == EMPTY_ADDRESS && data.len() != 32)
-            && root_addr + 17 != data.len() {
+            || root_addr + 17 != data.len() {
             return Err(Error::Format.into());
         }
         Ok(Fst {

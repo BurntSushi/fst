@@ -1,8 +1,7 @@
 use regex_syntax::{Expr, Repeater, CharClass, ClassRange};
 use utf8_ranges::{Utf8Sequences, Utf8Sequence};
 
-use regex::{Error, Inst};
-use Result;
+use {Error, Inst};
 
 pub struct Compiler {
     size_limit: usize,
@@ -17,13 +16,13 @@ impl Compiler {
         }
     }
 
-    pub fn compile(mut self, ast: &Expr) -> Result<Vec<Inst>> {
+    pub fn compile(mut self, ast: &Expr) -> Result<Vec<Inst>, Error> {
         try!(self.c(ast));
         self.insts.push(Inst::Match);
         Ok(self.insts)
     }
 
-    fn c(&mut self, ast: &Expr) -> Result<()> {
+    fn c(&mut self, ast: &Expr) -> Result<(), Error> {
         match *ast {
             Expr::StartLine
             | Expr::EndLine
@@ -157,7 +156,7 @@ impl Compiler {
         self.check_size()
     }
 
-    fn compile_class(&mut self, class: &CharClass) -> Result<()> {
+    fn compile_class(&mut self, class: &CharClass) -> Result<(), Error> {
         if class.is_empty() {
             return Ok(());
         }
@@ -178,7 +177,10 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_class_range(&mut self, char_range: &ClassRange) -> Result<()> {
+    fn compile_class_range(
+        &mut self,
+        char_range: &ClassRange,
+    ) -> Result<(), Error> {
         let mut it = Utf8Sequences::new(char_range.start, char_range.end)
                                    .peekable();
         let mut jmps = vec![];
@@ -206,7 +208,7 @@ impl Compiler {
         }
     }
 
-    fn check_size(&self) -> Result<()> {
+    fn check_size(&self) -> Result<(), Error> {
         use std::mem::size_of;
 
         if self.insts.len() * size_of::<Inst>() > self.size_limit {

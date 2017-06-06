@@ -1,3 +1,6 @@
+extern crate fst;
+extern crate utf8_ranges;
+
 use std::cmp;
 use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
@@ -5,8 +8,7 @@ use std::fmt;
 
 use utf8_ranges::{Utf8Range, Utf8Sequences};
 
-use automaton::Automaton;
-use Result;
+use fst::automaton::Automaton;
 
 pub use self::error::Error;
 
@@ -31,24 +33,30 @@ const STATE_LIMIT: usize = 10_000; // currently at least 20MB >_<
 /// from `foo`.
 ///
 /// ```rust
-/// use fst::{IntoStreamer, Streamer, Levenshtein, Set};
+/// extern crate fst;
+/// extern crate fst_levenshtein;
 ///
-/// let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-/// let set = Set::from_iter(keys).unwrap();
+/// use fst::{IntoStreamer, Streamer, Set};
+/// use fst_levenshtein::Levenshtein;
 ///
-/// let lev = Levenshtein::new("foo", 1).unwrap();
-/// let mut stream = set.search(&lev).into_stream();
+/// fn main() {
+///     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+///     let set = Set::from_iter(keys).unwrap();
 ///
-/// let mut keys = vec![];
-/// while let Some(key) = stream.next() {
-///     keys.push(key.to_vec());
+///     let lev = Levenshtein::new("foo", 1).unwrap();
+///     let mut stream = set.search(&lev).into_stream();
+///
+///     let mut keys = vec![];
+///     while let Some(key) = stream.next() {
+///         keys.push(key.to_vec());
+///     }
+///     assert_eq!(keys, vec![
+///         "fo".as_bytes(),   // 1 deletion
+///         "fob".as_bytes(),  // 1 substitution
+///         "foo".as_bytes(),  // 0 insertions/deletions/substitutions
+///         "food".as_bytes(), // 1 insertion
+///     ]);
 /// }
-/// assert_eq!(keys, vec![
-///     "fo".as_bytes(),   // 1 deletion
-///     "fob".as_bytes(),  // 1 substitution
-///     "foo".as_bytes(),  // 0 insertions/deletions/substitutions
-///     "food".as_bytes(), // 1 insertion
-/// ]);
 /// ```
 ///
 /// This example only uses ASCII characters, but it will work equally well
@@ -81,7 +89,7 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
-    pub fn new(query: &str, distance: u32) -> Result<Self> {
+    pub fn new(query: &str, distance: u32) -> Result<Self, Error> {
         let lev = DynamicLevenshtein {
             query: query.to_owned(),
             dist: distance as usize,
@@ -189,7 +197,7 @@ impl DfaBuilder {
         }
     }
 
-    fn build(mut self) -> Result<Dfa> {
+    fn build(mut self) -> Result<Dfa, Error> {
         let mut stack = vec![self.lev.start()];
         let mut seen = HashSet::new();
         let query = self.lev.query.clone(); // temp work around of borrowck
@@ -217,7 +225,7 @@ impl DfaBuilder {
                 }
             }
             if self.dfa.states.len() > STATE_LIMIT {
-                return Err(Error::TooManyStates(STATE_LIMIT).into());
+                return Err(Error::TooManyStates(STATE_LIMIT));
             }
         }
         Ok(self.dfa)

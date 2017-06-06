@@ -3,7 +3,7 @@ use std::sync::Arc;
 use automaton::AlwaysMatch;
 use error::Error;
 use raw::{self, Builder, Bound, Fst, Stream, Output};
-use stream::{IntoStreamer, Streamer};
+use stream::Streamer;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -445,34 +445,6 @@ test_range! {
     min: Bound::Included(vec![b'c']), max: Bound::Excluded(vec![b'd']),
     imin: 2, imax: 3,
     "a", "b", "c", "d", "e", "f"
-}
-
-#[test]
-fn regex_simple() {
-    use regex::Regex;
-    let set = fst_set(vec!["abc", "abd", "ayz", "za"]);
-    let re = Regex::new("a[a-z]*").unwrap();
-    let mut rdr = set.search(&re).ge("abd").lt("ax").into_stream();
-    assert_eq!(rdr.next(), Some(("abd".as_bytes(), Output::zero())));
-    assert!(rdr.next().is_none());
-}
-
-#[test]
-fn levenshtein_simple() {
-    use levenshtein::Levenshtein;
-    let set = fst_set(vec!["woof", "wood", "banana"]);
-    let q = Levenshtein::new("woog", 1).unwrap();
-    let vs = set.search(&q).into_stream().into_byte_keys();
-    assert_eq!(vs, vec!["wood".as_bytes(), "woof".as_bytes()]);
-}
-
-#[test]
-fn levenshtein_unicode() {
-    use levenshtein::Levenshtein;
-    let set = fst_set(vec!["woof", "wood", "banana", "☃snowman☃"]);
-    let q = Levenshtein::new("snoman", 3).unwrap();
-    let vs = set.search(&q).into_stream().into_byte_keys();
-    assert_eq!(vs, vec!["☃snowman☃".as_bytes()]);
 }
 
 #[test]

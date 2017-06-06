@@ -1,10 +1,12 @@
+extern crate fst;
+extern crate regex_syntax;
+extern crate utf8_ranges;
+
 use std::fmt;
 
-use regex_syntax;
+use fst::Automaton;
 
-use {Automaton, Result};
-
-pub use regex::error::Error;
+pub use error::Error;
 
 mod compile;
 mod dfa;
@@ -60,21 +62,27 @@ mod sparse;
 /// This example shows how to run a regular expression on a `Set`.
 ///
 /// ```rust
-/// use fst::{IntoStreamer, Streamer, Regex, Set};
+/// extern crate fst;
+/// extern crate fst_regex;
 ///
-/// let set = Set::from_iter(&["foo", "foo1", "foo2", "foo3", "foobar"])
-///               .unwrap();
+/// use fst::{IntoStreamer, Streamer, Set};
+/// use fst_regex::Regex;
 ///
-/// let re = Regex::new("f[a-z]+3?").unwrap();
-/// let mut stream = set.search(&re).into_stream();
+/// fn main() {
+///     let set = Set::from_iter(&["foo", "foo1", "foo2", "foo3", "foobar"])
+///                   .unwrap();
 ///
-/// let mut keys = vec![];
-/// while let Some(key) = stream.next() {
-///     keys.push(key.to_vec());
+///     let re = Regex::new("f[a-z]+3?").unwrap();
+///     let mut stream = set.search(&re).into_stream();
+///
+///     let mut keys = vec![];
+///     while let Some(key) = stream.next() {
+///         keys.push(key.to_vec());
+///     }
+///     assert_eq!(keys, vec![
+///         "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
+///     ]);
 /// }
-/// assert_eq!(keys, vec![
-///     "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
-/// ]);
 /// ```
 ///
 /// # Warning: experimental
@@ -111,11 +119,11 @@ impl Regex {
     ///
     /// A `Regex` value satisfies the `Automaton` trait, which means it can be
     /// used with the `search` method of any finite state transducer.
-    pub fn new(re: &str) -> Result<Regex> {
+    pub fn new(re: &str) -> Result<Regex, Error> {
         Regex::with_size_limit(10 * (1 << 20), re)
     }
 
-    fn with_size_limit(size: usize, re: &str) -> Result<Regex> {
+    fn with_size_limit(size: usize, re: &str) -> Result<Regex, Error> {
         let expr = try!(regex_syntax::Expr::parse(re));
         let insts = try!(compile::Compiler::new(size).compile(&expr));
         let dfa = try!(dfa::DfaBuilder::new(insts).build());

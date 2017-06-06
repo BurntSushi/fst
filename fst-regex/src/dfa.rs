@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use regex::{Error, Inst};
-use regex::sparse::SparseSet;
-use Result;
+use {Error, Inst};
+use sparse::SparseSet;
 
 const STATE_LIMIT: usize = 1_000; // currently at least 2MB >_<
 
@@ -34,7 +33,7 @@ impl DfaBuilder {
         }
     }
 
-    pub fn build(mut self) -> Result<Dfa> {
+    pub fn build(mut self) -> Result<Dfa, Error> {
         let mut cur = SparseSet::new(self.dfa.insts.len());
         let mut next = SparseSet::new(self.dfa.insts.len());
 
@@ -72,7 +71,7 @@ impl DfaBuilder {
 
     fn cached_state(&mut self, set: &SparseSet) -> Option<usize> {
         use std::collections::hash_map::Entry;
-        use regex::Inst::*;
+        use Inst::*;
 
         // There are probably many ways to optimize this routine. ---AG
 
@@ -116,7 +115,7 @@ impl Dfa {
     }
 
     fn add(&self, set: &mut SparseSet, ip: usize) {
-        use regex::Inst::*;
+        use Inst::*;
 
         if set.contains(ip) {
             return;
@@ -133,7 +132,7 @@ impl Dfa {
     }
 
     fn run(&self, from: &SparseSet, to: &mut SparseSet, byte: u8) -> bool {
-        use regex::Inst::*;
+        use Inst::*;
         to.clear();
         let mut is_match = false;
         for i in 0..from.len() {

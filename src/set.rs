@@ -156,26 +156,37 @@ impl Set {
     ///
     /// # Example
     ///
-    /// This crate provides an implementation of regular expressions
-    /// for `Automaton`. Make sure to see the documentation for `fst::Regex`
-    /// for more details such as what kind of regular expressions are allowed.
+    /// An implementation of regular expressions for `Automaton` is available
+    /// in the `fst-regex` crate, which can be used to search sets.
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Regex, Set};
+    /// extern crate fst;
+    /// extern crate fst_regex;
     ///
-    /// let set = Set::from_iter(&["foo", "foo1", "foo2", "foo3", "foobar"])
-    ///               .unwrap();
+    /// use std::error::Error;
     ///
-    /// let re = Regex::new("f[a-z]+3?").unwrap();
-    /// let mut stream = set.search(&re).into_stream();
+    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_regex::Regex;
     ///
-    /// let mut keys = vec![];
-    /// while let Some(key) = stream.next() {
-    ///     keys.push(key.to_vec());
+    /// # fn main() { example().unwrap(); }
+    /// fn example() -> Result<(), Box<Error>> {
+    ///     let set = Set::from_iter(&[
+    ///         "foo", "foo1", "foo2", "foo3", "foobar",
+    ///     ]).unwrap();
+    ///
+    ///     let re = Regex::new("f[a-z]+3?").unwrap();
+    ///     let mut stream = set.search(&re).into_stream();
+    ///
+    ///     let mut keys = vec![];
+    ///     while let Some(key) = stream.next() {
+    ///         keys.push(key.to_vec());
+    ///     }
+    ///     assert_eq!(keys, vec![
+    ///         "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
+    ///     ]);
+    ///
+    ///     Ok(())
     /// }
-    /// assert_eq!(keys, vec![
-    ///     "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
-    /// ]);
     /// ```
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
         StreamBuilder(self.0.search(aut))
@@ -817,5 +828,59 @@ impl<'a, S: Streamer<'a>> Streamer<'a> for StreamZeroOutput<S> {
 
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next().map(|key| (key, raw::Output::zero()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use Streamer;
+    use super::OpBuilder;
+
+    #[test]
+    fn no_fsts() {
+        struct Iter<'a> {
+            i: usize,
+            xs: Vec<&'a [u8]>,
+        }
+
+        impl<'a> Iter<'a> {
+            fn new(xs: Vec<&'a [u8]>) -> Iter<'a> {
+                Iter { i: 0, xs: xs }
+            }
+        }
+
+        impl<'a, 's> Streamer<'a> for Iter<'s> {
+            type Item = &'a [u8];
+            fn next(&'a mut self) -> Option<&'a [u8]> {
+                if self.i >= self.xs.len() {
+                    None
+                } else {
+                    let i = self.i;
+                    self.i += 1;
+                    Some(self.xs[i])
+                }
+            }
+        }
+
+        let mut stream = OpBuilder::new()
+            .add(Iter::new(vec![
+                &b"bar"[..],
+                &b"baz"[..],
+                &b"foo"[..],
+                &b"fubar"[..],
+                &b"quux"[..],
+            ]))
+            .add(Iter::new(vec![
+                &b"bar"[..],
+                &b"foofoo"[..],
+                &b"fubar"[..],
+            ]))
+            .intersection();
+
+        let mut got = vec![];
+        while let Some(x) = stream.next() {
+            got.push(x.to_vec());
+        }
+        assert_eq!(got, vec![&b"bar"[..], &b"fubar"[..]]);
     }
 }

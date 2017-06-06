@@ -255,29 +255,39 @@ impl Map {
     ///
     /// # Example
     ///
-    /// This crate provides an implementation of regular expressions
-    /// for `Automaton`. Make sure to see the documentation for `fst::Regex`
-    /// for more details such as what kind of regular expressions are allowed.
+    /// An implementation of regular expressions for `Automaton` is available
+    /// in the `fst-regex` crate, which can be used to search maps.
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Regex, Map};
+    /// extern crate fst;
+    /// extern crate fst_regex;
     ///
-    /// let map = Map::from_iter(vec![
-    ///     ("foo", 1), ("foo1", 2), ("foo2", 3), ("foo3", 4), ("foobar", 5),
-    /// ]).unwrap();
+    /// use std::error::Error;
     ///
-    /// let re = Regex::new("f[a-z]+3?").unwrap();
-    /// let mut stream = map.search(&re).into_stream();
+    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst_regex::Regex;
     ///
-    /// let mut kvs = vec![];
-    /// while let Some((k, v)) = stream.next() {
-    ///     kvs.push((k.to_vec(), v));
+    /// # fn main() { example().unwrap(); }
+    /// fn example() -> Result<(), Box<Error>> {
+    ///     let map = Map::from_iter(vec![
+    ///         ("foo", 1), ("foo1", 2), ("foo2", 3), ("foo3", 4), ("foobar", 5),
+    ///     ]).unwrap();
+    ///
+    ///     let re = Regex::new("f[a-z]+3?").unwrap();
+    ///     let mut stream = map.search(&re).into_stream();
+    ///
+    ///     let mut kvs = vec![];
+    ///     while let Some((k, v)) = stream.next() {
+    ///         kvs.push((k.to_vec(), v));
+    ///     }
+    ///     assert_eq!(kvs, vec![
+    ///         (b"foo".to_vec(), 1),
+    ///         (b"foo3".to_vec(), 4),
+    ///         (b"foobar".to_vec(), 5),
+    ///     ]);
+    ///
+    ///     Ok(())
     /// }
-    /// assert_eq!(kvs, vec![
-    ///     (b"foo".to_vec(), 1),
-    ///     (b"foo3".to_vec(), 4),
-    ///     (b"foobar".to_vec(), 5),
-    /// ]);
     /// ```
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
         StreamBuilder(self.0.search(aut))

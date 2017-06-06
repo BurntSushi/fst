@@ -47,8 +47,8 @@ pub trait Automaton {
         true
     }
 
-    /// Returns true if and only if `state` matches and must match no matter what
-    /// steps are taken.
+    /// Returns true if and only if `state` matches and must match no matter
+    /// what steps are taken.
     ///
     /// If this returns `true`, then every sequence of inputs from this state
     /// produces a match. If this does not follow, then those match states may
@@ -181,7 +181,11 @@ impl<A: Automaton> Automaton for StartsWith<A> {
         }
     }
 
-    fn accept(&self, state: &StartsWithState<A>, byte: u8) -> StartsWithState<A> {
+    fn accept(
+        &self,
+        state: &StartsWithState<A>,
+        byte: u8,
+    ) -> StartsWithState<A> {
         StartsWithState(
             match state.0 {
                 Done => Done,
@@ -223,7 +227,8 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
     }
 
     fn will_always_match(&self, state: &UnionState<A, B>) -> bool {
-        self.0.will_always_match(&state.0) || self.1.will_always_match(&state.1)
+        self.0.will_always_match(&state.0)
+        || self.1.will_always_match(&state.1)
     }
 
     fn accept(&self, state: &UnionState<A, B>, byte: u8) -> UnionState<A, B> {
@@ -262,7 +267,11 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
         self.0.will_always_match(&state.0) && self.1.will_always_match(&state.1)
     }
 
-    fn accept(&self, state: &IntersectionState<A, B>, byte: u8) -> IntersectionState<A, B> {
+    fn accept(
+        &self,
+        state: &IntersectionState<A, B>,
+        byte: u8,
+    ) -> IntersectionState<A, B> {
         IntersectionState(
             self.0.accept(&state.0, byte),
             self.1.accept(&state.1, byte)
@@ -295,91 +304,11 @@ impl<A: Automaton> Automaton for Complement<A> {
         !self.0.can_match(&state.0)
     }
 
-    fn accept(&self, state: &ComplementState<A>, byte: u8) -> ComplementState<A> {
+    fn accept(
+        &self,
+        state: &ComplementState<A>,
+        byte: u8,
+    ) -> ComplementState<A> {
         ComplementState(self.0.accept(&state.0, byte))
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use ::{IntoStreamer, Streamer, Levenshtein, Regex, Set, Automaton};
-    use set::OpBuilder;
-
-    static WORDS: &'static str = include_str!("../../data/words-10000");
-
-    fn get_set() -> Set {
-        Set::from_iter(WORDS.lines()).unwrap()
-    }
-
-    #[test]
-    fn complement_small() {
-        let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-        let set = Set::from_iter(keys).unwrap();
-        let lev = Levenshtein::new("foo", 1).unwrap();
-        let stream = set.search(lev.complement()).into_stream();
-
-        let keys = stream.into_strs().unwrap();
-        assert_eq!(keys, vec!["fa", "focus", "foul"]);
-    }
-
-    #[test]
-    fn startswith_small() {
-        let keys = vec!["", "cooing", "fa", "fo", "fob", "focus", "foo", "food", "foul", "fritter", "frothing"];
-        let set = Set::from_iter(keys).unwrap();
-        let lev = Levenshtein::new("foo", 1).unwrap();
-        let stream = set.search(lev.starts_with()).into_stream();
-
-        let keys = stream.into_strs().unwrap();
-        assert_eq!(keys, vec!["cooing", "fo", "fob", "focus", "foo", "food", "foul", "frothing"]);
-    }
-
-    #[test]
-    fn intersection_small() {
-        let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-        let set = Set::from_iter(keys).unwrap();
-        let lev = Levenshtein::new("foo", 1).unwrap();
-        let reg = Regex::new("(..)*").unwrap();
-        let stream = set.search(lev.intersection(reg)).into_stream();
-
-        let keys = stream.into_strs().unwrap();
-        assert_eq!(keys, vec!["fo", "food"]);
-    }
-
-    #[test]
-    fn union_small() {
-        let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-        let set = Set::from_iter(keys).unwrap();
-        let lev = Levenshtein::new("foo", 1).unwrap();
-        let reg = Regex::new("(..)*").unwrap();
-        let stream = set.search(lev.union(reg)).into_stream();
-
-        let keys = stream.into_strs().unwrap();
-        assert_eq!(keys, vec!["fa", "fo", "fob", "foo", "food", "foul"]);
-    }
-
-    #[test]
-    fn intersection_large() {
-        let set = get_set();
-        let lev = Levenshtein::new("foo", 3).unwrap();
-        let reg = Regex::new("(..)*").unwrap();
-        let mut stream1 = set.search((&lev).intersection(&reg)).into_stream();
-        let mut stream2 = OpBuilder::new().add(set.search(&lev)).add(set.search(&reg)).intersection();
-        while let Some(key1) = stream1.next() {
-            assert_eq!(stream2.next(), Some(key1));
-        }
-        assert_eq!(stream2.next(), None);
-    }
-
-    #[test]
-    fn union_large() {
-        let set = get_set();
-        let lev = Levenshtein::new("foo", 3).unwrap();
-        let reg = Regex::new("(..)*").unwrap();
-        let mut stream1 = set.search((&lev).union(&reg)).into_stream();
-        let mut stream2 = OpBuilder::new().add(set.search(&lev)).add(set.search(&reg)).union();
-        while let Some(key1) = stream1.next() {
-            assert_eq!(stream2.next(), Some(key1));
-        }
-        assert_eq!(stream2.next(), None);
     }
 }

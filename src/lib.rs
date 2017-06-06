@@ -54,24 +54,30 @@ deletions or substitutions required to get from one string to another. In this
 case, a character is a Unicode codepoint.)
 
 ```rust
-# fn example() -> Result<(), fst::Error> {
-use fst::{IntoStreamer, Streamer, Levenshtein, Set};
+extern crate fst;
+extern crate fst_levenshtein;
 
-// A convenient way to create sets in memory.
-let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-let set = try!(Set::from_iter(keys));
+use std::error::Error;
 
-// Build our fuzzy query.
-let lev = try!(Levenshtein::new("foo", 1));
+use fst::{IntoStreamer, Streamer, Set};
+use fst_levenshtein::Levenshtein;
 
-// Apply our fuzzy query to the set we built.
-let mut stream = set.search(lev).into_stream();
+# fn main() { example().unwrap(); }
+fn example() -> Result<(), Box<Error>> {
+    // A convenient way to create sets in memory.
+    let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+    let set = try!(Set::from_iter(keys));
 
-let keys = try!(stream.into_strs());
-assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
-# Ok(())
-# }
-# example().unwrap();
+    // Build our fuzzy query.
+    let lev = try!(Levenshtein::new("foo", 1));
+
+    // Apply our fuzzy query to the set we built.
+    let mut stream = set.search(lev).into_stream();
+
+    let keys = try!(stream.into_strs());
+    assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
+    Ok(())
+}
 ```
 
 # Example: stream a map to a file
@@ -124,19 +130,25 @@ Note that while sets can store arbitrary byte strings, a regular expression
 will only match valid UTF-8 encoded byte strings.
 
 ```rust
-# fn example() -> Result<(), fst::Error> {
-use fst::{IntoStreamer, Streamer, Regex, Set};
+extern crate fst;
+extern crate fst_regex;
 
-let set = try!(Set::from_iter(&["FoO", "Foo", "fOO", "foo"]));
+use std::error::Error;
 
-let re = try!(Regex::new("(?i)foo"));
-let mut stream = set.search(&re).into_stream();
+use fst::{IntoStreamer, Streamer, Set};
+use fst_regex::Regex;
 
-let keys = try!(stream.into_strs());
-assert_eq!(keys, vec!["FoO", "Foo", "fOO", "foo"]);
-# Ok(())
-# }
-# example().unwrap();
+# fn main() { example().unwrap(); }
+fn example() -> Result<(), Box<Error>> {
+    let set = try!(Set::from_iter(&["FoO", "Foo", "fOO", "foo"]));
+
+    let re = try!(Regex::new("(?i)foo"));
+    let mut stream = set.search(&re).into_stream();
+
+    let keys = try!(stream.into_strs());
+    assert_eq!(keys, vec!["FoO", "Foo", "fOO", "foo"]);
+    Ok(())
+}
 ```
 
 # Example: searching multiple sets efficiently
@@ -153,47 +165,53 @@ letter that doesn't appear at the beginning of the key. The example below uses
 sets, but the same operations are available on maps too.
 
 ```rust
-# fn example() -> Result<(), fst::Error> {
-use fst::{Streamer, Regex, Set};
+extern crate fst;
+extern crate fst_regex;
+
+use std::error::Error;
+
+use fst::{Streamer, Set};
 use fst::set;
+use fst_regex::Regex;
 
-let set1 = try!(Set::from_iter(&["AC/DC", "Aerosmith"]));
-let set2 = try!(Set::from_iter(&["Bob Seger", "Bruce Springsteen"]));
-let set3 = try!(Set::from_iter(&["George Thorogood", "Golden Earring"]));
-let set4 = try!(Set::from_iter(&["Kansas"]));
-let set5 = try!(Set::from_iter(&["Metallica"]));
+# fn main() { example().unwrap(); }
+fn example() -> Result<(), Box<Error>> {
+    let set1 = try!(Set::from_iter(&["AC/DC", "Aerosmith"]));
+    let set2 = try!(Set::from_iter(&["Bob Seger", "Bruce Springsteen"]));
+    let set3 = try!(Set::from_iter(&["George Thorogood", "Golden Earring"]));
+    let set4 = try!(Set::from_iter(&["Kansas"]));
+    let set5 = try!(Set::from_iter(&["Metallica"]));
 
-// Create the regular expression. We can reuse it to search all of the sets.
-let re = try!(Regex::new(r".+\p{Lu}.*"));
+    // Create the regular expression. We can reuse it to search all of the sets.
+    let re = try!(Regex::new(r".+\p{Lu}.*"));
 
-// Build a set operation. All we need to do is add a search result stream for
-// each set and ask for the union. (Other operations, like intersection and
-// difference are also available.)
-let mut stream =
-    set::OpBuilder::new()
-    .add(set1.search(&re))
-    .add(set2.search(&re))
-    .add(set3.search(&re))
-    .add(set4.search(&re))
-    .add(set5.search(&re))
-    .union();
+    // Build a set operation. All we need to do is add a search result stream for
+    // each set and ask for the union. (Other operations, like intersection and
+    // difference are also available.)
+    let mut stream =
+        set::OpBuilder::new()
+        .add(set1.search(&re))
+        .add(set2.search(&re))
+        .add(set3.search(&re))
+        .add(set4.search(&re))
+        .add(set5.search(&re))
+        .union();
 
-// Now collect all of the keys. Alternatively, you could build another set here
-// using `SetBuilder::extend_stream`.
-let mut keys = vec![];
-while let Some(key) = stream.next() {
-    keys.push(key.to_vec());
+    // Now collect all of the keys. Alternatively, you could build another set here
+    // using `SetBuilder::extend_stream`.
+    let mut keys = vec![];
+    while let Some(key) = stream.next() {
+        keys.push(key.to_vec());
+    }
+    assert_eq!(keys, vec![
+        "AC/DC".as_bytes(),
+        "Bob Seger".as_bytes(),
+        "Bruce Springsteen".as_bytes(),
+        "George Thorogood".as_bytes(),
+        "Golden Earring".as_bytes(),
+    ]);
+    Ok(())
 }
-assert_eq!(keys, vec![
-    "AC/DC".as_bytes(),
-    "Bob Seger".as_bytes(),
-    "Bruce Springsteen".as_bytes(),
-    "George Thorogood".as_bytes(),
-    "Golden Earring".as_bytes(),
-]);
-# Ok(())
-# }
-# example().unwrap();
 ```
 
 # Memory usage
@@ -281,30 +299,24 @@ will be returned if the automaton gets too big (tens of MB in heap usage).
 #![deny(missing_docs)]
 
 extern crate byteorder;
+#[cfg(test)] extern crate fst_levenshtein;
+#[cfg(test)] extern crate fst_regex;
 #[cfg(feature = "mmap")] extern crate memmap;
 #[cfg(test)] extern crate quickcheck;
 #[cfg(test)] extern crate rand;
-extern crate regex_syntax;
-extern crate utf8_ranges;
 
 pub use automaton::Automaton;
 pub use error::{Error, Result};
-pub use levenshtein::Error as LevenshteinError;
-pub use levenshtein::Levenshtein;
 pub use map::{Map, MapBuilder};
-pub use regex::Error as RegexError;
-pub use regex::Regex;
 pub use set::{Set, SetBuilder};
 pub use stream::{IntoStreamer, Streamer};
 
 #[path = "automaton/mod.rs"]
 mod inner_automaton;
 mod error;
-mod levenshtein;
 #[path = "map.rs"]
 mod inner_map;
 pub mod raw;
-mod regex;
 #[path = "set.rs"]
 mod inner_set;
 mod stream;

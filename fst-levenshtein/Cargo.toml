@@ -1,0 +1,16 @@
+[package]
+name = "fst-levenshtein"
+version = "0.1.0"
+authors = ["Andrew Gallant <jamslam@gmail.com>"]
+description = """
+Search finite state transducers with fuzzy queries using Levenshtein automata.
+"""
+documentation = "https://docs.rs/fst-levenshtein"
+homepage = "https://github.com/BurntSushi/fst"
+repository = "https://github.com/BurntSushi/fst"
+keywords = ["search", "information", "retrieval", "dictionary", "map"]
+license = "Unlicense/MIT"
+
+[dependencies]
+fst = { path = "..", version = "0.1" }
+utf8-ranges = "0.1"

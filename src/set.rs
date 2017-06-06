@@ -156,26 +156,37 @@ impl Set {
     ///
     /// # Example
     ///
-    /// This crate provides an implementation of regular expressions
-    /// for `Automaton`. Make sure to see the documentation for `fst::Regex`
-    /// for more details such as what kind of regular expressions are allowed.
+    /// An implementation of regular expressions for `Automaton` is available
+    /// in the `fst-regex` crate, which can be used to search sets.
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Regex, Set};
+    /// extern crate fst;
+    /// extern crate fst_regex;
     ///
-    /// let set = Set::from_iter(&["foo", "foo1", "foo2", "foo3", "foobar"])
-    ///               .unwrap();
+    /// use std::error::Error;
     ///
-    /// let re = Regex::new("f[a-z]+3?").unwrap();
-    /// let mut stream = set.search(&re).into_stream();
+    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_regex::Regex;
     ///
-    /// let mut keys = vec![];
-    /// while let Some(key) = stream.next() {
-    ///     keys.push(key.to_vec());
+    /// # fn main() { example().unwrap(); }
+    /// fn example() -> Result<(), Box<Error>> {
+    ///     let set = Set::from_iter(&[
+    ///         "foo", "foo1", "foo2", "foo3", "foobar",
+    ///     ]).unwrap();
+    ///
+    ///     let re = Regex::new("f[a-z]+3?").unwrap();
+    ///     let mut stream = set.search(&re).into_stream();
+    ///
+    ///     let mut keys = vec![];
+    ///     while let Some(key) = stream.next() {
+    ///         keys.push(key.to_vec());
+    ///     }
+    ///     assert_eq!(keys, vec![
+    ///         "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
+    ///     ]);
+    ///
+    ///     Ok(())
     /// }
-    /// assert_eq!(keys, vec![
-    ///     "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
-    /// ]);
     /// ```
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
         StreamBuilder(self.0.search(aut))

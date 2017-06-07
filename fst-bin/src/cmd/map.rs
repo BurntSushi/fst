@@ -48,7 +48,7 @@ Options:
                        debugging.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     arg_input: Vec<String>,
     arg_output: String,
@@ -65,10 +65,10 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).decode())
+                            .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
     if !args.flag_force && fs::metadata(&args.arg_output).is_ok() {
-        return fail!("Output file already exists: {}", args.arg_output);
+        fail!("Output file already exists: {}", args.arg_output);
     }
     if args.flag_sorted {
         run_sorted(&args)
@@ -82,8 +82,10 @@ fn run_sorted(args: &Args) -> Result<(), Error> {
     let mut map = try!(MapBuilder::new(wtr));
     for input in &args.arg_input {
         let rdr = try!(util::get_reader(Some(input)));
-        let mut rdr = csv::Reader::from_reader(rdr).has_headers(false);
-        for row in rdr.decode() {
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(false)
+            .from_reader(rdr);
+        for row in rdr.deserialize() {
             let (key, val): (String, u64) = try!(row);
             try!(map.insert(key, val));
         }

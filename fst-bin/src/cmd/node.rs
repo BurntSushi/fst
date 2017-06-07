@@ -22,7 +22,7 @@ Options:
     -h, --help       Show this help message.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     arg_fst: String,
     arg_node_address: usize,
@@ -30,7 +30,7 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).decode())
+                            .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
     let mut wtr = try!(util::get_buf_writer::<&str>(None));
     let fst = try!(Fst::from_path(&args.arg_fst));

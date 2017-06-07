@@ -25,7 +25,7 @@ Options:
     -e, --end ARG       Only show results less than or equal to this.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     arg_fst: String,
     flag_outputs: bool,
@@ -35,7 +35,7 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).decode())
+                            .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
     let fst = try!(Fst::from_path(&args.arg_fst));
     let mut q = fst.range();

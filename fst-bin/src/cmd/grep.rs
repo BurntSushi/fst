@@ -1,8 +1,8 @@
 use std::io;
 
 use docopt::Docopt;
-use fst::Regex;
 use fst::raw::Fst;
+use fst_regex::Regex;
 
 use util;
 use Error;
@@ -25,7 +25,7 @@ Options:
     -e, --end ARG       Only show results less than or equal to this.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     arg_fst: String,
     arg_regex: String,
@@ -36,7 +36,7 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).decode())
+                            .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
     let fst = try!(Fst::from_path(&args.arg_fst));
     let lev = try!(Regex::new(&args.arg_regex));

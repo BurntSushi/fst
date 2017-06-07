@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::BufRead;
 use std::path::Path;
 
 use docopt::Docopt;
@@ -45,7 +44,7 @@ Options:
                        debugging.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     arg_input: Vec<String>,
     arg_output: String,
@@ -60,10 +59,10 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).decode())
+                            .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
     if !args.flag_force && fs::metadata(&args.arg_output).is_ok() {
-        return fail!("Output file already exists: {}", args.arg_output);
+        fail!("Output file already exists: {}", args.arg_output);
     }
     if args.flag_sorted {
         run_sorted(&args)

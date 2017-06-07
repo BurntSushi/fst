@@ -32,7 +32,7 @@ Options:
                      reoccurrences. [default: 20]
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     arg_input: String,
     arg_output: Option<String>,
@@ -59,7 +59,7 @@ impl FullNode {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).decode())
+                            .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
 
     let mut wtr = try!(util::get_buf_writer(args.arg_output.as_ref()));
@@ -69,7 +69,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     let mut stack = vec![fst.root().addr()];
     while let Some(addr) = stack.pop() {
-        if set.contains(&addr) {
+        if set.contains(addr) {
             continue;
         }
         set.insert(addr);

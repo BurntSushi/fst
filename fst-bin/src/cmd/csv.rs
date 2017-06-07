@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use bit_set::BitSet;
 use csv;
 use docopt::Docopt;
@@ -22,7 +20,7 @@ Options:
     -h, --help       Display this message.
 ";
 
-#[derive(Debug, RustcDecodable)]
+#[derive(Debug, Deserialize)]
 struct Args {
     cmd_edges: bool,
     cmd_nodes: bool,
@@ -32,7 +30,7 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).decode())
+                            .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
 
     let wtr = try!(util::get_writer(args.arg_output.as_ref()));
@@ -42,22 +40,22 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let mut set = BitSet::with_capacity(fst.len());
 
     if args.cmd_edges {
-        try!(wtr.encode(("addr_in", "addr_out", "input", "output")));
+        try!(wtr.serialize(("addr_in", "addr_out", "input", "output")));
         let mut stack = vec![fst.root().addr()];
         set.insert(fst.root().addr());
         while let Some(addr) = stack.pop() {
             for t in fst.node(addr).transitions() {
-                if !set.contains(&t.addr) {
+                if !set.contains(t.addr) {
                     stack.push(t.addr);
                     set.insert(t.addr);
                 }
-                try!(wtr.encode((
+                try!(wtr.serialize((
                     addr, t.addr, t.inp as char, t.out.value(),
                 )));
             }
         }
     } else {
-        try!(wtr.encode((
+        try!(wtr.serialize((
             "addr", "state", "size",
             "transitions", "final", "final_output",
         )));
@@ -66,7 +64,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         while let Some(addr) = stack.pop() {
             let node = fst.node(addr);
             for t in node.transitions() {
-                if !set.contains(&t.addr) {
+                if !set.contains(t.addr) {
                     stack.push(t.addr);
                     set.insert(t.addr);
                 }
@@ -79,7 +77,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
                 node.is_final().to_string(),
                 node.final_output().value().to_string(),
             ];
-            try!(wtr.write(row.iter()));
+            try!(wtr.write_record(row.iter()));
         }
     }
     wtr.flush().map_err(From::from)

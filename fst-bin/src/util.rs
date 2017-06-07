@@ -69,7 +69,7 @@ where W: io::Write,
         let mut wtr = csv::Writer::from_writer(wtr);
         while let Some((k, v)) = stream.next() {
             let v = v.value().to_string();
-            try!(wtr.write((&[k, v.as_bytes()]).iter()));
+            try!(wtr.write_record((&[k, v.as_bytes()]).iter()));
         }
         wtr.flush().map_err(From::from)
     } else {
@@ -125,7 +125,8 @@ pub struct ConcatCsv {
     cur: Option<Rows>,
 }
 
-type Rows = csv::Reader<Box<io::Read + Send + Sync + 'static>>;
+type Reader = Box<io::Read + Send + Sync + 'static>;
+type Rows = csv::DeserializeRecordsIntoIter<Reader, (String, u64)>;
 
 impl ConcatCsv {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatCsv {
@@ -138,26 +139,10 @@ impl ConcatCsv {
             None => return None,
             Some(ref mut rdr) => rdr,
         };
-        // This is soooo painful. The CSV crate needs to grow owned iterators.
-        let key = match rdr.next_str().into_iter_result() {
-            Some(Ok(field)) => field.to_owned(),
-            Some(Err(err)) => return Some(Err(From::from(err))),
-            None => return None, // This is OK
-        };
-        let val = match rdr.next_str().into_iter_result() {
-            Some(Ok(field)) => match field.parse::<u64>() {
-                Err(err) => return Some(Err(From::from(err))),
-                Ok(val) => val,
-            },
-            Some(Err(err)) => return Some(Err(From::from(err))),
-            None => return Some(Err(From::from(format!(
-                "Expected row of length 2, but found row of length 1.")))),
-        };
-        match rdr.next_str().into_iter_result() {
-            None => Some(Ok((key, val))),
-            Some(_) => Some(Err(From::from(format!(
-                "Expected row of length 2, \
-                 but found row of length at least 3.")))),
+        match rdr.next() {
+            Some(Ok((k, v))) => Some(Ok((k, v))),
+            Some(Err(err)) => Some(Err(From::from(err))),
+            None => None,
         }
     }
 }
@@ -175,7 +160,8 @@ impl Iterator for ConcatCsv {
                             Err(err) => return Some(Err(From::from(err))),
                             Ok(rdr) => rdr,
                         };
-                        self.cur = Some(csv::Reader::from_reader(rdr));
+                        let csvrdr = csv::Reader::from_reader(rdr);
+                        self.cur = Some(csvrdr.into_deserialize());
                     }
                 }
             }

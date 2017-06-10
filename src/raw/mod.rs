@@ -539,6 +539,11 @@ impl Fst {
         node_new(addr, &self.data)
     }
 
+    /// Returns a copy of the binary contents of this FST.
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.data.to_vec()
+    }
+
     fn empty_final_output(&self) -> Option<Output> {
         let root = self.root();
         if root.is_final() {

@@ -598,10 +598,6 @@ impl StateAnyTrans {
                     - node.ntrans; // inputs
         let end = start + node.ntrans;
         let inputs = &node.data[start..end];
-        // Unbelievably, this is actually faster than memchr in
-        // microbenchmarks. I'm not sure why. Perhaps memchr has some overhead
-        // associated with it that doesn't work well with very very short
-        // searches.
         inputs.iter().position(|&b2| b == b2).map(|i| node.ntrans - i - 1)
     }
 

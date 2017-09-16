@@ -54,7 +54,7 @@ use Result;
 /// Keys will always be byte strings; however, we may grow more conveniences
 /// around dealing with them (such as a serialization/deserialization step,
 /// although it isn't clear where exactly this should live).
-pub struct Map(raw::Fst);
+pub struct Map(pub raw::Fst);
 
 impl Map {
     /// Opens a map stored at the given file path via a memory map.

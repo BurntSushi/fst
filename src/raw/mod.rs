@@ -277,7 +277,8 @@ pub type CompiledAddr = usize;
 ///   (excellent for surface level overview)
 pub struct Fst {
     data: FstData,
-    root_addr: CompiledAddr,
+    /// The address of the root note in the transducer
+    pub root_addr: CompiledAddr,
     ty: FstType,
     len: usize,
 }

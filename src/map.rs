@@ -64,7 +64,7 @@ impl Map {
     /// or if there is a mismatch between the API version of this library
     /// and the map, then an error is returned.
     #[cfg(feature = "mmap")]
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub unsafe fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         raw::Fst::from_path(path).map(Map)
     }
 
@@ -476,7 +476,7 @@ impl<'m, 'a> IntoStreamer<'a> for &'m Map {
 /// build.finish().unwrap();
 ///
 /// // At this point, the map has been constructed, but here's how to read it.
-/// let map = Map::from_path("map.fst").unwrap();
+/// let map = unsafe { Map::from_path("map.fst").unwrap() };
 /// let mut stream = map.into_stream();
 /// let mut kvs = vec![];
 /// while let Some((k, v)) = stream.next() {

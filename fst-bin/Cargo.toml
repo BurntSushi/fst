@@ -16,6 +16,7 @@ license = "Unlicense/MIT"
 
 [[bin]]
 name = "fst"
+path = "src/main.rs"
 
 [dependencies]
 bit-set = "0.4"

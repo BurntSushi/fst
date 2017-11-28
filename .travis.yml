@@ -6,6 +6,7 @@ rust:
   - nightly
 script:
   - cargo build --verbose
+  - cargo build --verbose --manifest-path fst-bin/Cargo.toml
   - cargo doc
   - cargo test --verbose
   - cargo test --lib --no-default-features

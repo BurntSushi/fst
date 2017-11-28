@@ -3,17 +3,17 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
-use memmap::{Mmap, Protection};
+use memmap::Mmap;
 
 /// A read only view into a memory map.
 ///
-/// Reading a memory map is unsafe because we cannot guarantee that its
+/// Opening a memory map is unsafe because we cannot guarantee that its
 /// underlying memory is not mutated by external processes. This read only
 /// memory map guarantees that consumers can at least never modify the
 /// underlying data.
 ///
 /// It is principally useful for controlling which region of a file an `Fst`
-/// reads. Taking a slice from it is still considered unsafe.
+/// reads.
 pub struct MmapReadOnly {
     map: Arc<Mmap>,
     offset: usize,
@@ -22,8 +22,13 @@ pub struct MmapReadOnly {
 
 impl MmapReadOnly {
     /// Create a new memory map from an existing file handle.
-    pub fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
-        let mmap = try!(Mmap::open(file, Protection::Read));
+    ///
+    /// This is unsafe because Rust programs cannot guarantee that memory
+    /// backed by a memory mapped file won't be mutably aliased. It is up to
+    /// the caller to enforce that the memory map is not modified while it is
+    /// opened.
+    pub unsafe fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
+        let mmap = try!(Mmap::map(file));
         let len = mmap.len();
         Ok(MmapReadOnly {
             map: Arc::new(mmap),
@@ -33,7 +38,14 @@ impl MmapReadOnly {
     }
 
     /// Open a new memory map from the path given.
-    pub fn open_path<P: AsRef<Path>>(path: P) -> io::Result<MmapReadOnly> {
+    ///
+    /// This is unsafe because Rust programs cannot guarantee that memory
+    /// backed by a memory mapped file won't be mutably aliased. It is up to
+    /// the caller to enforce that the memory map is not modified while it is
+    /// opened.
+    pub unsafe fn open_path<P: AsRef<Path>>(
+        path: P,
+    ) -> io::Result<MmapReadOnly> {
         MmapReadOnly::open(&try!(fs::File::open(path)))
     }
 
@@ -58,8 +70,8 @@ impl MmapReadOnly {
     }
 
     /// Read the memory map as a `&[u8]`.
-    pub unsafe fn as_slice(&self) -> &[u8] {
-        &self.map.as_slice()[self.offset..self.offset + self.len]
+    pub fn as_slice(&self) -> &[u8] {
+        &self.map[self.offset..self.offset + self.len]
     }
 }
 

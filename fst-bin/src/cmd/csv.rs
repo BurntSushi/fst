@@ -36,7 +36,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let wtr = try!(util::get_writer(args.arg_output.as_ref()));
     let mut wtr = csv::Writer::from_writer(wtr);
 
-    let fst = try!(fst::Fst::from_path(args.arg_input));
+    let fst = try!(unsafe { fst::Fst::from_path(args.arg_input) });
     let mut set = BitSet::with_capacity(fst.len());
 
     if args.cmd_edges {

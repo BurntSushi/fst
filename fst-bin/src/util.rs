@@ -16,13 +16,13 @@ pub fn escape_input(b: u8) -> String {
 pub fn get_buf_reader<T: AsRef<Path>>(
     path: Option<T>,
 ) -> io::Result<io::BufReader<Box<io::Read + Send + Sync + 'static>>> {
-    Ok(io::BufReader::new(try!(get_reader(path))))
+    Ok(io::BufReader::new(get_reader(path)?))
 }
 
 pub fn get_buf_writer<T: AsRef<Path>>(
     path: Option<T>,
 ) -> io::Result<io::BufWriter<Box<io::Write + Send + Sync + 'static>>> {
-    Ok(io::BufWriter::new(try!(get_writer(path))))
+    Ok(io::BufWriter::new(get_writer(path)?))
 }
 
 pub fn get_reader<T: AsRef<Path>>(
@@ -30,7 +30,7 @@ pub fn get_reader<T: AsRef<Path>>(
 ) -> io::Result<Box<io::Read + Send + Sync + 'static>> {
     Ok(match to_stdio(path) {
         None => Box::new(io::stdin()),
-        Some(path) => Box::new(try!(File::open(path))),
+        Some(path) => Box::new(File::open(path)?),
     })
 }
 
@@ -39,7 +39,7 @@ pub fn get_writer<T: AsRef<Path>>(
 ) -> io::Result<Box<io::Write + Send + Sync + 'static>> {
     Ok(match to_stdio(path) {
         None => Box::new(io::stdout()),
-        Some(path) => Box::new(try!(File::create(path))),
+        Some(path) => Box::new(File::create(path)?),
     })
 }
 
@@ -69,13 +69,13 @@ where W: io::Write,
         let mut wtr = csv::Writer::from_writer(wtr);
         while let Some((k, v)) = stream.next() {
             let v = v.value().to_string();
-            try!(wtr.write_record((&[k, v.as_bytes()]).iter()));
+            wtr.write_record((&[k, v.as_bytes()]).iter())?;
         }
         wtr.flush().map_err(From::from)
     } else {
         while let Some((k, _)) = stream.next() {
-            try!(wtr.write_all(k));
-            try!(wtr.write_all(b"\n"));
+            wtr.write_all(k)?;
+            wtr.write_all(b"\n")?;
         }
         wtr.flush().map_err(From::from)
     }

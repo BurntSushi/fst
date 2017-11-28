@@ -124,9 +124,9 @@ impl Regex {
     }
 
     fn with_size_limit(size: usize, re: &str) -> Result<Regex, Error> {
-        let expr = try!(regex_syntax::Expr::parse(re));
-        let insts = try!(compile::Compiler::new(size).compile(&expr));
-        let dfa = try!(dfa::DfaBuilder::new(insts).build());
+        let expr = regex_syntax::Expr::parse(re)?;
+        let insts = compile::Compiler::new(size).compile(&expr)?;
+        let dfa = dfa::DfaBuilder::new(insts).build()?;
         Ok(Regex { original: re.to_owned(), dfa: dfa })
     }
 }
@@ -151,7 +151,7 @@ impl Automaton for Regex {
 
 impl fmt::Debug for Regex {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(f, "Regex({:?})", self.original));
+        writeln!(f, "Regex({:?})", self.original)?;
         self.dfa.fmt(f)
     }
 }

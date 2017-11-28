@@ -17,7 +17,7 @@ impl Compiler {
     }
 
     pub fn compile(mut self, ast: &Expr) -> Result<Vec<Inst>, Error> {
-        try!(self.c(ast));
+        self.c(ast)?;
         self.insts.push(Inst::Match);
         Ok(self.insts)
     }
@@ -44,9 +44,9 @@ impl Compiler {
             Expr::Literal { ref chars, casei } => {
                 for &c in chars {
                     if casei {
-                        try!(self.c(&Expr::Class(CharClass::new(vec![
+                        self.c(&Expr::Class(CharClass::new(vec![
                             ClassRange { start: c, end: c },
-                        ]).case_fold())));
+                        ]).case_fold()))?;
                     } else {
                         // One scalar value, so we're guaranteed to get a
                         // single byte sequence.
@@ -56,20 +56,20 @@ impl Compiler {
                     }
                 }
             }
-            Expr::AnyChar => try!(self.c(&Expr::Class(CharClass::new(vec![
+            Expr::AnyChar => self.c(&Expr::Class(CharClass::new(vec![
                 ClassRange { start: '\u{0}', end: '\u{10FFFF}' },
-            ])))),
-            Expr::AnyCharNoNL => try!(self.c(&Expr::Class(CharClass::new(vec![
+            ])))?,
+            Expr::AnyCharNoNL => self.c(&Expr::Class(CharClass::new(vec![
                 ClassRange { start: '\u{0}', end: '\u{09}' },
                 ClassRange { start: '\u{0B}', end: '\u{10FFFF}' },
-            ])))),
+            ])))?,
             Expr::Class(ref cls) => {
-                try!(self.compile_class(cls));
+                self.compile_class(cls)?;
             }
-            Expr::Group { ref e, .. } => try!(self.c(e)),
+            Expr::Group { ref e, .. } => self.c(e)?,
             Expr::Concat(ref es) => {
                 for e in es {
-                    try!(self.c(e));
+                    self.c(e)?;
                 }
             }
             Expr::Alternate(ref es) => {
@@ -80,12 +80,12 @@ impl Compiler {
                 for e in &es[0..es.len()-1] {
                     let split = self.empty_split();
                     let j1 = self.insts.len();
-                    try!(self.c(e));
+                    self.c(e)?;
                     jmps_to_end.push(self.empty_jump());
                     let j2 = self.insts.len();
                     self.set_split(split, j1, j2);
                 }
-                try!(self.c(&es[es.len()-1]));
+                self.c(&es[es.len()-1])?;
                 let end = self.insts.len();
                 for jmp_to_end in jmps_to_end {
                     self.set_jump(jmp_to_end, end);
@@ -97,7 +97,7 @@ impl Compiler {
             Expr::Repeat { ref e, r: Repeater::ZeroOrOne, .. } => {
                 let split = self.empty_split();
                 let j1 = self.insts.len();
-                try!(self.c(e));
+                self.c(e)?;
                 let j2 = self.insts.len();
                 self.set_split(split, j1, j2);
             }
@@ -105,7 +105,7 @@ impl Compiler {
                 let j1 = self.insts.len();
                 let split = self.empty_split();
                 let j2 = self.insts.len();
-                try!(self.c(e));
+                self.c(e)?;
                 let jmp = self.empty_jump();
                 let j3 = self.insts.len();
 
@@ -114,7 +114,7 @@ impl Compiler {
             }
             Expr::Repeat { ref e, r: Repeater::OneOrMore, .. } => {
                 let j1 = self.insts.len();
-                try!(self.c(e));
+                self.c(e)?;
                 let split = self.empty_split();
                 let j2 = self.insts.len();
                 self.set_split(split, j1, j2);
@@ -125,13 +125,13 @@ impl Compiler {
                 ..
             } => {
                 for _ in 0..min {
-                    try!(self.c(e));
+                    self.c(e)?;
                 }
-                try!(self.c(&Expr::Repeat {
+                self.c(&Expr::Repeat {
                     e: e.clone(),
                     r: Repeater::ZeroOrMore,
                     greedy: true,
-                }));
+                })?;
             }
             Expr::Repeat {
                 ref e,
@@ -139,13 +139,13 @@ impl Compiler {
                 ..
             } => {
                 for _ in 0..min {
-                    try!(self.c(e));
+                    self.c(e)?;
                 }
                 let (mut splits, mut starts) = (vec![], vec![]);
                 for _ in min..max {
                     splits.push(self.empty_split());
                     starts.push(self.insts.len());
-                    try!(self.c(e));
+                    self.c(e)?;
                 }
                 let end = self.insts.len();
                 for (split, start) in splits.into_iter().zip(starts) {
@@ -164,12 +164,12 @@ impl Compiler {
         for r in &class[0..class.len()-1] {
             let split = self.empty_split();
             let j1 = self.insts.len();
-            try!(self.compile_class_range(r));
+            self.compile_class_range(r)?;
             jmps.push(self.empty_jump());
             let j2 = self.insts.len();
             self.set_split(split, j1, j2);
         }
-        try!(self.compile_class_range(&class[class.len()-1]));
+        self.compile_class_range(&class[class.len()-1])?;
         let end = self.insts.len();
         for jmp in jmps {
             self.set_jump(jmp, end);

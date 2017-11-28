@@ -32,8 +32,8 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
-    let mut wtr = try!(util::get_buf_writer::<&str>(None));
-    let fst = try!(unsafe { Fst::from_path(&args.arg_fst) });
+    let mut wtr = util::get_buf_writer::<&str>(None)?;
+    let fst = unsafe { Fst::from_path(&args.arg_fst) }?;
     let node = fst.node(args.arg_node_address);
     w!(wtr, "{:?}", node);
     Ok(())

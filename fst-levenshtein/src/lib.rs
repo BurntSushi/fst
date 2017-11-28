@@ -94,7 +94,7 @@ impl Levenshtein {
             query: query.to_owned(),
             dist: distance as usize,
         };
-        let dfa = try!(DfaBuilder::new(lev.clone()).build());
+        let dfa = DfaBuilder::new(lev.clone()).build()?;
         Ok(Levenshtein {
             prog: lev,
             dfa: dfa,
@@ -169,11 +169,11 @@ struct State {
 
 impl fmt::Debug for State {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(f, "State {{"));
-        try!(writeln!(f, "  is_match: {:?}", self.is_match));
+        writeln!(f, "State {{")?;
+        writeln!(f, "  is_match: {:?}", self.is_match)?;
         for i in 0..256 {
             if let Some(si) = self.next[i] {
-                try!(writeln!(f, "  {:?}: {:?}", i, si));
+                writeln!(f, "  {:?}: {:?}", i, si)?;
             }
         }
         write!(f, "}}")

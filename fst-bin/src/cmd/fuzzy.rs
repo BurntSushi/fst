@@ -47,8 +47,8 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
-    let fst = try!(unsafe { Fst::from_path(&args.arg_fst) });
-    let lev = try!(Levenshtein::new(&args.arg_query, args.flag_distance));
+    let fst = unsafe { Fst::from_path(&args.arg_fst) }?;
+    let lev = Levenshtein::new(&args.arg_query, args.flag_distance)?;
     let mut q = fst.search(&lev);
     if let Some(ref start) = args.flag_start {
         q = q.ge(start);

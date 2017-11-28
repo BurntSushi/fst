@@ -154,18 +154,18 @@ impl Dfa {
 impl fmt::Debug for Dfa {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for (i, inst) in self.insts.iter().enumerate() {
-            try!(writeln!(f, "{:03} {:?}", i, inst))
+            writeln!(f, "{:03} {:?}", i, inst)?;
         }
-        try!(writeln!(f, "------------"));
+        writeln!(f, "------------")?;
         for (i, state) in self.states.iter().enumerate() {
             if state.is_match {
-                try!(writeln!(f, "{:03}* {:?}", i, state.insts));
+                writeln!(f, "{:03}* {:?}", i, state.insts)?;
             } else {
-                try!(writeln!(f, "{:03}  {:?}", i, state.insts));
+                writeln!(f, "{:03}  {:?}", i, state.insts)?;
             }
             for j in 0..256 {
                 if let Some(si) = state.next[j] {
-                    try!(writeln!(f, "{:03}   {:X} => {}", i, j, si));
+                    writeln!(f, "{:03}   {:X} => {}", i, j, si)?;
                 }
             }
         }

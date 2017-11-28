@@ -62,8 +62,8 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
                             .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
 
-    let mut wtr = try!(util::get_buf_writer(args.arg_output.as_ref()));
-    let fst = try!(unsafe { fst::Fst::from_path(args.arg_input) });
+    let mut wtr = util::get_buf_writer(args.arg_output.as_ref())?;
+    let fst = unsafe { fst::Fst::from_path(args.arg_input) }?;
     let mut set = BitSet::with_capacity(fst.len());
     let mut node_counts = HashMap::with_capacity(10_000);
 
@@ -99,6 +99,6 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         w!(wtr, "----------------------------------");
     }
 
-    try!(wtr.flush());
+    wtr.flush()?;
     Ok(())
 }

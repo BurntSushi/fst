@@ -297,7 +297,7 @@ impl Fst {
     /// opened.
     #[cfg(feature = "mmap")]
     pub unsafe fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Fst::from_mmap(try!(MmapReadOnly::open_path(path)))
+        Fst::from_mmap(MmapReadOnly::open_path(path)?)
     }
 
     /// Opens a transducer from a `MmapReadOnly`.
@@ -814,7 +814,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
     pub fn into_str_vec(mut self) -> Result<Vec<(String, u64)>> {
         let mut vs = vec![];
         while let Some((k, v)) = self.next() {
-            let k = try!(String::from_utf8(k.to_vec()).map_err(Error::from));
+            let k = String::from_utf8(k.to_vec()).map_err(Error::from)?;
             vs.push((k, v.value()));
         }
         Ok(vs)
@@ -840,7 +840,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
     pub fn into_str_keys(mut self) -> Result<Vec<String>> {
         let mut vs = vec![];
         while let Some((k, _)) = self.next() {
-            let k = try!(String::from_utf8(k.to_vec()).map_err(Error::from));
+            let k = String::from_utf8(k.to_vec()).map_err(Error::from)?;
             vs.push(k);
         }
         Ok(vs)

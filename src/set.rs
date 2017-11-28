@@ -72,8 +72,8 @@ impl Set {
     pub fn from_iter<T, I>(iter: I) -> Result<Self>
             where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
         let mut builder = SetBuilder::memory();
-        try!(builder.extend_iter(iter));
-        Set::from_bytes(try!(builder.into_inner()))
+        builder.extend_iter(iter)?;
+        Set::from_bytes(builder.into_inner()?)
     }
 
     /// Tests the membership of a single key.
@@ -316,15 +316,15 @@ impl Set {
 
 impl fmt::Debug for Set {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "Set(["));
+        write!(f, "Set([")?;
         let mut stream = self.stream();
         let mut first = true;
         while let Some(key) = stream.next() {
             if !first {
-                try!(write!(f, ", "));
+                write!(f, ", ")?;
             }
             first = false;
-            try!(write!(f, "{}", String::from_utf8_lossy(key)));
+            write!(f, "{}", String::from_utf8_lossy(key))?;
         }
         write!(f, "])")
     }
@@ -472,7 +472,7 @@ impl<W: io::Write> SetBuilder<W> {
     pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
             where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
         for key in iter {
-            try!(self.0.add(key));
+            self.0.add(key)?;
         }
         Ok(())
     }

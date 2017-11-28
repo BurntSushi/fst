@@ -37,7 +37,7 @@ impl<W: io::Write> CountingWriter<W> {
 
 impl<W: io::Write> io::Write for CountingWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let n = try!(self.wtr.write(buf));
+        let n = self.wtr.write(buf)?;
         self.cnt += n as u64;
         Ok(n)
     }

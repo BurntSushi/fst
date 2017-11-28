@@ -97,8 +97,8 @@ impl Map {
     pub fn from_iter<K, I>(iter: I) -> Result<Self>
             where K: AsRef<[u8]>, I: IntoIterator<Item=(K, u64)> {
         let mut builder = MapBuilder::memory();
-        try!(builder.extend_iter(iter));
-        Map::from_bytes(try!(builder.into_inner()))
+        builder.extend_iter(iter)?;
+        Map::from_bytes(builder.into_inner()?)
     }
 
     /// Tests the membership of a single key.
@@ -363,15 +363,15 @@ impl Map {
 
 impl fmt::Debug for Map {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "Map(["));
+        write!(f, "Map([")?;
         let mut stream = self.stream();
         let mut first = true;
         while let Some((k, v)) = stream.next() {
             if !first {
-                try!(write!(f, ", "));
+                write!(f, ", ")?;
             }
             first = false;
-            try!(write!(f, "({}, {})", String::from_utf8_lossy(k), v));
+            write!(f, "({}, {})", String::from_utf8_lossy(k), v)?;
         }
         write!(f, "])")
     }

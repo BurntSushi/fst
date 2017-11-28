@@ -72,13 +72,13 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 }
 
 fn run_sorted(args: &Args) -> Result<(), Error> {
-    let wtr = try!(util::get_buf_writer(Some(&args.arg_output)));
-    let mut set = try!(SetBuilder::new(wtr));
+    let wtr = util::get_buf_writer(Some(&args.arg_output))?;
+    let mut set = SetBuilder::new(wtr)?;
     for input in &args.arg_input {
-        let rdr = try!(util::get_buf_reader(Some(input)));
+        let rdr = util::get_buf_reader(Some(input))?;
         let mut lines = LineReader::new(rdr);
         loop {
-            let line = try!(lines.read_line());
+            let line = lines.read_line()?;
             if line.is_empty() {
                 break;
             }
@@ -87,7 +87,7 @@ fn run_sorted(args: &Args) -> Result<(), Error> {
             } else {
                 1
             };
-            try!(set.insert(&line[0..line.len()-off]));
+            set.insert(&line[0..line.len()-off])?;
         }
     }
     set.finish().map_err(From::from)

@@ -40,11 +40,11 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
                             .and_then(|d| d.argv(&argv).deserialize())
                             .unwrap_or_else(|e| e.exit());
-    let mut wtr = try!(util::get_buf_writer::<&str>(None));
-    let mut rdr = try!(util::get_buf_reader(Some(&args.arg_fst)));
+    let mut wtr = util::get_buf_writer::<&str>(None)?;
+    let mut rdr = util::get_buf_reader(Some(&args.arg_fst))?;
 
     let mut bytes = vec![];
-    try!(rdr.read_to_end(&mut bytes));
+    rdr.read_to_end(&mut bytes)?;
 
     w!(wtr, "lazy_static! {{");
     w!(wtr, "    pub static ref {}: ::fst::raw::Fst = ", args.arg_name);
@@ -62,10 +62,10 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         };
         if column + escaped.len() >= 79 {
             column = 0;
-            try!(write!(wtr, "\\\n"));
+            write!(wtr, "\\\n")?;
         }
         column += escaped.len();
-        try!(write!(wtr, "{}", escaped));
+        write!(wtr, "{}", escaped)?;
     }
     w!(wtr, "\\\n\";");
 

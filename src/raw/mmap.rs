@@ -23,7 +23,13 @@ pub struct MmapReadOnly {
 impl MmapReadOnly {
     /// Create a new memory map from an existing file handle.
     pub fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
-        Ok(try!(Mmap::open(file, Protection::Read)).into())
+        let mmap = try!(Mmap::open(file, Protection::Read));
+        let len = mmap.len();
+        Ok(MmapReadOnly {
+            map: Arc::new(mmap),
+            offset: 0,
+            len: len,
+        })
     }
 
     /// Open a new memory map from the path given.
@@ -63,23 +69,6 @@ impl Clone for MmapReadOnly {
             map: self.map.clone(),
             offset: self.offset,
             len: self.len,
-        }
-    }
-}
-
-impl From<Mmap> for MmapReadOnly {
-    fn from(mmap: Mmap) -> MmapReadOnly {
-        From::from(Arc::new(mmap))
-    }
-}
-
-impl From<Arc<Mmap>> for MmapReadOnly {
-    fn from(mmap_arc: Arc<Mmap>) -> MmapReadOnly {
-        let len = mmap_arc.len();
-        MmapReadOnly {
-            map: mmap_arc,
-            offset: 0,
-            len: len,
         }
     }
 }

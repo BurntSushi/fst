@@ -135,7 +135,7 @@ impl ConcatCsv {
     }
 
     fn read_row(&mut self) -> Option<Result<(String, u64), Error>> {
-        let mut rdr = match self.cur {
+        let rdr = match self.cur {
             None => return None,
             Some(ref mut rdr) => rdr,
         };

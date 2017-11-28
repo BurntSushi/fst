@@ -290,7 +290,7 @@ impl Fst {
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     #[cfg(feature = "mmap")]
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub unsafe fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         Fst::from_mmap(try!(MmapReadOnly::open_path(path)))
     }
 
@@ -980,7 +980,7 @@ impl Deref for FstData {
                 &vec[offset..offset + len]
             }
             #[cfg(feature = "mmap")]
-            FstData::Mmap(ref v) => unsafe { v.as_slice() },
+            FstData::Mmap(ref v) => v.as_slice(),
         }
     }
 }

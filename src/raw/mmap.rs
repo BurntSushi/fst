@@ -3,7 +3,7 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
-use memmap::{Mmap, Protection};
+use memmap::Mmap;
 
 /// A read only view into a memory map.
 ///
@@ -22,12 +22,12 @@ pub struct MmapReadOnly {
 
 impl MmapReadOnly {
     /// Create a new memory map from an existing file handle.
-    pub fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
-        Ok(try!(Mmap::open(file, Protection::Read)).into())
+    pub unsafe fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
+        Ok(try!(Mmap::map(file)).into())
     }
 
     /// Open a new memory map from the path given.
-    pub fn open_path<P: AsRef<Path>>(path: P) -> io::Result<MmapReadOnly> {
+    pub unsafe fn open_path<P: AsRef<Path>>(path: P) -> io::Result<MmapReadOnly> {
         MmapReadOnly::open(&try!(fs::File::open(path)))
     }
 
@@ -52,8 +52,8 @@ impl MmapReadOnly {
     }
 
     /// Read the memory map as a `&[u8]`.
-    pub unsafe fn as_slice(&self) -> &[u8] {
-        &self.map.as_slice()[self.offset..self.offset + self.len]
+    pub fn as_slice(&self) -> &[u8] {
+        &self.map[self.offset..self.offset + self.len]
     }
 }
 

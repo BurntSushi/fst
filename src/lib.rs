@@ -73,15 +73,15 @@ use fst_levenshtein::Levenshtein;
 fn example() -> Result<(), Box<Error>> {
     // A convenient way to create sets in memory.
     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-    let set = try!(Set::from_iter(keys));
+    let set = Set::from_iter(keys)?;
 
     // Build our fuzzy query.
-    let lev = try!(Levenshtein::new("foo", 1));
+    let lev = Levenshtein::new("foo", 1)?;
 
     // Apply our fuzzy query to the set we built.
     let mut stream = set.search(lev).into_stream();
 
-    let keys = try!(stream.into_strs());
+    let keys = stream.into_strs()?;
     assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
     Ok(())
 }
@@ -101,26 +101,26 @@ use std::io;
 use fst::{IntoStreamer, Streamer, Map, MapBuilder};
 
 // This is where we'll write our map to.
-let mut wtr = io::BufWriter::new(try!(File::create("map.fst")));
+let mut wtr = io::BufWriter::new(File::create("map.fst")?);
 
 // Create a builder that can be used to insert new key-value pairs.
-let mut build = try!(MapBuilder::new(wtr));
+let mut build = MapBuilder::new(wtr)?;
 build.insert("bruce", 1).unwrap();
 build.insert("clarence", 2).unwrap();
 build.insert("stevie", 3).unwrap();
 
 // Finish construction of the map and flush its contents to disk.
-try!(build.finish());
+build.finish()?;
 
 // At this point, the map has been constructed. Now we'd like to search it.
 // This creates a memory map, which enables searching the map without loading
 // all of it into memory.
-let map = try!(unsafe { Map::from_path("map.fst") });
+let map = unsafe { Map::from_path("map.fst") }?;
 
 // Query for keys that are greater than or equal to clarence.
 let mut stream = map.range().ge("clarence").into_stream();
 
-let kvs = try!(stream.into_str_vec());
+let kvs = stream.into_str_vec()?;
 assert_eq!(kvs, vec![
     ("clarence".to_owned(), 2),
     ("stevie".to_owned(), 3),
@@ -147,12 +147,12 @@ use fst_regex::Regex;
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<Error>> {
-    let set = try!(Set::from_iter(&["FoO", "Foo", "fOO", "foo"]));
+    let set = Set::from_iter(&["FoO", "Foo", "fOO", "foo"])?;
 
-    let re = try!(Regex::new("(?i)foo"));
+    let re = Regex::new("(?i)foo")?;
     let mut stream = set.search(&re).into_stream();
 
-    let keys = try!(stream.into_strs());
+    let keys = stream.into_strs()?;
     assert_eq!(keys, vec!["FoO", "Foo", "fOO", "foo"]);
     Ok(())
 }
@@ -183,14 +183,14 @@ use fst_regex::Regex;
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<Error>> {
-    let set1 = try!(Set::from_iter(&["AC/DC", "Aerosmith"]));
-    let set2 = try!(Set::from_iter(&["Bob Seger", "Bruce Springsteen"]));
-    let set3 = try!(Set::from_iter(&["George Thorogood", "Golden Earring"]));
-    let set4 = try!(Set::from_iter(&["Kansas"]));
-    let set5 = try!(Set::from_iter(&["Metallica"]));
+    let set1 = Set::from_iter(&["AC/DC", "Aerosmith"])?;
+    let set2 = Set::from_iter(&["Bob Seger", "Bruce Springsteen"])?;
+    let set3 = Set::from_iter(&["George Thorogood", "Golden Earring"])?;
+    let set4 = Set::from_iter(&["Kansas"])?;
+    let set5 = Set::from_iter(&["Metallica"])?;
 
     // Create the regular expression. We can reuse it to search all of the sets.
-    let re = try!(Regex::new(r".+\p{Lu}.*"));
+    let re = Regex::new(r".+\p{Lu}.*")?;
 
     // Build a set operation. All we need to do is add a search result stream for
     // each set and ask for the union. (Other operations, like intersection and

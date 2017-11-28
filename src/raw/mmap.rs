@@ -28,7 +28,7 @@ impl MmapReadOnly {
     /// the caller to enforce that the memory map is not modified while it is
     /// opened.
     pub unsafe fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
-        let mmap = try!(Mmap::map(file));
+        let mmap = Mmap::map(file)?;
         let len = mmap.len();
         Ok(MmapReadOnly {
             map: Arc::new(mmap),
@@ -46,7 +46,7 @@ impl MmapReadOnly {
     pub unsafe fn open_path<P: AsRef<Path>>(
         path: P,
     ) -> io::Result<MmapReadOnly> {
-        MmapReadOnly::open(&try!(fs::File::open(path)))
+        MmapReadOnly::open(&fs::File::open(path)?)
     }
 
     /// Returns the size in byte of the memory map.

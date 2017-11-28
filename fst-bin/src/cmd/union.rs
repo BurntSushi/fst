@@ -36,15 +36,15 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         fail!("Output file already exists: {}", args.arg_output);
     }
 
-    let wtr = try!(util::get_buf_writer(Some(&args.arg_output)));
-    let mut merged = try!(fst::SetBuilder::new(wtr));
+    let wtr = util::get_buf_writer(Some(&args.arg_output))?;
+    let mut merged = fst::SetBuilder::new(wtr)?;
 
     let mut sets = vec![];
     for set_path in &args.arg_input {
-        sets.push(try!(unsafe { fst::Set::from_path(set_path) }));
+        sets.push(unsafe { fst::Set::from_path(set_path) }?);
     }
     let union = sets.iter().collect::<fst::set::OpBuilder>().union();
-    try!(merged.extend_stream(union));
-    try!(merged.finish());
+    merged.extend_stream(union)?;
+    merged.finish()?;
     Ok(())
 }

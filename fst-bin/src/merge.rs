@@ -77,7 +77,7 @@ where I: Iterator<Item=Result<(String, u64), Error>> + Send + 'static {
     }
 
     pub fn merge(self) -> Result<(), Error> {
-        let tmp_dir = try!(TempDir::new_in(&self.tmp_dir, "rust-fst"));
+        let tmp_dir = TempDir::new_in(&self.tmp_dir, "rust-fst")?;
         let tmp_dir_path = Arc::new(tmp_dir.path().to_path_buf());
 
         // Do the initial round of creating FSTs for every batch in the input.
@@ -87,16 +87,16 @@ where I: Iterator<Item=Result<(String, u64), Error>> + Send + 'static {
             sorters.create_fst(KvBatch {
                 tmp_dir: tmp_dir_path.clone(),
                 index: i,
-                kvs: try!(kv_batch),
+                kvs: kv_batch?,
             });
         }
         let mut results = sorters.results();
 
         // Nothing? Create an empty FST and be done with it.
         if results.is_empty() {
-            let wtr = io::BufWriter::new(try!(File::create(&self.output)));
-            let builder = try!(raw::Builder::new(wtr));
-            try!(builder.finish());
+            let wtr = io::BufWriter::new(File::create(&self.output)?);
+            let builder = raw::Builder::new(wtr)?;
+            builder.finish()?;
             return Ok(());
         }
 
@@ -111,7 +111,7 @@ where I: Iterator<Item=Result<(String, u64), Error>> + Send + 'static {
                     tmp_dir: tmp_dir_path.clone(),
                     gen: gen,
                     index: i,
-                    fsts: try!(union_batch),
+                    fsts: union_batch?,
                     value_merger: self.value_merger.clone(),
                 });
             }
@@ -119,7 +119,7 @@ where I: Iterator<Item=Result<(String, u64), Error>> + Send + 'static {
             gen += 1;
         }
         assert_eq!(results.len(), 1);
-        try!(fs::copy(try!(results.pop().unwrap()), &self.output));
+        fs::copy(results.pop().unwrap()?, &self.output)?;
         if self.keep_tmp_dir {
             drop(tmp_dir.into_path());
         }
@@ -218,8 +218,8 @@ impl Batchable for KvBatch {
         self.kvs.dedup();
         let file_name = format!("batch{}", self.index);
         let path = self.tmp_dir.join(file_name).to_path_buf();
-        let wtr = io::BufWriter::new(try!(File::create(&path)));
-        let mut builder = try!(raw::Builder::new(wtr));
+        let wtr = io::BufWriter::new(File::create(&path)?);
+        let mut builder = raw::Builder::new(wtr)?;
         for &(ref k, v) in &self.kvs {
             match builder.insert(k, v) {
                 Ok(_) => {}
@@ -227,7 +227,7 @@ impl Batchable for KvBatch {
                 Err(err) => return Err(From::from(err)),
             }
         }
-        try!(builder.finish());
+        builder.finish()?;
         Ok(path)
     }
 }
@@ -244,12 +244,12 @@ impl Batchable for UnionBatch {
     fn create_fst(&mut self) -> Result<PathBuf, Error> {
         let file_name = format!("union-gen{}-batch{}", self.gen, self.index);
         let path = self.tmp_dir.join(file_name).to_path_buf();
-        let wtr = io::BufWriter::new(try!(File::create(&path)));
-        let mut builder = try!(raw::Builder::new(wtr));
+        let wtr = io::BufWriter::new(File::create(&path)?);
+        let mut builder = raw::Builder::new(wtr)?;
 
         let mut fsts = vec![];
         for path in &self.fsts {
-            fsts.push(try!(unsafe { raw::Fst::from_path(path) }));
+            fsts.push(unsafe { raw::Fst::from_path(path) }?);
         }
         let mut union = fsts.iter().collect::<raw::OpBuilder>().union();
         while let Some((key, outputs)) = union.next() {
@@ -259,9 +259,9 @@ impl Batchable for UnionBatch {
                     value_merger(merged, iv.value)
                 });
             }
-            try!(builder.insert(key, merged));
+            builder.insert(key, merged)?;
         }
-        try!(builder.finish());
+        builder.finish()?;
         Ok(path)
     }
 }

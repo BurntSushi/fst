@@ -56,21 +56,31 @@ against it. Check out the documentation for a lot more examples!
 extern crate fst;
 extern crate fst_levenshtein;
 
+use std::error::Error;
+use std::process;
+
 use fst::{IntoStreamer, Streamer, Set};
 use fst_levenshtein::Levenshtein;
 
-fn main() {
+fn try_main() -> Result<(), Box<Error>> {
   // A convenient way to create sets in memory.
   let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-  let set = try!(Set::from_iter(keys));
+  let set = Set::from_iter(keys)?;
 
   // Build our fuzzy query.
-  let lev = try!(Levenshtein::new("foo", 1));
+  let lev = Levenshtein::new("foo", 1)?;
 
   // Apply our fuzzy query to the set we built.
   let mut stream = set.search(lev).into_stream();
 
-  let keys = try!(stream.into_strs());
+  let keys = stream.into_strs()?;
   assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
+}
+
+fn main() {
+  if let Err(err) = try_main() {
+    eprintln!("{}", err);
+    process::exit(1);
+  }
 }
 ```

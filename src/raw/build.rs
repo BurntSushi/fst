@@ -118,9 +118,9 @@ impl<W: io::Write> Builder<W> {
         // Don't allow any nodes to have address 0-7. We use these to encode
         // the API version. We also use addresses `0` and `1` as special
         // sentinel values, so they should never correspond to a real node.
-        try!(wtr.write_u64::<LittleEndian>(VERSION));
+        wtr.write_u64::<LittleEndian>(VERSION)?;
         // Similarly for 8-15 for the fst type.
-        try!(wtr.write_u64::<LittleEndian>(ty));
+        wtr.write_u64::<LittleEndian>(ty)?;
         Ok(Builder {
             wtr: wtr,
             unfinished: UnfinishedNodes::new(),
@@ -134,7 +134,7 @@ impl<W: io::Write> Builder<W> {
     /// Adds a byte string to this FST with a zero output value.
     pub fn add<B>(&mut self, bs: B) -> Result<()>
             where B: AsRef<[u8]> {
-        try!(self.check_last_key(bs.as_ref(), false));
+        self.check_last_key(bs.as_ref(), false)?;
         self.insert_output(bs, None)
     }
 
@@ -149,7 +149,7 @@ impl<W: io::Write> Builder<W> {
     /// writing to the underlying writer, an error is returned.
     pub fn insert<B>(&mut self, bs: B, val: u64) -> Result<()>
             where B: AsRef<[u8]> {
-        try!(self.check_last_key(bs.as_ref(), true));
+        self.check_last_key(bs.as_ref(), true)?;
         self.insert_output(bs, Some(Output::new(val)))
     }
 
@@ -164,7 +164,7 @@ impl<W: io::Write> Builder<W> {
     pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
             where T: AsRef<[u8]>, I: IntoIterator<Item=(T, Output)> {
         for (key, out) in iter {
-            try!(self.insert(key, out.value()));
+            self.insert(key, out.value())?;
         }
         Ok(())
     }
@@ -182,7 +182,7 @@ impl<W: io::Write> Builder<W> {
                   S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         let mut stream = stream.into_stream();
         while let Some((key, out)) = stream.next() {
-            try!(self.insert(key, out.value()));
+            self.insert(key, out.value())?;
         }
         Ok(())
     }
@@ -191,19 +191,19 @@ impl<W: io::Write> Builder<W> {
     /// writer. After completion, the data written to `W` may be read using
     /// one of `Fst`'s constructor methods.
     pub fn finish(self) -> Result<()> {
-        try!(self.into_inner());
+        self.into_inner()?;
         Ok(())
     }
 
     /// Just like `finish`, except it returns the underlying writer after
     /// flushing it.
     pub fn into_inner(mut self) -> Result<W> {
-        try!(self.compile_from(0));
+        self.compile_from(0)?;
         let root_node = self.unfinished.pop_root();
-        let root_addr = try!(self.compile(&root_node));
-        try!(self.wtr.write_u64::<LittleEndian>(self.len as u64));
-        try!(self.wtr.write_u64::<LittleEndian>(root_addr as u64));
-        try!(self.wtr.flush());
+        let root_addr = self.compile(&root_node)?;
+        self.wtr.write_u64::<LittleEndian>(self.len as u64)?;
+        self.wtr.write_u64::<LittleEndian>(root_addr as u64)?;
+        self.wtr.flush()?;
         Ok(self.wtr.into_inner())
     }
 
@@ -231,7 +231,7 @@ impl<W: io::Write> Builder<W> {
             return Ok(());
         }
         self.len += 1;
-        try!(self.compile_from(prefix_len));
+        self.compile_from(prefix_len)?;
         self.unfinished.add_suffix(&bs[prefix_len..], out);
         Ok(())
     }
@@ -245,7 +245,7 @@ impl<W: io::Write> Builder<W> {
                 } else {
                     self.unfinished.pop_freeze(addr)
                 };
-            addr = try!(self.compile(&node));
+            addr = self.compile(&node)?;
             assert!(addr != NONE_ADDRESS);
         }
         self.unfinished.top_last_freeze(addr);
@@ -263,7 +263,7 @@ impl<W: io::Write> Builder<W> {
             return Ok(*addr);
         }
         let start_addr = self.wtr.count() as CompiledAddr;
-        try!(node.compile_to(&mut self.wtr, self.last_addr, start_addr));
+        node.compile_to(&mut self.wtr, self.last_addr, start_addr)?;
         self.last_addr = self.wtr.count() as CompiledAddr - 1;
         if let RegistryEntry::NotFound(cell) = entry {
             cell.insert(self.last_addr);

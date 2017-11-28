@@ -33,16 +33,16 @@ pub struct Node<'f> {
 
 impl<'f> fmt::Debug for Node<'f> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(writeln!(f, "NODE@{}", self.start));
-        try!(writeln!(f, "  end_addr: {}", self.end));
-        try!(writeln!(f, "  size: {} bytes", self.as_slice().len()));
-        try!(writeln!(f, "  state: {:?}", self.state));
-        try!(writeln!(f, "  is_final: {}", self.is_final()));
-        try!(writeln!(f, "  final_output: {:?}", self.final_output()));
-        try!(writeln!(f, "  # transitions: {}", self.len()));
-        try!(writeln!(f, "  transitions:"));
+        writeln!(f, "NODE@{}", self.start)?;
+        writeln!(f, "  end_addr: {}", self.end)?;
+        writeln!(f, "  size: {} bytes", self.as_slice().len())?;
+        writeln!(f, "  state: {:?}", self.state)?;
+        writeln!(f, "  is_final: {}", self.is_final())?;
+        writeln!(f, "  final_output: {:?}", self.final_output())?;
+        writeln!(f, "  # transitions: {}", self.len())?;
+        writeln!(f, "  transitions:")?;
         for t in self.transitions() {
-            try!(writeln!(f, "    {:?}", t));
+            writeln!(f, "    {:?}", t)?;
         }
         Ok(())
     }
@@ -319,7 +319,7 @@ impl StateOneTransNext {
         let mut state = StateOneTransNext::new();
         state.set_common_input(input);
         if state.common_input().is_none() {
-            try!(wtr.write_u8(input));
+            wtr.write_u8(input)?;
         }
         wtr.write_u8(state.0).map_err(From::from)
     }
@@ -371,19 +371,19 @@ impl StateOneTrans {
         let output_pack_size = if out == 0 {
             0
         } else {
-            try!(pack_uint(&mut wtr, out))
+            pack_uint(&mut wtr, out)?
         };
-        let trans_pack_size = try!(pack_delta(&mut wtr, addr, trans.addr));
+        let trans_pack_size = pack_delta(&mut wtr, addr, trans.addr)?;
 
         let mut pack_sizes = PackSizes::new();
         pack_sizes.set_output_pack_size(output_pack_size);
         pack_sizes.set_transition_pack_size(trans_pack_size);
-        try!(wtr.write_u8(pack_sizes.encode()));
+        wtr.write_u8(pack_sizes.encode())?;
 
         let mut state = StateOneTrans::new();
         state.set_common_input(trans.inp);
         if state.common_input().is_none() {
-            try!(wtr.write_u8(trans.inp));
+            wtr.write_u8(trans.inp)?;
         }
         wtr.write_u8(state.0).map_err(From::from)
     }
@@ -486,17 +486,17 @@ impl StateAnyTrans {
 
         if any_outs {
             if node.is_final {
-                try!(pack_uint_in(&mut wtr, node.final_output.value(), osize));
+                pack_uint_in(&mut wtr, node.final_output.value(), osize)?;
             }
             for t in node.trans.iter().rev() {
-                try!(pack_uint_in(&mut wtr, t.out.value(), osize));
+                pack_uint_in(&mut wtr, t.out.value(), osize)?;
             }
         }
         for t in node.trans.iter().rev() {
-            try!(pack_delta_in(&mut wtr, addr, t.addr, tsize));
+            pack_delta_in(&mut wtr, addr, t.addr, tsize)?;
         }
         for t in node.trans.iter().rev() {
-            try!(wtr.write_u8(t.inp));
+            wtr.write_u8(t.inp)?;
         }
         if node.trans.len() > TRANS_INDEX_THRESHOLD {
             // A value of 255 indicates that no transition exists for the byte
@@ -507,18 +507,18 @@ impl StateAnyTrans {
             for (i, t) in node.trans.iter().enumerate() {
                 index[t.inp as usize] = i as u8;
             }
-            try!(wtr.write_all(&index));
+            wtr.write_all(&index)?;
         }
 
-        try!(wtr.write_u8(pack_sizes.encode()));
+        wtr.write_u8(pack_sizes.encode())?;
         if state.state_ntrans().is_none() {
             if node.trans.len() == 256 {
                 // 256 can't be represented in a u8, so we abuse the fact that
                 // the # of transitions can never be 1 here, since 1 is always
                 // encoded in the state byte.
-                try!(wtr.write_u8(1));
+                wtr.write_u8(1)?;
             } else {
-                try!(wtr.write_u8(node.trans.len() as u8));
+                wtr.write_u8(node.trans.len() as u8)?;
             }
         }
         wtr.write_u8(state.0).map_err(From::from)
@@ -813,7 +813,7 @@ fn pack_delta<W: io::Write>(
     trans_addr: CompiledAddr,
 ) -> io::Result<u8> {
     let nbytes = pack_delta_size(node_addr, trans_addr);
-    try!(pack_delta_in(wtr, node_addr, trans_addr, nbytes));
+    pack_delta_in(wtr, node_addr, trans_addr, nbytes)?;
     Ok(nbytes)
 }
 

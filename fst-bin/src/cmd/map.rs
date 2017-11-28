@@ -78,19 +78,19 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 }
 
 fn run_sorted(args: &Args) -> Result<(), Error> {
-    let wtr = try!(util::get_buf_writer(Some(&args.arg_output)));
-    let mut map = try!(MapBuilder::new(wtr));
+    let wtr = util::get_buf_writer(Some(&args.arg_output))?;
+    let mut map = MapBuilder::new(wtr)?;
     for input in &args.arg_input {
-        let rdr = try!(util::get_reader(Some(input)));
+        let rdr = util::get_reader(Some(input))?;
         let mut rdr = csv::ReaderBuilder::new()
             .has_headers(false)
             .from_reader(rdr);
         for row in rdr.deserialize() {
-            let (key, val): (String, u64) = try!(row);
-            try!(map.insert(key, val));
+            let (key, val): (String, u64) = row?;
+            map.insert(key, val)?;
         }
     }
-    try!(map.finish());
+    map.finish()?;
     Ok(())
 }
 

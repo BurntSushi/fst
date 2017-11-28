@@ -31,7 +31,7 @@ bench = true
 
 [dependencies]
 byteorder = "1"
-memmap = { version = "0.4.0", optional = true }
+memmap = { version = "0.5", optional = true }
 
 [dev-dependencies]
 fnv = "1.0.5"
@@ -39,7 +39,7 @@ fst-levenshtein = { version = "0.1", path = "fst-levenshtein" }
 fst-regex = { version = "0.1", path = "fst-regex" }
 lazy_static = "0.2.8"
 quickcheck = { version = "0.4.1", default-features = false }
-rand = "0.3.15"
+rand = "0.3.16"
 
 [profile.release]
 debug = true

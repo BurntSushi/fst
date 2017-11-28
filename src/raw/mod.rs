@@ -64,7 +64,7 @@ mod registry_minimal;
 /// regenerating the finite state transducer or switching to a version of this
 /// crate that is compatible with the serialized transducer. This particular
 /// behavior may be relaxed in future versions.
-pub const VERSION: u64 = 1;
+pub const VERSION: u64 = 2;
 
 /// A sentinel value used to indicate an empty final state.
 const EMPTY_ADDRESS: CompiledAddr = 0;
@@ -276,6 +276,7 @@ pub type CompiledAddr = usize;
 /// * [Comparison of Construction Algorithms for Minimal, Acyclic, Deterministic, Finite-State Automata from Sets of Strings](http://www.cs.mun.ca/~harold/Courses/Old/CS4750/Diary/q3p2qx4lv71m5vew.pdf)
 ///   (excellent for surface level overview)
 pub struct Fst {
+    version: u64,
     data: FstData,
     root_addr: CompiledAddr,
     ty: FstType,
@@ -347,7 +348,7 @@ impl Fst {
         // IO errors possible) and we've confirmed the byte slice is at least
         // N bytes (no unexpected EOF).
         let version = (&*data).read_u64::<LittleEndian>().unwrap();
-        if version != VERSION {
+        if version == 0 || version > VERSION {
             return Err(Error::Version {
                 expected: VERSION,
                 got: version,
@@ -387,6 +388,7 @@ impl Fst {
             return Err(Error::Format.into());
         }
         Ok(Fst {
+            version: version,
             data: data,
             root_addr: root_addr,
             ty: ty,
@@ -397,6 +399,7 @@ impl Fst {
     /// Retrieves the value associated with a key.
     ///
     /// If the key does not exist, then `None` is returned.
+    #[inline(never)]
     pub fn get<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
         let mut node = self.root();
         let mut out = Output::zero();
@@ -528,6 +531,7 @@ impl Fst {
     }
 
     /// Returns the root node of this fst.
+    #[inline(always)]
     pub fn root(&self) -> Node {
         self.node(self.root_addr)
     }
@@ -536,7 +540,7 @@ impl Fst {
     ///
     /// Node addresses can be obtained by reading transitions on `Node` values.
     pub fn node(&self, addr: CompiledAddr) -> Node {
-        node_new(addr, &self.data)
+        node_new(self.version, addr, &self.data)
     }
 
     /// Returns a copy of the binary contents of this FST.

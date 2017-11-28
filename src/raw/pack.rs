@@ -1,6 +1,6 @@
 use std::io;
 
-use byteorder::{ReadBytesExt, WriteBytesExt, LittleEndian};
+use byteorder::{ByteOrder, WriteBytesExt, LittleEndian};
 
 /// pack_uint packs the given integer in the smallest number of bytes possible,
 /// and writes it to the given writer. The number of bytes written is returned
@@ -24,11 +24,12 @@ pub fn pack_uint_in<W: io::Write>(
 }
 
 /// unpack_uint is the dual of pack_uint. It unpacks the integer at the current
-/// position in `rdr` after reading `nbytes` bytes.
+/// position in `slice` after reading `nbytes` bytes.
 ///
 /// `nbytes` must be >= 1 and <= 8.
-pub fn unpack_uint<R: io::Read>(mut rdr: R, nbytes: u8) -> io::Result<u64> {
-    rdr.read_uint::<LittleEndian>(nbytes as usize).map_err(From::from)
+#[inline(always)]
+pub fn unpack_uint(slice: &[u8], nbytes: u8) -> u64 {
+    LittleEndian::read_uint(slice, nbytes as usize)
 }
 
 /// pack_size returns the smallest number of bytes that can encode `n`.
@@ -64,7 +65,7 @@ mod tests {
             let mut buf = io::Cursor::new(vec![]);
             let size = pack_uint(&mut buf, num).unwrap();
             buf.set_position(0);
-            num == unpack_uint(&mut buf, size).unwrap()
+            num == unpack_uint(buf.get_ref(), size)
         }
         QuickCheck::new()
             .gen(StdGen::new(::rand::thread_rng(), 257)) // pick byte boundary

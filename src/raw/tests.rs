@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use automaton::AlwaysMatch;
 use error::Error;
-use raw::{self, Builder, Bound, Fst, Stream, Output};
+use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
 use stream::Streamer;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
@@ -191,6 +191,21 @@ fn fst_map_100000_lengths() {
 fn invalid_version() {
     match Fst::from_bytes(vec![0; 32]) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => assert_eq!(got, 0),
+        Err(err) => panic!("expected version error, got {:?}", err),
+        Ok(_) => panic!("expected version error, got FST"),
+    }
+}
+
+#[test]
+fn invalid_version_crate_too_old() {
+    use byteorder::{ByteOrder, LittleEndian};
+
+    let mut buf = vec![0; 32];
+    LittleEndian::write_u64(&mut buf, VERSION + 1);
+    match Fst::from_bytes(buf) {
+        Err(Error::Fst(raw::Error::Version { got, .. })) => {
+            assert_eq!(got, VERSION + 1);
+        }
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
     }

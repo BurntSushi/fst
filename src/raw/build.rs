@@ -265,7 +265,7 @@ impl<W: io::Write> Builder<W> {
         let start_addr = self.wtr.count() as CompiledAddr;
         try!(node.compile_to(&mut self.wtr, self.last_addr, start_addr));
         self.last_addr = self.wtr.count() as CompiledAddr - 1;
-        if let RegistryEntry::NotFound(mut cell) = entry {
+        if let RegistryEntry::NotFound(cell) = entry {
             cell.insert(self.last_addr);
         }
         Ok(self.last_addr)

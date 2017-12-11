@@ -12,7 +12,7 @@ Check out my blog post
 Rust](http://blog.burntsushi.net/transducers/)
 for extensive background, examples and experiments.
 
-[![Linux build status](https://api.travis-ci.org/BurntSushi/fst.png)](https://travis-ci.org/BurntSushi/fst)
+[![Linux build status](https://travis-ci.org/BurntSushi/fst.svg?branch=master)](https://travis-ci.org/BurntSushi/fst)
 [![Windows build status](https://ci.appveyor.com/api/projects/status/github/BurntSushi/fst?svg=true)](https://ci.appveyor.com/project/BurntSushi/fst)
 [![](http://meritbadge.herokuapp.com/fst)](https://crates.io/crates/fst)
 

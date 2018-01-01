@@ -29,7 +29,7 @@ use Result;
 ///
 /// 1. Once constructed, a `Set` can never be modified.
 /// 2. Sets must be constructed with lexicographically ordered byte sequences.
-pub struct Set(raw::Fst);
+pub struct Set(pub raw::Fst);
 
 impl Set {
     /// Opens a set stored at the given file path via a memory map.

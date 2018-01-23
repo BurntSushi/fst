@@ -50,7 +50,8 @@ extern crate fst;
 ### Example
 
 This example demonstrates building a set in memory and executing a fuzzy query
-against it. Check out the documentation for a lot more examples!
+against it. You'll need `fst = "0.3"` and `fst-levenshtein = "0.2"` in your
+`Cargo.toml`.
 
 ```rust
 extern crate fst;
@@ -59,7 +60,7 @@ extern crate fst_levenshtein;
 use std::error::Error;
 use std::process;
 
-use fst::{IntoStreamer, Streamer, Set};
+use fst::{IntoStreamer, Set};
 use fst_levenshtein::Levenshtein;
 
 fn try_main() -> Result<(), Box<Error>> {
@@ -71,10 +72,11 @@ fn try_main() -> Result<(), Box<Error>> {
   let lev = Levenshtein::new("foo", 1)?;
 
   // Apply our fuzzy query to the set we built.
-  let mut stream = set.search(lev).into_stream();
+  let stream = set.search(lev).into_stream();
 
   let keys = stream.into_strs()?;
   assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
+  Ok(())
 }
 
 fn main() {
@@ -84,3 +86,5 @@ fn main() {
   }
 }
 ```
+
+Check out the documentation for a lot more examples!

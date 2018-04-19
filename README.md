@@ -37,7 +37,7 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
 ```toml,ignore
 [dependencies]
-fst = "0.2"
+fst = "0.3"
 ```
 
 And add this to your crate root:

@@ -137,3 +137,12 @@ fn union_large() {
     }
     assert_eq!(stream2.next(), None);
 }
+
+#[test]
+fn implements_default() {
+    let map: fst::Map = Default::default();
+    assert!(map.is_empty());
+
+    let set: fst::Set = Default::default();
+    assert!(set.is_empty());
+}

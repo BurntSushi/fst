@@ -1,5 +1,5 @@
 use std::fmt;
-use std::iter::FromIterator;
+use std::iter::{self, FromIterator};
 use std::io;
 #[cfg(feature = "mmap")]
 use std::path::Path;
@@ -358,6 +358,12 @@ impl Map {
     /// Returns a reference to the underlying raw finite state transducer.
     pub fn as_fst(&self) -> &raw::Fst {
         &self.0
+    }
+}
+
+impl Default for Map {
+    fn default() -> Map {
+        Map::from_iter(iter::empty::<(&[u8], u64)>()).unwrap()
     }
 }
 

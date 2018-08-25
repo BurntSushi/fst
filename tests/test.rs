@@ -6,6 +6,7 @@ use fst_levenshtein::Levenshtein;
 use fst_regex::Regex;
 
 use fst::{Automaton, IntoStreamer, Streamer};
+use fst::automaton::Subsequence;
 use fst::raw::{Builder, Fst, Output};
 use fst::set::{Set, OpBuilder};
 
@@ -132,6 +133,19 @@ fn union_large() {
         .add(set.search(&lev))
         .add(set.search(&reg))
         .union();
+    while let Some(key1) = stream1.next() {
+        assert_eq!(stream2.next(), Some(key1));
+    }
+    assert_eq!(stream2.next(), None);
+}
+
+#[test]
+fn subsequence() {
+    let set = get_set();
+    let subseq = Subsequence::new("aab");
+    let regex = Regex::new(".*a.*a.*b.*").unwrap();
+    let mut stream1 = set.search(&subseq).into_stream();
+    let mut stream2 = set.search(&regex).into_stream();
     while let Some(key1) = stream1.next() {
         assert_eq!(stream2.next(), Some(key1));
     }

@@ -119,6 +119,67 @@ impl<'a, T: Automaton> Automaton for &'a T {
     }
 }
 
+/// An automaton that matches if the input contains a specific subsequence.
+///
+/// It can be used to build a simple fuzzy-finder.
+///
+/// ```rust
+/// extern crate fst;
+///
+/// use std::error::Error;
+///
+/// use fst::{IntoStreamer, Streamer, Set};
+/// use fst::automaton::Subsequence;
+///
+/// # fn main() { example().unwrap(); }
+/// fn example() -> Result<(), Box<Error>> {
+///     let paths = vec!["/home/projects/bar", "/home/projects/foo", "/tmp/foo"];
+///     let set = Set::from_iter(paths)?;
+///
+///     // Build our fuzzy query.
+///     let subseq = Subsequence::new("hpf");
+///
+///     // Apply our fuzzy query to the set we built.
+///     let mut stream = set.search(subseq).into_stream();
+///
+///     let matches = stream.into_strs()?;
+///     assert_eq!(matches, vec!["/home/projects/foo"]);
+///     Ok(())
+/// }
+/// ```
+pub struct Subsequence<'a> {
+    subseq: &'a [u8]
+}
+
+impl<'a> Subsequence<'a> {
+    /// Constructs automaton that matches input containing the
+    /// specified subsequence.
+    pub fn new(subsequence: &'a str) -> Subsequence<'a> {
+        Subsequence { subseq: subsequence.as_bytes() }
+    }
+}
+
+impl<'a> Automaton for Subsequence<'a> {
+    type State = usize;
+
+    fn start(&self) -> usize { 0 }
+
+    fn is_match(&self, &state: &usize) -> bool {
+        state == self.subseq.len()
+    }
+
+    fn can_match(&self, _: &usize) -> bool { true }
+
+    fn will_always_match(&self, &state: &usize) -> bool {
+        state == self.subseq.len()
+    }
+
+    fn accept(&self, &state: &usize, byte: u8) -> usize {
+        if state == self.subseq.len() { return state; }
+        state + (byte == self.subseq[state]) as usize
+    }
+}
+
 /// An automaton that always matches.
 ///
 /// This is useful in a generic context as a way to express that no automaton

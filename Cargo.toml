@@ -1,12 +1,12 @@
 [package]
 name = "fst"
-version = "0.3.0"  #:version
+version = "0.3.1"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = """
 Use finite state transducers to compactly represents sets or maps of many
 strings (> 1 billion is possible).
 """
-documentation = "http://burntsushi.net/rustdoc/fst/"
+documentation = "https://docs.rs/fst"
 homepage = "https://github.com/BurntSushi/fst"
 repository = "https://github.com/BurntSushi/fst"
 readme = "README.md"
@@ -35,11 +35,11 @@ memmap = { version = "0.6.0", optional = true }
 
 [dev-dependencies]
 fnv = "1.0.5"
-fst-levenshtein = { version = "0.2", path = "fst-levenshtein" }
-fst-regex = { version = "0.2", path = "fst-regex" }
+fst-levenshtein = { version = "0.2.1", path = "fst-levenshtein" }
+fst-regex = { version = "0.2.1", path = "fst-regex" }
 lazy_static = "0.2.8"
-quickcheck = { version = "0.4.1", default-features = false }
-rand = "0.3.15"
+quickcheck = { version = "0.7", default-features = false }
+rand = "0.5"
 
 [profile.release]
 debug = true

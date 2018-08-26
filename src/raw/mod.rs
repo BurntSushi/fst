@@ -624,6 +624,17 @@ impl<'f, A: Automaton> StreamBuilder<'f, A> {
         self.max = Bound::Excluded(bound.as_ref().to_owned());
         self
     }
+
+    /// Return this builder and gives the automaton states
+    /// along with the results.
+    pub fn with_state(self) -> StreamWithStateBuilder<'f, A> {
+        StreamWithStateBuilder {
+            fst: self.fst,
+            aut: self.aut,
+            min: self.min,
+            max: self.max,
+        }
+    }
 }
 
 impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
@@ -632,6 +643,37 @@ impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
 
     fn into_stream(self) -> Stream<'f, A> {
         Stream::new(self.fst, self.aut, self.min, self.max)
+    }
+}
+
+/// A builder for constructing range queries of streams
+/// that returns results along with automaton states.
+///
+/// Once all bounds are set, one should call `into_stream` to get a
+/// `StreamWithState`.
+///
+/// Bounds are not additive. That is, if `ge` is called twice on the same
+/// builder, then the second setting wins.
+///
+/// The `A` type parameter corresponds to an optional automaton to filter
+/// the stream. By default, no filtering is done.
+///
+/// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+pub struct StreamWithStateBuilder<'f, A=AlwaysMatch> {
+    fst: &'f Fst,
+    aut: A,
+    min: Bound,
+    max: Bound,
+}
+
+impl<'a, 'f, A: 'a + Automaton> IntoStreamer<'a> for StreamWithStateBuilder<'f, A>
+where A::State: Clone
+{
+    type Item = (&'a [u8], Output, A::State);
+    type Into = StreamWithState<'f, A>;
+
+    fn into_stream(self) -> StreamWithState<'f, A> {
+        StreamWithState::new(self.fst, self.aut, self.min, self.max)
     }
 }
 
@@ -673,7 +715,91 @@ impl Bound {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
-pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
+pub struct Stream<'f, A=AlwaysMatch>(StreamWithState<'f, A>) where A: Automaton;
+
+impl<'f, A: Automaton> Stream<'f, A> {
+    fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
+        Stream(StreamWithState::new(fst, aut, min, max))
+    }
+
+    /// Convert this stream into a vector of byte strings and outputs.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_byte_vec(mut self) -> Vec<(Vec<u8>, u64)> {
+        let mut vs = vec![];
+        while let Some((k, v)) = self.next() {
+            vs.push((k.to_vec(), v.value()));
+        }
+        vs
+    }
+
+    /// Convert this stream into a vector of Unicode strings and outputs.
+    ///
+    /// If any key is not valid UTF-8, then iteration on the stream is stopped
+    /// and a UTF-8 decoding error is returned.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_str_vec(mut self) -> Result<Vec<(String, u64)>> {
+        let mut vs = vec![];
+        while let Some((k, v)) = self.next() {
+            let k = String::from_utf8(k.to_vec()).map_err(Error::from)?;
+            vs.push((k, v.value()));
+        }
+        Ok(vs)
+    }
+
+    /// Convert this stream into a vector of byte strings.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_byte_keys(mut self) -> Vec<Vec<u8>> {
+        let mut vs = vec![];
+        while let Some((k, _)) = self.next() {
+            vs.push(k.to_vec());
+        }
+        vs
+    }
+
+    /// Convert this stream into a vector of Unicode strings.
+    ///
+    /// If any key is not valid UTF-8, then iteration on the stream is stopped
+    /// and a UTF-8 decoding error is returned.
+    ///
+    /// Note that this creates a new allocation for every key in the stream.
+    pub fn into_str_keys(mut self) -> Result<Vec<String>> {
+        let mut vs = vec![];
+        while let Some((k, _)) = self.next() {
+            let k = String::from_utf8(k.to_vec()).map_err(Error::from)?;
+            vs.push(k);
+        }
+        Ok(vs)
+    }
+
+    /// Convert this stream into a vector of outputs.
+    pub fn into_values(mut self) -> Vec<u64> {
+        let mut vs = vec![];
+        while let Some((_, v)) = self.next() {
+            vs.push(v.value());
+        }
+        vs
+    }
+}
+
+impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
+    type Item = (&'a [u8], Output);
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        self.0.next(|_| ()).map(|(key, out, _)| (key, out))
+    }
+}
+
+/// A lexicographically ordered stream from an fst
+/// of key-value pairs along with the state of the automaton.
+///
+/// The `A` type parameter corresponds to an optional automaton to filter
+/// the stream. By default, no filtering is done.
+///
+/// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     fst: &'f Fst,
     aut: A,
     inp: Vec<u8>,
@@ -690,9 +816,9 @@ struct StreamState<'f, S> {
     aut_state: S,
 }
 
-impl<'f, A: Automaton> Stream<'f, A> {
+impl<'f, A: Automaton> StreamWithState<'f, A> {
     fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
-        let mut rdr = Stream {
+        let mut rdr = StreamWithState {
             fst: fst,
             aut: aut,
             inp: Vec::with_capacity(16),
@@ -794,84 +920,30 @@ impl<'f, A: Automaton> Stream<'f, A> {
         }
     }
 
-    /// Convert this stream into a vector of byte strings and outputs.
+    /// This method only exist because the `map::Stream` implementation
+    /// use a `map::StreamWithState` internally and the
+    /// `StreamWithState::next` method require that the `Automaton::State`
+    /// implement `Clone` to be returned.
     ///
-    /// Note that this creates a new allocation for every key in the stream.
-    pub fn into_byte_vec(mut self) -> Vec<(Vec<u8>, u64)> {
-        let mut vs = vec![];
-        while let Some((k, v)) = self.next() {
-            vs.push((k.to_vec(), v.value()));
-        }
-        vs
-    }
-
-    /// Convert this stream into a vector of Unicode strings and outputs.
-    ///
-    /// If any key is not valid UTF-8, then iteration on the stream is stopped
-    /// and a UTF-8 decoding error is returned.
-    ///
-    /// Note that this creates a new allocation for every key in the stream.
-    pub fn into_str_vec(mut self) -> Result<Vec<(String, u64)>> {
-        let mut vs = vec![];
-        while let Some((k, v)) = self.next() {
-            let k = String::from_utf8(k.to_vec()).map_err(Error::from)?;
-            vs.push((k, v.value()));
-        }
-        Ok(vs)
-    }
-
-    /// Convert this stream into a vector of byte strings.
-    ///
-    /// Note that this creates a new allocation for every key in the stream.
-    pub fn into_byte_keys(mut self) -> Vec<Vec<u8>> {
-        let mut vs = vec![];
-        while let Some((k, _)) = self.next() {
-            vs.push(k.to_vec());
-        }
-        vs
-    }
-
-    /// Convert this stream into a vector of Unicode strings.
-    ///
-    /// If any key is not valid UTF-8, then iteration on the stream is stopped
-    /// and a UTF-8 decoding error is returned.
-    ///
-    /// Note that this creates a new allocation for every key in the stream.
-    pub fn into_str_keys(mut self) -> Result<Vec<String>> {
-        let mut vs = vec![];
-        while let Some((k, _)) = self.next() {
-            let k = String::from_utf8(k.to_vec()).map_err(Error::from)?;
-            vs.push(k);
-        }
-        Ok(vs)
-    }
-
-    /// Convert this stream into a vector of outputs.
-    pub fn into_values(mut self) -> Vec<u64> {
-        let mut vs = vec![];
-        while let Some((_, v)) = self.next() {
-            vs.push(v.value());
-        }
-        vs
-    }
-}
-
-impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
-    type Item = (&'a [u8], Output);
-
-    fn next(&'a mut self) -> Option<Self::Item> {
+    /// So using a function trick we can keep one implementation of this
+    /// algorithm, specify the "transform" method, the `A::State` can be cloned
+    /// or be ignored depending of the function.
+    #[inline]
+    fn next<F, T>(&mut self, transform: F) -> Option<(&[u8], Output, T)>
+    where F: Fn(&A::State) -> T
+    {
         if let Some(out) = self.empty_output.take() {
             if self.end_at.exceeded_by(&[]) {
                 self.stack.clear();
                 return None;
             }
-            if self.aut.is_match(&self.aut.start()) {
-                return Some((&[], out));
+            let start = self.aut.start();
+            if self.aut.is_match(&start) {
+                return Some((&[], out, transform(&start)));
             }
         }
         while let Some(state) = self.stack.pop() {
-            if state.trans >= state.node.len()
-                    || !self.aut.can_match(&state.aut_state) {
+            if state.trans >= state.node.len() || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
                 }
@@ -886,6 +958,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             self.stack.push(StreamState {
                 trans: state.trans + 1, .. state
             });
+            let ns = transform(&next_state);
             self.stack.push(StreamState {
                 node: next_node,
                 trans: 0,
@@ -898,10 +971,21 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
                 return None;
             }
             if next_node.is_final() && is_match {
-                return Some((&self.inp, out.cat(next_node.final_output())));
+                let out = out.cat(next_node.final_output());
+                return Some((&self.inp, out, ns));
             }
         }
         None
+    }
+}
+
+impl<'f, 'a, A: 'a + Automaton> Streamer<'a> for StreamWithState<'f, A>
+where A::State: Clone
+{
+    type Item = (&'a [u8], Output, A::State);
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        self.next(Clone::clone)
     }
 }
 

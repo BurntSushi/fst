@@ -147,6 +147,7 @@ impl<'a, T: Automaton> Automaton for &'a T {
 ///     Ok(())
 /// }
 /// ```
+#[derive(Clone, Copy, Debug)]
 pub struct Subsequence<'a> {
     subseq: &'a [u8]
 }

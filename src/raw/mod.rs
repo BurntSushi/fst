@@ -306,6 +306,7 @@ impl Fst {
     /// A `MmapReadOnly` lets one control which region of the file is used for
     /// the transducer.
     #[cfg(feature = "mmap")]
+    #[inline]
     pub fn from_mmap(mmap: MmapReadOnly) -> Result<Self> {
         Fst::new(FstData::Mmap(mmap))
     }
@@ -318,6 +319,7 @@ impl Fst {
     /// transducer builder (`Builder` qualifies). If the format is invalid or
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
+    #[inline]
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Fst::new(FstData::Cow(Cow::Owned(bytes)))
     }
@@ -326,6 +328,7 @@ impl Fst {
     ///
     /// This accepts a static byte slice, which may be useful if the Fst
     /// is embedded into source code.
+    #[inline]
     pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
         Fst::new(FstData::Cow(Cow::Borrowed(bytes)))
     }
@@ -335,6 +338,7 @@ impl Fst {
     ///
     /// This permits creating multiple transducers from a single region of
     /// owned memory.
+    #[inline]
     pub fn from_shared_bytes(
         bytes: Arc<Vec<u8>>,
         offset: usize,
@@ -439,6 +443,7 @@ impl Fst {
 
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
+    #[inline]
     pub fn stream(&self) -> Stream {
         StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
@@ -447,6 +452,7 @@ impl Fst {
     ///
     /// A range query returns a subset of key-value pairs in this fst in a
     /// range given in lexicographic order.
+    #[inline]
     pub fn range(&self) -> StreamBuilder {
         StreamBuilder::new(self, AlwaysMatch)
     }
@@ -457,16 +463,19 @@ impl Fst {
     }
 
     /// Returns the number of keys in this fst.
+    #[inline]
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// Returns true if and only if this fst has no keys.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     /// Returns the number of bytes used by this fst.
+    #[inline]
     pub fn size(&self) -> usize {
         self.data.len()
     }
@@ -477,6 +486,7 @@ impl Fst {
     /// and perform set operations like union, intersection, difference and
     /// symmetric difference on the keys of the fst. These set operations also
     /// allow one to specify how conflicting values are merged in the stream.
+    #[inline]
     pub fn op(&self) -> OpBuilder {
         OpBuilder::new().add(self)
     }
@@ -531,6 +541,7 @@ impl Fst {
     ///
     /// This crate reserves the range 0-255 (inclusive) but currently leaves
     /// the meaning of 0-255 unspecified.
+    #[inline]
     pub fn fst_type(&self) -> FstType {
         self.ty
     }
@@ -544,11 +555,13 @@ impl Fst {
     /// Returns the node at the given address.
     ///
     /// Node addresses can be obtained by reading transitions on `Node` values.
+    #[inline]
     pub fn node(&self, addr: CompiledAddr) -> Node {
         node_new(self.version, addr, &self.data)
     }
 
     /// Returns a copy of the binary contents of this FST.
+    #[inline]
     pub fn to_vec(&self) -> Vec<u8> {
         self.data.to_vec()
     }
@@ -567,6 +580,7 @@ impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
     type Item = (&'a [u8], Output);
     type Into = Stream<'f>;
 
+    #[inline]
     fn into_stream(self) -> Self::Into {
         StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
@@ -1006,6 +1020,7 @@ pub struct Transition {
 }
 
 impl Default for Transition {
+    #[inline]
     fn default() -> Self {
         Transition {
             inp: 0,

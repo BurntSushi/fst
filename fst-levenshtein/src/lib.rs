@@ -89,6 +89,7 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
+    #[inline]
     pub fn new(query: &str, distance: u32) -> Result<Self, Error> {
         let lev = DynamicLevenshtein {
             query: query.to_owned(),
@@ -142,16 +143,20 @@ impl DynamicLevenshtein {
 impl Automaton for Levenshtein {
     type State = Option<usize>;
 
+    #[inline]
     fn start(&self) -> Option<usize> { Some(0) }
 
+    #[inline]
     fn is_match(&self, state: &Option<usize>) -> bool {
         state.map(|state| self.dfa.states[state].is_match).unwrap_or(false)
     }
 
+    #[inline]
     fn can_match(&self, state: &Option<usize>) -> bool {
         state.is_some()
     }
 
+    #[inline]
     fn accept(&self, state: &Option<usize>, byte: u8) -> Option<usize> {
         state.and_then(|state| self.dfa.states[state].next[byte as usize])
     }

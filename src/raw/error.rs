@@ -114,6 +114,7 @@ impl error::Error for Error {
 }
 
 impl From<FromUtf8Error> for Error {
+    #[inline]
     fn from(err: FromUtf8Error) -> Self {
         Error::FromUtf8(err)
     }

@@ -18,12 +18,14 @@ pub enum Error {
 }
 
 impl From<io::Error> for Error {
+    #[inline]
     fn from(err: io::Error) -> Error {
         Error::Io(err)
     }
 }
 
 impl From<raw::Error> for Error {
+    #[inline]
     fn from(err: raw::Error) -> Error {
         Error::Fst(err)
     }

@@ -27,6 +27,7 @@ impl MmapReadOnly {
     /// backed by a memory mapped file won't be mutably aliased. It is up to
     /// the caller to enforce that the memory map is not modified while it is
     /// opened.
+    #[inline]
     pub unsafe fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
         let mmap = Mmap::map(file)?;
         let len = mmap.len();
@@ -52,7 +53,8 @@ impl MmapReadOnly {
     /// Returns the size in byte of the memory map.
     ///
     /// If it is a range, the size is the size of the range.
-    pub fn len(&self,) -> usize {
+    #[inline]
+    pub fn len(&self) -> usize {
         self.len
     }
 
@@ -60,6 +62,7 @@ impl MmapReadOnly {
     ///
     /// If the new range is outside the bounds of `self`, then this method
     /// panics.
+    #[inline]
     pub fn range(&self, offset: usize, len: usize) -> MmapReadOnly {
         assert!(offset + len <= self.len);
         MmapReadOnly {
@@ -70,12 +73,14 @@ impl MmapReadOnly {
     }
 
     /// Read the memory map as a `&[u8]`.
+    #[inline]
     pub fn as_slice(&self) -> &[u8] {
         &self.map[self.offset..self.offset + self.len]
     }
 }
 
 impl Clone for MmapReadOnly {
+    #[inline]
     fn clone(&self) -> MmapReadOnly {
         MmapReadOnly{
             map: self.map.clone(),

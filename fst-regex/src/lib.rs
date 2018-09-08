@@ -119,6 +119,7 @@ impl Regex {
     ///
     /// A `Regex` value satisfies the `Automaton` trait, which means it can be
     /// used with the `search` method of any finite state transducer.
+    #[inline]
     pub fn new(re: &str) -> Result<Regex, Error> {
         Regex::with_size_limit(10 * (1 << 20), re)
     }
@@ -134,16 +135,20 @@ impl Regex {
 impl Automaton for Regex {
     type State = Option<usize>;
 
+    #[inline]
     fn start(&self) -> Option<usize> { Some(0) }
 
+    #[inline]
     fn is_match(&self, state: &Option<usize>) -> bool {
         state.map(|state| self.dfa.is_match(state)).unwrap_or(false)
     }
 
+    #[inline]
     fn can_match(&self, state: &Option<usize>) -> bool {
         state.is_some()
     }
 
+    #[inline]
     fn accept(&self, state: &Option<usize>, byte: u8) -> Option<usize> {
         state.and_then(|state| self.dfa.accept(state, byte))
     }

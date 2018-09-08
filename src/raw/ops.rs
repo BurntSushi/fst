@@ -46,6 +46,7 @@ pub struct OpBuilder<'f> {
 
 impl<'f> OpBuilder<'f> {
     /// Create a new set operation builder.
+    #[inline]
     pub fn new() -> Self {
         OpBuilder { streams: vec![] }
     }
@@ -83,6 +84,7 @@ impl<'f> OpBuilder<'f> {
     /// with that key in that stream. The index uniquely identifies each
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
+    #[inline]
     pub fn union(self) -> Union<'f> {
         Union {
             heap: StreamHeap::new(self.streams),
@@ -100,6 +102,7 @@ impl<'f> OpBuilder<'f> {
     /// with that key in that stream. The index uniquely identifies each
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
+    #[inline]
     pub fn intersection(self) -> Intersection<'f> {
         Intersection {
             heap: StreamHeap::new(self.streams),
@@ -119,6 +122,7 @@ impl<'f> OpBuilder<'f> {
     /// with that key in that stream. The index uniquely identifies each
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
+    #[inline]
     pub fn difference(mut self) -> Difference<'f> {
         let first = self.streams.swap_remove(0);
         Difference {
@@ -145,6 +149,7 @@ impl<'f> OpBuilder<'f> {
     /// with that key in that stream. The index uniquely identifies each
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
+    #[inline]
     pub fn symmetric_difference(self) -> SymmetricDifference<'f> {
         SymmetricDifference {
             heap: StreamHeap::new(self.streams),

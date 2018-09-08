@@ -99,6 +99,7 @@ struct LastTransition {
 
 impl Builder<Vec<u8>> {
     /// Create a builder that builds an fst in memory.
+    #[inline]
     pub fn memory() -> Self {
         Builder::new(Vec::with_capacity(10 * (1 << 10))).unwrap()
     }

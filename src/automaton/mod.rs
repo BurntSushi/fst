@@ -147,7 +147,7 @@ impl<'a, T: Automaton> Automaton for &'a T {
 ///     Ok(())
 /// }
 /// ```
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct Subsequence<'a> {
     subseq: &'a [u8]
 }
@@ -185,6 +185,7 @@ impl<'a> Automaton for Subsequence<'a> {
 ///
 /// This is useful in a generic context as a way to express that no automaton
 /// should be used.
+#[derive(Clone, Debug)]
 pub struct AlwaysMatch;
 
 impl Automaton for AlwaysMatch {
@@ -199,6 +200,7 @@ impl Automaton for AlwaysMatch {
 
 /// An automaton that matches a string that begins with something that the
 /// wrapped automaton matches.
+#[derive(Clone, Debug)]
 pub struct StartsWith<A>(A);
 
 /// The `Automaton` state for `StartsWith<A>`.
@@ -265,6 +267,7 @@ impl<A: Automaton> Automaton for StartsWith<A> {
 }
 
 /// An automaton that matches when one of its component automata match.
+#[derive(Clone, Debug)]
 pub struct Union<A, B>(A, B);
 
 /// The `Automaton` state for `Union<A, B>`.
@@ -302,6 +305,7 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
 }
 
 /// An automaton that matches when both of its component automata match.
+#[derive(Clone, Debug)]
 pub struct Intersection<A, B>(A, B);
 
 /// The `Automaton` state for `Intersection<A, B>`.
@@ -342,6 +346,7 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
 }
 
 /// An automaton that matches exactly when the automaton it wraps does not.
+#[derive(Clone, Debug)]
 pub struct Complement<A>(A);
 
 /// The `Automaton` state for `Complement<A>`.

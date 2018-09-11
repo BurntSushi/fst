@@ -155,6 +155,7 @@ pub struct Subsequence<'a> {
 impl<'a> Subsequence<'a> {
     /// Constructs automaton that matches input containing the
     /// specified subsequence.
+    #[inline]
     pub fn new(subsequence: &'a str) -> Subsequence<'a> {
         Subsequence { subseq: subsequence.as_bytes() }
     }
@@ -163,18 +164,23 @@ impl<'a> Subsequence<'a> {
 impl<'a> Automaton for Subsequence<'a> {
     type State = usize;
 
+    #[inline]
     fn start(&self) -> usize { 0 }
 
+    #[inline]
     fn is_match(&self, &state: &usize) -> bool {
         state == self.subseq.len()
     }
 
+    #[inline]
     fn can_match(&self, _: &usize) -> bool { true }
 
+    #[inline]
     fn will_always_match(&self, &state: &usize) -> bool {
         state == self.subseq.len()
     }
 
+    #[inline]
     fn accept(&self, &state: &usize, byte: u8) -> usize {
         if state == self.subseq.len() { return state; }
         state + (byte == self.subseq[state]) as usize
@@ -191,11 +197,11 @@ pub struct AlwaysMatch;
 impl Automaton for AlwaysMatch {
     type State = ();
 
-    fn start(&self) -> () { () }
-    fn is_match(&self, _: &()) -> bool { true }
-    fn can_match(&self, _: &()) -> bool { true }
-    fn will_always_match(&self, _: &()) -> bool { true }
-    fn accept(&self, _: &(), _: u8) -> () { () }
+    #[inline] fn start(&self) -> () { () }
+    #[inline] fn is_match(&self, _: &()) -> bool { true }
+    #[inline] fn can_match(&self, _: &()) -> bool { true }
+    #[inline] fn will_always_match(&self, _: &()) -> bool { true }
+    #[inline] fn accept(&self, _: &(), _: u8) -> () { () }
 }
 
 /// An automaton that matches a string that begins with something that the
@@ -213,6 +219,7 @@ enum StartsWithStateInternal<A: Automaton> {
 
 impl<A: Automaton> Automaton for StartsWith<A> {
     type State = StartsWithState<A>;
+
     fn start(&self) -> StartsWithState<A> {
         StartsWithState({
             let inner = self.0.start();

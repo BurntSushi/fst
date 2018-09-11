@@ -40,6 +40,7 @@ pub enum Error {
 }
 
 impl From<regex_syntax::Error> for Error {
+    #[inline]
     fn from(err: regex_syntax::Error) -> Error {
         Error::Syntax(err)
     }

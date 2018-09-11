@@ -167,6 +167,7 @@ impl Map {
     ///     (b"c".to_vec(), 3),
     /// ]);
     /// ```
+    #[inline]
     pub fn stream(&self) -> Stream {
         Stream(self.0.stream())
     }
@@ -189,6 +190,7 @@ impl Map {
     /// }
     /// assert_eq!(keys, vec![b"a", b"b", b"c"]);
     /// ```
+    #[inline]
     pub fn keys(&self) -> Keys {
         Keys(self.0.stream())
     }
@@ -212,6 +214,7 @@ impl Map {
     /// }
     /// assert_eq!(values, vec![1, 2, 3]);
     /// ```
+    #[inline]
     pub fn values(&self) -> Values {
         Values(self.0.stream())
     }
@@ -247,6 +250,7 @@ impl Map {
     ///     (b"d".to_vec(), 4),
     /// ]);
     /// ```
+    #[inline]
     pub fn range(&self) -> StreamBuilder {
         StreamBuilder(self.0.range())
     }
@@ -299,11 +303,13 @@ impl Map {
     }
 
     /// Returns the number of elements in this map.
+    #[inline]
     pub fn len(&self) -> usize {
         self.0.len()
     }
 
     /// Returns true if and only if this map is empty.
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -351,17 +357,20 @@ impl Map {
     ///     (b"z".to_vec(), vec![IndexedValue { index: 1, value: 12 }]),
     /// ]);
     /// ```
+    #[inline]
     pub fn op(&self) -> OpBuilder {
         OpBuilder::new().add(self)
     }
 
     /// Returns a reference to the underlying raw finite state transducer.
+    #[inline]
     pub fn as_fst(&self) -> &raw::Fst {
         &self.0
     }
 }
 
 impl Default for Map {
+    #[inline]
     fn default() -> Map {
         Map::from_iter(iter::empty::<(&[u8], u64)>()).unwrap()
     }
@@ -385,6 +394,7 @@ impl fmt::Debug for Map {
 
 // Construct a map from an Fst object.
 impl From<raw::Fst> for Map {
+    #[inline]
     fn from(fst: raw::Fst) -> Map {
         Map(fst)
     }
@@ -392,6 +402,7 @@ impl From<raw::Fst> for Map {
 
 /// Returns the underlying finite state transducer.
 impl AsRef<raw::Fst> for Map {
+    #[inline]
     fn as_ref(&self) -> &raw::Fst {
         &self.0
     }
@@ -401,6 +412,7 @@ impl<'m, 'a> IntoStreamer<'a> for &'m Map {
     type Item = (&'a [u8], u64);
     type Into = Stream<'m>;
 
+    #[inline]
     fn into_stream(self) -> Self::Into {
         Stream(self.0.stream())
     }
@@ -503,6 +515,7 @@ pub struct MapBuilder<W>(raw::Builder<W>);
 
 impl MapBuilder<Vec<u8>> {
     /// Create a builder that builds a map in memory.
+    #[inline]
     pub fn memory() -> Self {
         MapBuilder(raw::Builder::memory())
     }
@@ -646,6 +659,7 @@ pub struct Keys<'m>(raw::Stream<'m>);
 impl<'a, 'm> Streamer<'a> for Keys<'m> {
     type Item = &'a [u8];
 
+    #[inline]
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next().map(|(key, _)| key)
     }
@@ -660,6 +674,7 @@ pub struct Values<'m>(raw::Stream<'m>);
 impl<'a, 'm> Streamer<'a> for Values<'m> {
     type Item = u64;
 
+    #[inline]
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next().map(|(_, out)| out.value())
     }
@@ -731,6 +746,7 @@ pub struct OpBuilder<'m>(raw::OpBuilder<'m>);
 
 impl<'m> OpBuilder<'m> {
     /// Create a new set operation builder.
+    #[inline]
     pub fn new() -> Self {
         OpBuilder(raw::OpBuilder::new())
     }
@@ -799,6 +815,7 @@ impl<'m> OpBuilder<'m> {
     ///     (b"z".to_vec(), vec![IndexedValue { index: 1, value: 13 }]),
     /// ]);
     /// ```
+    #[inline]
     pub fn union(self) -> Union<'m> {
         Union(self.0.union())
     }
@@ -839,6 +856,7 @@ impl<'m> OpBuilder<'m> {
     ///     ]),
     /// ]);
     /// ```
+    #[inline]
     pub fn intersection(self) -> Intersection<'m> {
         Intersection(self.0.intersection())
     }
@@ -879,6 +897,7 @@ impl<'m> OpBuilder<'m> {
     ///     (b"c".to_vec(), vec![IndexedValue { index: 0, value: 3 }]),
     /// ]);
     /// ```
+    #[inline]
     pub fn difference(self) -> Difference<'m> {
         Difference(self.0.difference())
     }
@@ -926,6 +945,7 @@ impl<'m> OpBuilder<'m> {
     ///     (b"z".to_vec(), vec![IndexedValue { index: 1, value: 13 }]),
     /// ]);
     /// ```
+    #[inline]
     pub fn symmetric_difference(self) -> SymmetricDifference<'m> {
         SymmetricDifference(self.0.symmetric_difference())
     }
@@ -959,6 +979,7 @@ pub struct Union<'m>(raw::Union<'m>);
 impl<'a, 'm> Streamer<'a> for Union<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
+    #[inline]
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next()
     }
@@ -973,6 +994,7 @@ pub struct Intersection<'m>(raw::Intersection<'m>);
 impl<'a, 'm> Streamer<'a> for Intersection<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
+    #[inline]
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next()
     }
@@ -991,6 +1013,7 @@ pub struct Difference<'m>(raw::Difference<'m>);
 impl<'a, 'm> Streamer<'a> for Difference<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
+    #[inline]
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next()
     }
@@ -1005,6 +1028,7 @@ pub struct SymmetricDifference<'m>(raw::SymmetricDifference<'m>);
 impl<'a, 'm> Streamer<'a> for SymmetricDifference<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
+    #[inline]
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next()
     }

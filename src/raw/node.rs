@@ -123,6 +123,7 @@ pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node {
 impl<'f> Node<'f> {
     /// Returns an iterator over all transitions in this node in lexicographic
     /// order.
+    #[inline]
     pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
         Transitions { node: self, range: 0..self.len() }
     }
@@ -771,6 +772,7 @@ pub struct Transitions<'f: 'n, 'n> {
 impl<'f, 'n> Iterator for Transitions<'f, 'n> {
     type Item = Transition;
 
+    #[inline]
     fn next(&mut self) -> Option<Transition> {
         self.range.next().map(|i| self.node.transition(i))
     }

@@ -58,12 +58,11 @@ extern crate fst;
 extern crate fst_levenshtein;
 
 use std::error::Error;
-use std::process;
 
 use fst::{IntoStreamer, Set};
 use fst_levenshtein::Levenshtein;
 
-fn try_main() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Box<Error>> {
   // A convenient way to create sets in memory.
   let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
   let set = Set::from_iter(keys)?;
@@ -77,13 +76,6 @@ fn try_main() -> Result<(), Box<Error>> {
   let keys = stream.into_strs()?;
   assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
   Ok(())
-}
-
-fn main() {
-  if let Err(err) = try_main() {
-    eprintln!("{}", err);
-    process::exit(1);
-  }
 }
 ```
 

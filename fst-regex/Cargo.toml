@@ -11,7 +11,11 @@ repository = "https://github.com/BurntSushi/fst"
 keywords = ["search", "information", "retrieval", "dictionary", "map"]
 license = "Unlicense/MIT"
 
+[features]
+mmap = ["fst/mmap"]
+default = ["mmap"]
+
 [dependencies]
-fst = { path = "..", version = "0.3.1" }
+fst = { path = "..", version = "0.3.1", default-features = false }
 regex-syntax = "0.3"
 utf8-ranges = "1"

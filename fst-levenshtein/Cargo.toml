@@ -1,6 +1,6 @@
 [package]
 name = "fst-levenshtein"
-version = "0.2.1"
+version = "0.2.1"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = """
 Search finite state transducers with fuzzy queries using Levenshtein automata.

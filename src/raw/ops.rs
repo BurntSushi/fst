@@ -122,6 +122,10 @@ impl<'f> OpBuilder<'f> {
     /// with that key in that stream. The index uniquely identifies each
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
+    ///
+    /// The interface is the same for all the operations, but due to the nature
+    /// of `difference`, each yielded key contains exactly one `IndexValue` with
+    /// `index` set to 0.
     #[inline]
     pub fn difference(mut self) -> Difference<'f> {
         let first = self.streams.swap_remove(0);

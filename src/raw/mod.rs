@@ -219,8 +219,7 @@ pub type CompiledAddr = usize;
 ///
 /// The corresponding automaton looks like this:
 ///
-/// ![finite state automaton - one billion strings]
-/// (http://burntsushi.net/stuff/one-billion.png)
+/// ![finite state automaton - one billion strings](http://burntsushi.net/stuff/one-billion.png)
 ///
 /// Indeed, the on disk size of this automaton is a mere **251 bytes**.
 ///

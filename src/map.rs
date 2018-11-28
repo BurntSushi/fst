@@ -873,6 +873,10 @@ impl<'m> OpBuilder<'m> {
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
     ///
+    /// While the interface is the same for all the operations combining multiple
+    /// maps, due to the nature of `difference` there's exactly one `IndexValue`
+    /// for each yielded value.
+    ///
     /// # Example
     ///
     /// ```rust

@@ -565,6 +565,12 @@ impl Fst {
         self.data.to_vec()
     }
 
+    /// Returns the binary contents of this FST.
+    #[inline]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data
+    }
+
     fn empty_final_output(&self) -> Option<Output> {
         let root = self.root();
         if root.is_final() {

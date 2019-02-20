@@ -17,7 +17,7 @@ pub fn fst_set<I, S>(ss: I) -> Fst
     for s in ss.iter().into_iter() {
         bfst.add(s).unwrap();
     }
-    let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
+    let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
     ss.dedup();
     assert_eq!(fst.len(), ss.len());
     fst
@@ -33,7 +33,7 @@ pub fn fst_map<I, S>(ss: I) -> Fst
     for (s, o) in ss.into_iter() {
         bfst.insert(s, o).unwrap();
     }
-    Fst::from_bytes(bfst.into_inner().unwrap()).unwrap()
+    Fst::new(bfst.into_inner().unwrap()).unwrap()
 }
 
 pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
@@ -190,7 +190,7 @@ fn fst_map_100000_lengths() {
 
 #[test]
 fn invalid_version() {
-    match Fst::from_bytes(vec![0; 32]) {
+    match Fst::new(vec![0; 32]) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
@@ -203,7 +203,7 @@ fn invalid_version_crate_too_old() {
 
     let mut buf = vec![0; 32];
     LittleEndian::write_u64(&mut buf, VERSION + 1);
-    match Fst::from_bytes(buf) {
+    match Fst::new(buf) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => {
             assert_eq!(got, VERSION + 1);
         }
@@ -214,7 +214,7 @@ fn invalid_version_crate_too_old() {
 
 #[test]
 fn invalid_format() {
-    match Fst::from_bytes(vec![0; 0]) {
+    match Fst::new(vec![0; 0]) {
         Err(Error::Fst(raw::Error::Format)) => {}
         Err(err) => panic!("expected format error, got {:?}", err),
         Ok(_) => panic!("expected format error, got FST"),

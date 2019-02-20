@@ -280,23 +280,6 @@ pub struct Fst<Data=Vec<u8>> {
     len: usize,
 }
 
-
-impl Fst<FstData> {
-    /// Creates a transducer from its representation as a raw byte sequence.
-    ///
-    /// Note that this operation is very cheap (no allocations and no copies).
-    ///
-    /// The fst must have been written with a compatible finite state
-    /// transducer builder (`Builder` qualifies). If the format is invalid or
-    /// if there is a mismatch between the API version of this library and the
-    /// fst, then an error is returned.
-    #[inline]
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Fst<Vec<u8>>> {
-        Fst::new(bytes)
-    }
-
-}
-
 impl<'f> Fst<&'f [u8]> {
     #[inline(always)]
     pub fn root_dissociate(&self) -> Node<'f> {
@@ -324,7 +307,7 @@ impl<'f, Data> Into<Fst<&'f [u8]>> for &'f Fst<Data> where Data: Deref<Target=[u
 
 impl<Data: Deref<Target=[u8]>> Fst<Data> {
 
-    fn new(data: Data) -> Result<Fst<Data>> {
+    pub fn new(data: Data) -> Result<Fst<Data>> {
         if data.len() < 32 {
             return Err(Error::Format.into());
         }

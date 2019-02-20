@@ -66,7 +66,7 @@ impl Map<Vec<u8>> {
     /// or if there is a mismatch between the API version of this library
     /// and the map, then an error is returned.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Map<Vec<u8>>> {
-        raw::Fst::from_bytes(bytes).map(Map)
+        raw::Fst::new(bytes).map(Map)
     }
 
     /// Create a `Map` from an iterator of lexicographically ordered byte

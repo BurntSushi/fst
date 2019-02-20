@@ -1,4 +1,5 @@
 .*.swp
+.idea
 tags
 target
 *.lock

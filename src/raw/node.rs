@@ -878,7 +878,7 @@ mod tests {
             for word in &bs {
                 bfst.add(word).unwrap();
             }
-            let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
+            let fst = Fst::new(bfst.into_inner().unwrap()).unwrap();
             let mut rdr = fst.stream();
             let mut words = vec![];
             while let Some(w) = rdr.next() {

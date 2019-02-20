@@ -1,7 +1,7 @@
 use std::error;
 use std::fmt;
 
-use regex_syntax;
+use super::regex_syntax;
 
 /// An error that occurred while compiling a regular expression.
 #[derive(Debug)]

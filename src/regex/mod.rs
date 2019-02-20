@@ -1,17 +1,17 @@
-extern crate fst;
 extern crate regex_syntax;
 extern crate utf8_ranges;
 
 use std::fmt;
 
-use fst::Automaton;
-
-pub use error::Error;
+use Automaton;
 
 mod compile;
 mod dfa;
 mod error;
 mod sparse;
+
+pub use self::error::Error;
+
 
 /// A regular expression for searching FSTs with Unicode support.
 ///
@@ -126,9 +126,9 @@ impl Regex {
 
     fn with_size_limit(size: usize, re: &str) -> Result<Regex, Error> {
         let expr = regex_syntax::Expr::parse(re)?;
-        let insts = compile::Compiler::new(size).compile(&expr)?;
-        let dfa = dfa::DfaBuilder::new(insts).build()?;
-        Ok(Regex { original: re.to_owned(), dfa: dfa })
+        let insts = self::compile::Compiler::new(size).compile(&expr)?;
+        let dfa = self::dfa::DfaBuilder::new(insts).build()?;
+        Ok(Regex { original: re.to_owned(), dfa })
     }
 }
 

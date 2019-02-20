@@ -1,7 +1,7 @@
-use regex_syntax::{Expr, Repeater, CharClass, ClassRange};
-use utf8_ranges::{Utf8Sequences, Utf8Sequence};
-
-use {Error, Inst};
+use super::regex_syntax::{Expr, Repeater, CharClass, ClassRange};
+use super::utf8_ranges::{Utf8Sequences, Utf8Sequence};
+use super::Error;
+use super::Inst;
 
 pub struct Compiler {
     size_limit: usize,

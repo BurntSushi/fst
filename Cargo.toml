@@ -1,7 +1,7 @@
 [package]
-name = "fst"
-version = "0.3.2"  #:version
-authors = ["Andrew Gallant <jamslam@gmail.com>"]
+name = "tantivy-fst"
+version = "0.3.2"
+authors = ["Paul Masurel<paul.masurel@gmail.com>"] # forked from Andrew Gallant's work
 description = """
 Use finite state transducers to compactly represents sets or maps of many
 strings (> 1 billion is possible).
@@ -27,10 +27,11 @@ bench = true
 
 [dependencies]
 byteorder = "1"
+regex-syntax = "0.3"
+utf8-ranges = "1"
 
 [dev-dependencies]
 fnv = "1.0.5"
-fst-regex = { version = "0.2", path = "fst-regex" }
 lazy_static = "0.2.8"
 quickcheck = { version = "0.7", default-features = false }
 rand = "0.5"

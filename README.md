@@ -1,5 +1,15 @@
-fst
+tantivy-fst
 ===
+
+
+# WARNING: This is not the crate you are looking for.
+
+This crate is a fork of the `fst` crate to better fit the need of tantivy. 
+You are probably looking for the  [fst](https://github.com/BurntSushi/fst) crate
+
+
+-----
+
 This crate provides a fast implementation of ordered sets and maps using finite
 state machines. In particular, it makes use of finite state transducers to map
 keys to values as the machine is executed. Using finite state machines as data

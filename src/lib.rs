@@ -1,3 +1,7 @@
+// Copyright 2015 2016 2017 2018 Andrew Gallant
+// Copyright 2019 Paul Masurel
+//
+// This is a fork over Andrew Gallant `fst` crate.
 /*!
 Crate `fst` is a library for efficiently storing and searching ordered sets or
 maps where the keys are byte strings. A key design goal of this crate is to

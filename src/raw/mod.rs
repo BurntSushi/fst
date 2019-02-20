@@ -36,7 +36,6 @@ pub use self::ops::{
     IndexedValue, OpBuilder,
     Intersection, Union, Difference, SymmetricDifference,
 };
-use std::mem;
 
 mod build;
 mod common_inputs;
@@ -686,7 +685,87 @@ impl<'f, A: Automaton> Stream<'f, A> {
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
     fn seek_min(&mut self, min: Bound) {
-        seek_min(min, &self.fst, self.data, &mut self.inp, &mut self.stack, &mut self.empty_output, &self.aut);
+        if min.is_empty() {
+            if min.is_inclusive() {
+                self.empty_output = self.fst.empty_final_output(self.data);
+            }
+            self.stack.clear();
+            self.stack = vec![StreamState {
+                node:  self.fst.root(self.data),
+                trans: 0,
+                out: Output::zero(),
+                aut_state: self.aut.start(),
+            }];
+            return;
+        }
+        let (key, inclusive) = match min {
+            Bound::Excluded(ref min) => {
+                (min, false)
+            }
+            Bound::Included(ref min) => {
+                (min, true)
+            }
+            Bound::Unbounded => unreachable!(),
+        };
+        // At this point, we need to find the starting location of `min` in
+        // the FST. However, as we search, we need to maintain a stack of
+        // reader states so that the reader can pick up where we left off.
+        // N.B. We do not necessarily need to stop in a final state, unlike
+        // the one-off `find` method. For the example, the given bound might
+        // not actually exist in the FST.
+        let mut node = self.fst.root(self.data);
+        let mut out = Output::zero();
+        let mut aut_state = self.aut.start();
+        for &b in key {
+            match node.find_input(b) {
+                Some(i) => {
+                    let t = node.transition(i);
+                    let prev_state = aut_state;
+                    aut_state = self.aut.accept(&prev_state, b);
+                    self.inp.push(b);
+                    self.stack.push(StreamState {
+                        node,
+                        trans: i+1,
+                        out,
+                        aut_state: prev_state,
+                    });
+                    out = out.cat(t.out);
+                    node = self.fst.node(t.addr, self.data);
+                }
+                None => {
+                    // This is a little tricky. We're in this case if the
+                    // given bound is not a prefix of any key in the FST.
+                    // Since this is a minimum bound, we need to find the
+                    // first transition in this node that proceeds the current
+                    // input byte.
+                    self.stack.push(StreamState {
+                        node,
+                        trans: node.transitions()
+                            .position(|t| t.inp > b)
+                            .unwrap_or(node.len()),
+                        out,
+                        aut_state,
+                    });
+                    return;
+                }
+            }
+        }
+        if !self.stack.is_empty() {
+            let last = self.stack.len() - 1;
+            if inclusive {
+                self.stack[last].trans -= 1;
+                self.inp.pop();
+            } else {
+                let node = self.stack[last].node;
+                let trans = self.stack[last].trans;
+                self.stack.push(StreamState {
+                    node: self.fst.node(node.transition(trans - 1).addr, self.data),
+                    trans: 0,
+                    out,
+                    aut_state,
+                });
+            }
+        }
     }
 
     /// Convert this stream into a vector of byte strings and outputs.
@@ -753,97 +832,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
 
 
 
-#[inline(always)]
-fn seek_min<'f, A>(min: Bound,
-                   fst: &FstMeta,
-                   data: &'f [u8],
-                   inp: &mut Vec<u8>,
-                   stack: &mut Vec<StreamState<'f, A::State>>,
-                   empty_output: &mut Option<Output>,
-                   aut: &A)
-    where A: Automaton {
-    if min.is_empty() {
-        if min.is_inclusive() {
-            *empty_output = fst.empty_final_output(data);
-        }
-        stack.clear();
-        mem::replace(stack, vec![StreamState {
-            node:  fst.root(data),
-            trans: 0,
-            out: Output::zero(),
-            aut_state: aut.start(),
-        }]);
-        return;
-    }
-    let (key, inclusive) = match min {
-        Bound::Excluded(ref min) => {
-            (min, false)
-        }
-        Bound::Included(ref min) => {
-            (min, true)
-        }
-        Bound::Unbounded => unreachable!(),
-    };
-    // At this point, we need to find the starting location of `min` in
-    // the FST. However, as we search, we need to maintain a stack of
-    // reader states so that the reader can pick up where we left off.
-    // N.B. We do not necessarily need to stop in a final state, unlike
-    // the one-off `find` method. For the example, the given bound might
-    // not actually exist in the FST.
-    let mut node = fst.root(data);
-    let mut out = Output::zero();
-    let mut aut_state = aut.start();
-    for &b in key {
-        match node.find_input(b) {
-            Some(i) => {
-                let t = node.transition(i);
-                let prev_state = aut_state;
-                aut_state = aut.accept(&prev_state, b);
-                inp.push(b);
-                stack.push(StreamState {
-                    node,
-                    trans: i+1,
-                    out,
-                    aut_state: prev_state,
-                });
-                out = out.cat(t.out);
-                node = fst.node(t.addr, data);
-            }
-            None => {
-                // This is a little tricky. We're in this case if the
-                // given bound is not a prefix of any key in the FST.
-                // Since this is a minimum bound, we need to find the
-                // first transition in this node that proceeds the current
-                // input byte.
-                stack.push(StreamState {
-                    node,
-                    trans: node.transitions()
-                        .position(|t| t.inp > b)
-                        .unwrap_or(node.len()),
-                    out,
-                    aut_state,
-                });
-                return;
-            }
-        }
-    }
-    if !stack.is_empty() {
-        let last = stack.len() - 1;
-        if inclusive {
-            stack[last].trans -= 1;
-            inp.pop();
-        } else {
-            let node = stack[last].node;
-            let trans = stack[last].trans;
-            stack.push(StreamState {
-                node: fst.node(node.transition(trans - 1).addr, data),
-                trans: 0,
-                out,
-                aut_state,
-            });
-        }
-    }
-}
+
 
 impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
     type Item = (&'a [u8], Output);

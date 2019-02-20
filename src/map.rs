@@ -1,5 +1,5 @@
 use std::fmt;
-use std::iter::{self, FromIterator};
+use std::iter::FromIterator;
 use std::io;
 
 use automaton::{Automaton, AlwaysMatch};
@@ -8,7 +8,6 @@ pub use raw::IndexedValue as IndexedValue;
 use stream::{IntoStreamer, Streamer};
 use Result;
 use std::ops::Deref;
-use raw::FstData;
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///

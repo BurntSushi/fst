@@ -18,11 +18,9 @@ option of specifying a merge strategy for output values.
 
 Most of the rest of the types are streams from set operations.
 */
-use std::borrow::Cow;
 use std::cmp;
 use std::fmt;
 use std::ops::Deref;
-use std::sync::Arc;
 
 use byteorder::{ReadBytesExt, LittleEndian};
 
@@ -273,37 +271,38 @@ pub type CompiledAddr = usize;
 /// * [Comparison of Construction Algorithms for Minimal, Acyclic, Deterministic, Finite-State Automata from Sets of Strings](http://www.cs.mun.ca/~harold/Courses/Old/CS4750/Diary/q3p2qx4lv71m5vew.pdf)
 ///   (excellent for surface level overview)
 pub struct Fst<Data=Vec<u8>> {
-    version: u64,
+    meta: FstMeta,
     data: Data,
+}
+
+pub struct FstMeta {
+    version: u64,
     root_addr: CompiledAddr,
     ty: FstType,
     len: usize,
 }
 
-impl<'f> Fst<&'f [u8]> {
+impl FstMeta {
     #[inline(always)]
-    pub fn root_dissociate(&self) -> Node<'f> {
-        self.node_dissociate(self.root_addr)
+    fn root<'f>(&self, data: &'f [u8]) -> Node<'f> {
+        self.node(self.root_addr, data)
     }
 
     #[inline(always)]
-    pub fn node_dissociate(&self, addr: CompiledAddr) -> Node<'f> {
-        node_new(self.version, addr, self.data)
+    fn node<'f>(&self, addr: CompiledAddr, data: &'f [u8]) -> Node<'f> {
+        node_new(self.version, addr, data)
     }
-}
 
-impl<'f, Data> Into<Fst<&'f [u8]>> for &'f Fst<Data> where Data: Deref<Target=[u8]> {
-    fn into(self) -> Fst<&'f [u8]> {
-        let data = self.data.deref();
-        Fst {
-            version: self.version,
-            data,
-            root_addr: self.root_addr,
-            ty: self.ty,
-            len: self.len
+    fn empty_final_output(&self, data: &[u8]) -> Option<Output> {
+        let root = self.root(data);
+        if root.is_final() {
+            Some(root.final_output())
+        } else {
+            None
         }
     }
 }
+
 
 impl<Data: Deref<Target=[u8]>> Fst<Data> {
 
@@ -357,11 +356,13 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
             return Err(Error::Format.into());
         }
         Ok(Fst {
-            version: version,
-            data: data,
-            root_addr: root_addr,
-            ty: ty,
-            len: len,
+            data,
+            meta: FstMeta {
+                version,
+                root_addr,
+                ty,
+                len
+            }
         })
     }
 
@@ -405,7 +406,11 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// this fst.
     #[inline]
     pub fn stream(&self) -> Stream {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
+        self.stream_builder(AlwaysMatch).into_stream()
+    }
+
+    fn stream_builder<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
+        StreamBuilder::new(&self.meta, self.data.deref(), aut)
     }
 
     /// Return a builder for range queries.
@@ -414,24 +419,24 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// range given in lexicographic order.
     #[inline]
     pub fn range(&self) -> StreamBuilder {
-        StreamBuilder::new(self, AlwaysMatch)
+        self.stream_builder(AlwaysMatch)
     }
 
     /// Executes an automaton on the keys of this map.
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
-        StreamBuilder::new(self, aut)
+        self.stream_builder(aut)
     }
 
     /// Returns the number of keys in this fst.
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        self.meta.len
     }
 
     /// Returns true if and only if this fst has no keys.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len == 0
+        self.len() == 0
     }
 
     /// Returns the number of bytes used by this fst.
@@ -503,13 +508,13 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// the meaning of 0-255 unspecified.
     #[inline]
     pub fn fst_type(&self) -> FstType {
-        self.ty
+        self.meta.ty
     }
 
     /// Returns the root node of this fst.
     #[inline(always)]
     pub fn root(&self) -> Node {
-        self.node(self.root_addr)
+        self.meta.root(self.data.deref())
     }
 
     /// Returns the node at the given address.
@@ -517,22 +522,13 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// Node addresses can be obtained by reading transitions on `Node` values.
     #[inline]
     pub fn node(&self, addr: CompiledAddr) -> Node {
-        node_new(self.version, addr, &self.data)
+        self.meta.node(addr, self.data.deref())
     }
 
     /// Returns a copy of the binary contents of this FST.
     #[inline]
     pub fn to_vec(&self) -> Vec<u8> {
         self.data.to_vec()
-    }
-
-    fn empty_final_output(&self) -> Option<Output> {
-        let root = self.root();
-        if root.is_final() {
-            Some(root.final_output())
-        } else {
-            None
-        }
     }
 }
 
@@ -542,7 +538,7 @@ impl<'a, 'f, Data> IntoStreamer<'a> for &'f Fst<Data> where Data: Deref<Target=[
 
     #[inline]
     fn into_stream(self) -> Self::Into {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
+        self.stream()
     }
 }
 
@@ -559,16 +555,18 @@ impl<'a, 'f, Data> IntoStreamer<'a> for &'f Fst<Data> where Data: Deref<Target=[
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct StreamBuilder<'f, A=AlwaysMatch> {
-    fst: Fst<&'f [u8]>,
+    fst: &'f FstMeta,
+    data: &'f [u8],
     aut: A,
     min: Bound,
     max: Bound,
 }
 
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
-    fn new<F: Into<Fst<&'f [u8]>>>(fst: F, aut: A) -> Self {
+    fn new(fst: &'f FstMeta, data: &'f [u8], aut: A) -> Self {
         StreamBuilder {
-            fst: fst.into(),
+            fst,
+            data,
             aut,
             min: Bound::Unbounded,
             max: Bound::Unbounded,
@@ -605,7 +603,7 @@ impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
     type Into = Stream<'f, A>;
 
     fn into_stream(self) -> Stream<'f, A> {
-        Stream::new(self.fst, self.aut, self.min, self.max)
+        Stream::new(self.fst, self.data, self.aut, self.min, self.max)
     }
 }
 
@@ -648,7 +646,8 @@ impl Bound {
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
-    fst: Fst<&'f [u8]>,
+    fst: &'f FstMeta,
+    data: &'f [u8],
     aut: A,
     inp: Vec<u8>,
     empty_output: Option<Output>,
@@ -665,9 +664,10 @@ struct StreamState<'f, S> {
 }
 
 impl<'f, A: Automaton> Stream<'f, A> {
-    fn new(fst: Fst<&'f [u8]>, aut: A, min: Bound, max: Bound) -> Self {
+    fn new(fst: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound) -> Self {
         let mut rdr = Stream {
             fst,
+            data,
             aut,
             inp: Vec::with_capacity(16),
             empty_output: None,
@@ -686,7 +686,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
     fn seek_min(&mut self, min: Bound) {
-        seek_min(min, &self.fst, &mut self.inp, &mut self.stack, &mut self.empty_output, &self.aut);
+        seek_min(min, &self.fst, self.data, &mut self.inp, &mut self.stack, &mut self.empty_output, &self.aut);
     }
 
     /// Convert this stream into a vector of byte strings and outputs.
@@ -755,7 +755,8 @@ impl<'f, A: Automaton> Stream<'f, A> {
 
 #[inline(always)]
 fn seek_min<'f, A>(min: Bound,
-                   fst: &Fst<&'f [u8]>,
+                   fst: &FstMeta,
+                   data: &'f [u8],
                    inp: &mut Vec<u8>,
                    stack: &mut Vec<StreamState<'f, A::State>>,
                    empty_output: &mut Option<Output>,
@@ -763,11 +764,11 @@ fn seek_min<'f, A>(min: Bound,
     where A: Automaton {
     if min.is_empty() {
         if min.is_inclusive() {
-            *empty_output = fst.empty_final_output();
+            *empty_output = fst.empty_final_output(data);
         }
         stack.clear();
         mem::replace(stack, vec![StreamState {
-            node:  fst.root_dissociate(),
+            node:  fst.root(data),
             trans: 0,
             out: Output::zero(),
             aut_state: aut.start(),
@@ -789,7 +790,7 @@ fn seek_min<'f, A>(min: Bound,
     // N.B. We do not necessarily need to stop in a final state, unlike
     // the one-off `find` method. For the example, the given bound might
     // not actually exist in the FST.
-    let mut node = fst.root_dissociate();
+    let mut node = fst.root(data);
     let mut out = Output::zero();
     let mut aut_state = aut.start();
     for &b in key {
@@ -806,7 +807,7 @@ fn seek_min<'f, A>(min: Bound,
                     aut_state: prev_state,
                 });
                 out = out.cat(t.out);
-                node = fst.node_dissociate(t.addr);
+                node = fst.node(t.addr, data);
             }
             None => {
                 // This is a little tricky. We're in this case if the
@@ -835,7 +836,7 @@ fn seek_min<'f, A>(min: Bound,
             let node = stack[last].node;
             let trans = stack[last].trans;
             stack.push(StreamState {
-                node: fst.node_dissociate(node.transition(trans - 1).addr),
+                node: fst.node(node.transition(trans - 1).addr, data),
                 trans: 0,
                 out,
                 aut_state,
@@ -869,7 +870,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             let out = state.out.cat(trans.out);
             let next_state = self.aut.accept(&state.aut_state, trans.inp);
             let is_match = self.aut.is_match(&next_state);
-            let next_node = self.fst.node_dissociate(trans.addr);
+            let next_node = self.fst.node(trans.addr, self.data);
             self.inp.push(trans.inp);
             self.stack.push(StreamState {
                 trans: state.trans + 1, .. state
@@ -953,28 +954,6 @@ impl Output {
     pub fn sub(self, o: Output) -> Output {
         Output(self.0.checked_sub(o.0)
                      .expect("BUG: underflow subtraction not allowed"))
-    }
-}
-
-pub enum FstData {
-    Cow(Cow<'static, [u8]>),
-    Shared {
-        vec: Arc<Vec<u8>>,
-        offset: usize,
-        len: usize,
-    },
-}
-
-impl Deref for FstData {
-    type Target = [u8];
-
-    fn deref(&self) -> &[u8] {
-        match *self {
-            FstData::Cow(ref v) => &**v,
-            FstData::Shared { ref vec, offset, len } => {
-                &vec[offset..offset + len]
-            }
-        }
     }
 }
 

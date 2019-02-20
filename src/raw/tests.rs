@@ -1,10 +1,8 @@
-use std::sync::Arc;
-
 use automaton::AlwaysMatch;
 use error::Error;
 use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
 use stream::Streamer;
-use raw::FstData;
+use std::ops::Deref;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -244,7 +242,7 @@ macro_rules! test_range {
                 items.into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
             let fst: Fst = fst_map(items.clone()).into();
-            let mut rdr = Stream::new((&fst).into(), AlwaysMatch, $min, $max);
+            let mut rdr = Stream::new(&fst.meta, fst.data.deref(), AlwaysMatch, $min, $max);
             for i in $imin..$imax {
                 assert_eq!(rdr.next().unwrap(),
                            (items[i].0.as_bytes(), Output::new(items[i].1)));

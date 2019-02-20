@@ -322,17 +322,20 @@ impl<'f> Fst<&'f [u8]> {
     }
 }
 
-impl<Data: Deref<Target=[u8]>> Fst<Data> {
-
-    fn to_ref_fst<'a>(&'a self) -> Fst<&'a [u8]> {
+impl<'f, Data> Into<Fst<&'f [u8]>> for &'f Fst<Data> where Data: Deref<Target=[u8]> {
+    fn into(self) -> Fst<&'f [u8]> {
+        let data = self.data.deref();
         Fst {
             version: self.version,
-            data: self.data.deref(),
+            data,
             root_addr: self.root_addr,
             ty: self.ty,
             len: self.len
         }
     }
+}
+
+impl<Data: Deref<Target=[u8]>> Fst<Data> {
 
     fn new(data: Data) -> Result<Fst<Data>> {
         if data.len() < 32 {
@@ -432,7 +435,7 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// this fst.
     #[inline]
     pub fn stream(&self) -> Stream {
-        StreamBuilder::new(self.to_ref_fst(), AlwaysMatch).into_stream()
+        StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
 
     /// Return a builder for range queries.
@@ -441,12 +444,12 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// range given in lexicographic order.
     #[inline]
     pub fn range(&self) -> StreamBuilder {
-        StreamBuilder::new(self.to_ref_fst(), AlwaysMatch)
+        StreamBuilder::new(self, AlwaysMatch)
     }
 
     /// Executes an automaton on the keys of this map.
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
-        StreamBuilder::new(self.to_ref_fst(), aut)
+        StreamBuilder::new(self, aut)
     }
 
     /// Returns the number of keys in this fst.
@@ -569,7 +572,7 @@ impl<'a, 'f, Data> IntoStreamer<'a> for &'f Fst<Data> where Data: Deref<Target=[
 
     #[inline]
     fn into_stream(self) -> Self::Into {
-        StreamBuilder::new(self.to_ref_fst(), AlwaysMatch).into_stream()
+        StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
 }
 
@@ -593,9 +596,9 @@ pub struct StreamBuilder<'f, A=AlwaysMatch> {
 }
 
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
-    fn new(fst: Fst<&'f [u8]>, aut: A) -> Self {
+    fn new<F: Into<Fst<&'f [u8]>>>(fst: F, aut: A) -> Self {
         StreamBuilder {
-            fst,
+            fst: fst.into(),
             aut,
             min: Bound::Unbounded,
             max: Bound::Unbounded,

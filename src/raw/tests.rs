@@ -244,8 +244,7 @@ macro_rules! test_range {
                 items.into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
             let fst: Fst = fst_map(items.clone()).into();
-            let fst_ref: Fst<&[u8]> = fst.to_ref_fst();
-            let mut rdr = Stream::new(fst_ref, AlwaysMatch, $min, $max);
+            let mut rdr = Stream::new((&fst).into(), AlwaysMatch, $min, $max);
             for i in $imin..$imax {
                 assert_eq!(rdr.next().unwrap(),
                            (items[i].0.as_bytes(), Output::new(items[i].1)));

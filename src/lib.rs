@@ -56,174 +56,6 @@ The `raw` module permits direct interaction with finite state transducers.
 Namely, the states and transitions of a transducer can be directly accessed
 with the `raw` module.
 
-# Example: fuzzy query
-
-This example shows how to create a set of strings in memory, and then execute
-a fuzzy query. Namely, the query looks for all keys within an edit distance
-of `1` of `foo`. (Edit distance is the number of character insertions,
-deletions or substitutions required to get from one string to another. In this
-case, a character is a Unicode codepoint.)
-
-```rust
-extern crate fst;
-extern crate fst_levenshtein; // the fst-levenshtein crate
-
-use std::error::Error;
-
-use fst::{IntoStreamer, Streamer, Set};
-use fst_levenshtein::Levenshtein;
-
-# fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<Error>> {
-    // A convenient way to create sets in memory.
-    let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-    let set = Set::from_iter(keys)?;
-
-    // Build our fuzzy query.
-    let lev = Levenshtein::new("foo", 1)?;
-
-    // Apply our fuzzy query to the set we built.
-    let mut stream = set.search(lev).into_stream();
-
-    let keys = stream.into_strs()?;
-    assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
-    Ok(())
-}
-```
-
-# Example: stream a map to a file
-
-This shows how to create a `MapBuilder` that will stream construction of the
-map to a file. Notably, this will never store the entire transducer in memory.
-Instead, only constant memory is required.
-
-```rust,no_run
-# fn example() -> Result<(), fst::Error> {
-use std::fs::File;
-use std::io;
-
-use fst::{IntoStreamer, Streamer, Map, MapBuilder};
-
-// This is where we'll write our map to.
-let mut wtr = io::BufWriter::new(File::create("map.fst")?);
-
-// Create a builder that can be used to insert new key-value pairs.
-let mut build = MapBuilder::new(wtr)?;
-build.insert("bruce", 1).unwrap();
-build.insert("clarence", 2).unwrap();
-build.insert("stevie", 3).unwrap();
-
-// Finish construction of the map and flush its contents to disk.
-build.finish()?;
-
-// At this point, the map has been constructed. Now we'd like to search it.
-// This creates a memory map, which enables searching the map without loading
-// all of it into memory.
-let map = unsafe { Map::from_path("map.fst") }?;
-
-// Query for keys that are greater than or equal to clarence.
-let mut stream = map.range().ge("clarence").into_stream();
-
-let kvs = stream.into_str_vec()?;
-assert_eq!(kvs, vec![
-    ("clarence".to_owned(), 2),
-    ("stevie".to_owned(), 3),
-]);
-# Ok(())
-# }
-# example().unwrap();
-```
-
-# Example: case insensitive search
-
-We can perform case insensitive search on a set using a regular expression.
-Note that while sets can store arbitrary byte strings, a regular expression
-will only match valid UTF-8 encoded byte strings.
-
-```rust
-extern crate fst;
-extern crate fst_regex; // the fst-regex crate
-
-use std::error::Error;
-
-use fst::{IntoStreamer, Streamer, Set};
-use fst_regex::Regex;
-
-# fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<Error>> {
-    let set = Set::from_iter(&["FoO", "Foo", "fOO", "foo"])?;
-
-    let re = Regex::new("(?i)foo")?;
-    let mut stream = set.search(&re).into_stream();
-
-    let keys = stream.into_strs()?;
-    assert_eq!(keys, vec!["FoO", "Foo", "fOO", "foo"]);
-    Ok(())
-}
-```
-
-# Example: searching multiple sets efficiently
-
-Since queries can search a transducer without reading the entire data structure
-into memory, it is possible to search *many* transducers very quickly.
-
-This crate provides efficient set/map operations that allow one to combine
-multiple streams of search results. Each operation only uses memory
-proportional to the number of streams.
-
-The example below shows how to find all keys that have at least one capital
-letter that doesn't appear at the beginning of the key. The example below uses
-sets, but the same operations are available on maps too.
-
-```rust
-extern crate fst;
-extern crate fst_regex; // the fst-regex crate
-
-use std::error::Error;
-
-use fst::{Streamer, Set};
-use fst::set;
-use fst_regex::Regex;
-
-# fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<Error>> {
-    let set1 = Set::from_iter(&["AC/DC", "Aerosmith"])?;
-    let set2 = Set::from_iter(&["Bob Seger", "Bruce Springsteen"])?;
-    let set3 = Set::from_iter(&["George Thorogood", "Golden Earring"])?;
-    let set4 = Set::from_iter(&["Kansas"])?;
-    let set5 = Set::from_iter(&["Metallica"])?;
-
-    // Create the regular expression. We can reuse it to search all of the sets.
-    let re = Regex::new(r".+\p{Lu}.*")?;
-
-    // Build a set operation. All we need to do is add a search result stream for
-    // each set and ask for the union. (Other operations, like intersection and
-    // difference are also available.)
-    let mut stream =
-        set::OpBuilder::new()
-        .add(set1.search(&re))
-        .add(set2.search(&re))
-        .add(set3.search(&re))
-        .add(set4.search(&re))
-        .add(set5.search(&re))
-        .union();
-
-    // Now collect all of the keys. Alternatively, you could build another set here
-    // using `SetBuilder::extend_stream`.
-    let mut keys = vec![];
-    while let Some(key) = stream.next() {
-        keys.push(key.to_vec());
-    }
-    assert_eq!(keys, vec![
-        "AC/DC".as_bytes(),
-        "Bob Seger".as_bytes(),
-        "Bruce Springsteen".as_bytes(),
-        "George Thorogood".as_bytes(),
-        "Golden Earring".as_bytes(),
-    ]);
-    Ok(())
-}
-```
 
 # Memory usage
 
@@ -306,20 +138,16 @@ improved.
 Note that whether you're using regexes or Levenshtein automatons, an error
 will be returned if the automaton gets too big (tens of MB in heap usage).
 */
-
-#![deny(missing_docs)]
+#![warn(missing_docs)]
 
 extern crate byteorder;
-#[cfg(test)] extern crate fst_levenshtein;
 #[cfg(test)] extern crate fst_regex;
-#[cfg(feature = "mmap")] extern crate memmap;
 #[cfg(test)] extern crate quickcheck;
 #[cfg(test)] extern crate rand;
 
 pub use automaton::Automaton;
 pub use error::{Error, Result};
 pub use map::{Map, MapBuilder};
-pub use set::{Set, SetBuilder};
 pub use stream::{IntoStreamer, Streamer};
 
 #[path = "automaton/mod.rs"]
@@ -328,8 +156,6 @@ mod error;
 #[path = "map.rs"]
 mod inner_map;
 pub mod raw;
-#[path = "set.rs"]
-mod inner_set;
 mod stream;
 
 /// Automaton implementations for finite state transducers.
@@ -357,27 +183,4 @@ pub mod automaton {
 /// types are streams for set operations.
 pub mod map {
     pub use inner_map::*;
-}
-
-/// Set operations implemented by finite state transducers.
-///
-/// This API provided by this sub-module is close in spirit to the API
-/// provided by
-/// [`std::collections::BTreeSet`](http://doc.rust-lang.org/stable/std/collections/struct.BTreeSet.html).
-/// The principle difference, as with everything else in this crate, is that
-/// operations are performed on streams of byte strings instead of generic
-/// iterators. Another difference is that most of the set operations (union,
-/// intersection, difference and symmetric difference) work on multiple sets at
-/// the same time, instead of two.
-///
-/// # Overview of types
-///
-/// `Set` is a read only interface to pre-constructed sets. `SetBuilder` is
-/// used to create new sets. (Once a set is created, it can never be modified.)
-/// `Stream` is a stream of values that originated from a set (analogous to an
-/// iterator). `StreamBuilder` builds range queries. `OpBuilder` collects a set
-/// of streams and executes set operations like `union` or `intersection` on
-/// them. The rest of the types are streams for set operations.
-pub mod set {
-    pub use inner_set::*;
 }

@@ -22,8 +22,6 @@ use std::borrow::Cow;
 use std::cmp;
 use std::fmt;
 use std::ops::Deref;
-#[cfg(feature = "mmap")]
-use std::path::Path;
 use std::sync::Arc;
 
 use byteorder::{ReadBytesExt, LittleEndian};
@@ -35,18 +33,17 @@ use stream::{IntoStreamer, Streamer};
 pub use self::build::Builder;
 pub use self::error::Error;
 pub use self::node::{Node, Transitions};
-#[cfg(feature = "mmap")] pub use self::mmap::MmapReadOnly;
 use self::node::node_new;
 pub use self::ops::{
     IndexedValue, OpBuilder,
     Intersection, Union, Difference, SymmetricDifference,
 };
+use std::mem;
 
 mod build;
 mod common_inputs;
 mod counting_writer;
 mod error;
-#[cfg(feature = "mmap")] mod mmap;
 mod node;
 mod ops;
 mod pack;
@@ -275,42 +272,16 @@ pub type CompiledAddr = usize;
 ///   (excellent for in depth overview)
 /// * [Comparison of Construction Algorithms for Minimal, Acyclic, Deterministic, Finite-State Automata from Sets of Strings](http://www.cs.mun.ca/~harold/Courses/Old/CS4750/Diary/q3p2qx4lv71m5vew.pdf)
 ///   (excellent for surface level overview)
-pub struct Fst {
+pub struct Fst<Data=FstData> {
     version: u64,
-    data: FstData,
+    data: Data,
     root_addr: CompiledAddr,
     ty: FstType,
     len: usize,
 }
 
-impl Fst {
-    /// Opens a transducer stored at the given file path via a memory map.
-    ///
-    /// The fst must have been written with a compatible finite state
-    /// transducer builder (`Builder` qualifies). If the format is invalid or
-    /// if there is a mismatch between the API version of this library and the
-    /// fst, then an error is returned.
-    ///
-    /// This is unsafe because Rust programs cannot guarantee that memory
-    /// backed by a memory mapped file won't be mutably aliased. It is up to
-    /// the caller to enforce that the memory map is not modified while it is
-    /// opened.
-    #[cfg(feature = "mmap")]
-    pub unsafe fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Fst::from_mmap(MmapReadOnly::open_path(path)?)
-    }
 
-    /// Opens a transducer from a `MmapReadOnly`.
-    ///
-    /// This is useful if a transducer is serialized to only a part of a file.
-    /// A `MmapReadOnly` lets one control which region of the file is used for
-    /// the transducer.
-    #[cfg(feature = "mmap")]
-    #[inline]
-    pub fn from_mmap(mmap: MmapReadOnly) -> Result<Self> {
-        Fst::new(FstData::Mmap(mmap))
-    }
-
+impl Fst<FstData> {
     /// Creates a transducer from its representation as a raw byte sequence.
     ///
     /// Note that this operation is very cheap (no allocations and no copies).
@@ -320,34 +291,50 @@ impl Fst {
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     #[inline]
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Fst<FstData>> {
         Fst::new(FstData::Cow(Cow::Owned(bytes)))
     }
 
-    /// Creates a transducer from its representation as a raw byte sequence.
-    ///
-    /// This accepts a static byte slice, which may be useful if the Fst
-    /// is embedded into source code.
-    #[inline]
-    pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
-        Fst::new(FstData::Cow(Cow::Borrowed(bytes)))
+}
+
+
+//impl<'a, Data: Deref<Target=[u8]>> Into<Fst<&'a [u8]>> for &'a Fst<Data> {
+//    fn into(self) -> Fst<&'a [u8]> {
+//        Fst {
+//            version: self.version,
+//            data: self.data.deref(),
+//            root_addr: self.root_addr,
+//            ty: self.ty,
+//            len: self.len
+//        }
+//    }
+//}
+
+impl<'f> Fst<&'f [u8]> {
+    #[inline(always)]
+    pub fn root_dissociate(&self) -> Node<'f> {
+        self.node_dissociate(self.root_addr)
     }
 
-    /// Creates a transducer from a shared vector at the given offset and
-    /// length.
-    ///
-    /// This permits creating multiple transducers from a single region of
-    /// owned memory.
-    #[inline]
-    pub fn from_shared_bytes(
-        bytes: Arc<Vec<u8>>,
-        offset: usize,
-        len: usize,
-    ) -> Result<Self> {
-        Fst::new(FstData::Shared { vec: bytes, offset: offset, len: len })
+    #[inline(always)]
+    pub fn node_dissociate(&self, addr: CompiledAddr) -> Node<'f> {
+        node_new(self.version, addr, self.data)
+    }
+}
+
+impl<Data: Deref<Target=[u8]>> Fst<Data> {
+
+    fn to_ref_fst<'a>(&'a self) -> Fst<&'a [u8]> {
+        Fst {
+            version: self.version,
+            data: self.data.deref(),
+            root_addr: self.root_addr,
+            ty: self.ty,
+            len: self.len
+        }
     }
 
-    fn new(data: FstData) -> Result<Self> {
+    fn new(data: Data) -> Result<Fst<Data>> {
         if data.len() < 32 {
             return Err(Error::Format.into());
         }
@@ -445,7 +432,7 @@ impl Fst {
     /// this fst.
     #[inline]
     pub fn stream(&self) -> Stream {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
+        StreamBuilder::new(self.to_ref_fst(), AlwaysMatch).into_stream()
     }
 
     /// Return a builder for range queries.
@@ -454,12 +441,12 @@ impl Fst {
     /// range given in lexicographic order.
     #[inline]
     pub fn range(&self) -> StreamBuilder {
-        StreamBuilder::new(self, AlwaysMatch)
+        StreamBuilder::new(self.to_ref_fst(), AlwaysMatch)
     }
 
     /// Executes an automaton on the keys of this map.
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
-        StreamBuilder::new(self, aut)
+        StreamBuilder::new(self.to_ref_fst(), aut)
     }
 
     /// Returns the number of keys in this fst.
@@ -576,13 +563,13 @@ impl Fst {
     }
 }
 
-impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
+impl<'a, 'f, Data> IntoStreamer<'a> for &'f Fst<Data> where Data: Deref<Target=[u8]> {
     type Item = (&'a [u8], Output);
     type Into = Stream<'f>;
 
     #[inline]
     fn into_stream(self) -> Self::Into {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
+        StreamBuilder::new(self.to_ref_fst(), AlwaysMatch).into_stream()
     }
 }
 
@@ -599,17 +586,17 @@ impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct StreamBuilder<'f, A=AlwaysMatch> {
-    fst: &'f Fst,
+    fst: Fst<&'f [u8]>,
     aut: A,
     min: Bound,
     max: Bound,
 }
 
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
-    fn new(fst: &'f Fst, aut: A) -> Self {
+    fn new(fst: Fst<&'f [u8]>, aut: A) -> Self {
         StreamBuilder {
-            fst: fst,
-            aut: aut,
+            fst,
+            aut,
             min: Bound::Unbounded,
             max: Bound::Unbounded,
         }
@@ -688,7 +675,7 @@ impl Bound {
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
-    fst: &'f Fst,
+    fst: Fst<&'f [u8]>,
     aut: A,
     inp: Vec<u8>,
     empty_output: Option<Output>,
@@ -705,10 +692,10 @@ struct StreamState<'f, S> {
 }
 
 impl<'f, A: Automaton> Stream<'f, A> {
-    fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
+    fn new(fst: Fst<&'f [u8]>, aut: A, min: Bound, max: Bound) -> Self {
         let mut rdr = Stream {
-            fst: fst,
-            aut: aut,
+            fst,
+            aut,
             inp: Vec::with_capacity(16),
             empty_output: None,
             stack: vec![],
@@ -726,86 +713,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
     fn seek_min(&mut self, min: Bound) {
-        if min.is_empty() {
-            if min.is_inclusive() {
-                self.empty_output = self.fst.empty_final_output();
-            }
-            self.stack = vec![StreamState {
-                node: self.fst.root(),
-                trans: 0,
-                out: Output::zero(),
-                aut_state: self.aut.start(),
-            }];
-            return;
-        }
-        let (key, inclusive) = match min {
-            Bound::Excluded(ref min) => {
-                (min, false)
-            }
-            Bound::Included(ref min) => {
-                (min, true)
-            }
-            Bound::Unbounded => unreachable!(),
-        };
-        // At this point, we need to find the starting location of `min` in
-        // the FST. However, as we search, we need to maintain a stack of
-        // reader states so that the reader can pick up where we left off.
-        // N.B. We do not necessarily need to stop in a final state, unlike
-        // the one-off `find` method. For the example, the given bound might
-        // not actually exist in the FST.
-        let mut node = self.fst.root();
-        let mut out = Output::zero();
-        let mut aut_state = self.aut.start();
-        for &b in key {
-            match node.find_input(b) {
-                Some(i) => {
-                    let t = node.transition(i);
-                    let prev_state = aut_state;
-                    aut_state = self.aut.accept(&prev_state, b);
-                    self.inp.push(b);
-                    self.stack.push(StreamState {
-                        node: node,
-                        trans: i+1,
-                        out: out,
-                        aut_state: prev_state,
-                    });
-                    out = out.cat(t.out);
-                    node = self.fst.node(t.addr);
-                }
-                None => {
-                    // This is a little tricky. We're in this case if the
-                    // given bound is not a prefix of any key in the FST.
-                    // Since this is a minimum bound, we need to find the
-                    // first transition in this node that proceeds the current
-                    // input byte.
-                    self.stack.push(StreamState {
-                        node: node,
-                        trans: node.transitions()
-                                   .position(|t| t.inp > b)
-                                   .unwrap_or(node.len()),
-                        out: out,
-                        aut_state: aut_state,
-                    });
-                    return;
-                }
-            }
-        }
-        if !self.stack.is_empty() {
-            let last = self.stack.len() - 1;
-            if inclusive {
-                self.stack[last].trans -= 1;
-                self.inp.pop();
-            } else {
-                let node = self.stack[last].node;
-                let trans = self.stack[last].trans;
-                self.stack.push(StreamState {
-                    node: self.fst.node(node.transition(trans - 1).addr),
-                    trans: 0,
-                    out: out,
-                    aut_state: aut_state,
-                });
-            }
-        }
+        seek_min(min, &self.fst, &mut self.inp, &mut self.stack, &mut self.empty_output, &self.aut);
     }
 
     /// Convert this stream into a vector of byte strings and outputs.
@@ -870,6 +778,99 @@ impl<'f, A: Automaton> Stream<'f, A> {
     }
 }
 
+
+
+#[inline(always)]
+fn seek_min<'f, A>(min: Bound,
+                   fst: &Fst<&'f [u8]>,
+                   inp: &mut Vec<u8>,
+                   stack: &mut Vec<StreamState<'f, A::State>>,
+                   empty_output: &mut Option<Output>,
+                   aut: &A)
+    where A: Automaton {
+    if min.is_empty() {
+        if min.is_inclusive() {
+            *empty_output = fst.empty_final_output();
+        }
+        stack.clear();
+        mem::replace(stack, vec![StreamState {
+            node:  fst.root_dissociate(),
+            trans: 0,
+            out: Output::zero(),
+            aut_state: aut.start(),
+        }]);
+        return;
+    }
+    let (key, inclusive) = match min {
+        Bound::Excluded(ref min) => {
+            (min, false)
+        }
+        Bound::Included(ref min) => {
+            (min, true)
+        }
+        Bound::Unbounded => unreachable!(),
+    };
+    // At this point, we need to find the starting location of `min` in
+    // the FST. However, as we search, we need to maintain a stack of
+    // reader states so that the reader can pick up where we left off.
+    // N.B. We do not necessarily need to stop in a final state, unlike
+    // the one-off `find` method. For the example, the given bound might
+    // not actually exist in the FST.
+    let mut node = fst.root_dissociate();
+    let mut out = Output::zero();
+    let mut aut_state = aut.start();
+    for &b in key {
+        match node.find_input(b) {
+            Some(i) => {
+                let t = node.transition(i);
+                let prev_state = aut_state;
+                aut_state = aut.accept(&prev_state, b);
+                inp.push(b);
+                stack.push(StreamState {
+                    node,
+                    trans: i+1,
+                    out,
+                    aut_state: prev_state,
+                });
+                out = out.cat(t.out);
+                node = fst.node_dissociate(t.addr);
+            }
+            None => {
+                // This is a little tricky. We're in this case if the
+                // given bound is not a prefix of any key in the FST.
+                // Since this is a minimum bound, we need to find the
+                // first transition in this node that proceeds the current
+                // input byte.
+                stack.push(StreamState {
+                    node,
+                    trans: node.transitions()
+                        .position(|t| t.inp > b)
+                        .unwrap_or(node.len()),
+                    out,
+                    aut_state,
+                });
+                return;
+            }
+        }
+    }
+    if !stack.is_empty() {
+        let last = stack.len() - 1;
+        if inclusive {
+            stack[last].trans -= 1;
+            inp.pop();
+        } else {
+            let node = stack[last].node;
+            let trans = stack[last].trans;
+            stack.push(StreamState {
+                node: fst.node_dissociate(node.transition(trans - 1).addr),
+                trans: 0,
+                out,
+                aut_state,
+            });
+        }
+    }
+}
+
 impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
     type Item = (&'a [u8], Output);
 
@@ -895,7 +896,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             let out = state.out.cat(trans.out);
             let next_state = self.aut.accept(&state.aut_state, trans.inp);
             let is_match = self.aut.is_match(&next_state);
-            let next_node = self.fst.node(trans.addr);
+            let next_node = self.fst.node_dissociate(trans.addr);
             self.inp.push(trans.inp);
             self.stack.push(StreamState {
                 trans: state.trans + 1, .. state
@@ -903,7 +904,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             self.stack.push(StreamState {
                 node: next_node,
                 trans: 0,
-                out: out,
+                out,
                 aut_state: next_state,
             });
             if self.end_at.exceeded_by(&self.inp) {
@@ -982,15 +983,13 @@ impl Output {
     }
 }
 
-enum FstData {
+pub enum FstData {
     Cow(Cow<'static, [u8]>),
     Shared {
         vec: Arc<Vec<u8>>,
         offset: usize,
         len: usize,
     },
-    #[cfg(feature = "mmap")]
-    Mmap(MmapReadOnly),
 }
 
 impl Deref for FstData {
@@ -1002,8 +1001,6 @@ impl Deref for FstData {
             FstData::Shared { ref vec, offset, len } => {
                 &vec[offset..offset + len]
             }
-            #[cfg(feature = "mmap")]
-            FstData::Mmap(ref v) => v.as_slice(),
         }
     }
 }

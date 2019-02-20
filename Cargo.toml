@@ -13,10 +13,6 @@ readme = "README.md"
 keywords = ["search", "information", "retrieval", "dictionary", "map"]
 license = "Unlicense/MIT"
 
-[features]
-mmap = ["memmap"]
-default = ["mmap"]
-
 [[bench]]
 name = "build"
 path = "./benches/build.rs"
@@ -31,11 +27,9 @@ bench = true
 
 [dependencies]
 byteorder = "1"
-memmap = { version = "0.6.0", optional = true }
 
 [dev-dependencies]
 fnv = "1.0.5"
-fst-levenshtein = { version = "0.2", path = "fst-levenshtein" }
 fst-regex = { version = "0.2", path = "fst-regex" }
 lazy_static = "0.2.8"
 quickcheck = { version = "0.7", default-features = false }

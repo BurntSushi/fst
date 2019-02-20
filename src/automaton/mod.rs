@@ -120,33 +120,6 @@ impl<'a, T: Automaton> Automaton for &'a T {
 }
 
 /// An automaton that matches if the input contains a specific subsequence.
-///
-/// It can be used to build a simple fuzzy-finder.
-///
-/// ```rust
-/// extern crate fst;
-///
-/// use std::error::Error;
-///
-/// use fst::{IntoStreamer, Streamer, Set};
-/// use fst::automaton::Subsequence;
-///
-/// # fn main() { example().unwrap(); }
-/// fn example() -> Result<(), Box<Error>> {
-///     let paths = vec!["/home/projects/bar", "/home/projects/foo", "/tmp/foo"];
-///     let set = Set::from_iter(paths)?;
-///
-///     // Build our fuzzy query.
-///     let subseq = Subsequence::new("hpf");
-///
-///     // Apply our fuzzy query to the set we built.
-///     let mut stream = set.search(subseq).into_stream();
-///
-///     let matches = stream.into_strs()?;
-///     assert_eq!(matches, vec!["/home/projects/foo"]);
-///     Ok(())
-/// }
-/// ```
 #[derive(Clone, Debug)]
 pub struct Subsequence<'a> {
     subseq: &'a [u8]

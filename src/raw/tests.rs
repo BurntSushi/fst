@@ -4,10 +4,11 @@ use automaton::AlwaysMatch;
 use error::Error;
 use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
 use stream::Streamer;
+use raw::FstData;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
-pub fn fst_set<I, S>(ss: I) -> Fst
+pub fn fst_set<I, S>(ss: I) -> Fst<FstData>
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<Vec<u8>> =
@@ -22,7 +23,7 @@ pub fn fst_set<I, S>(ss: I) -> Fst
     fst
 }
 
-pub fn fst_map<I, S>(ss: I) -> Fst
+pub fn fst_map<I, S>(ss: I) -> Fst<FstData>
         where I: IntoIterator<Item=(S, u64)>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<(Vec<u8>, u64)> =
@@ -35,7 +36,7 @@ pub fn fst_map<I, S>(ss: I) -> Fst
     Fst::from_bytes(bfst.into_inner().unwrap()).unwrap()
 }
 
-pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
+pub fn fst_inputs(fst: &Fst<FstData>) -> Vec<Vec<u8>> {
     let mut words = vec![];
     let mut rdr = fst.stream();
     while let Some((word, _)) = rdr.next() {
@@ -44,7 +45,7 @@ pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
     words
 }
 
-pub fn fst_inputs_outputs(fst: &Fst) -> Vec<(Vec<u8>, u64)> {
+pub fn fst_inputs_outputs(fst: &Fst<FstData>) -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
     let mut rdr = fst.stream();
     while let Some((word, out)) = rdr.next() {
@@ -242,8 +243,9 @@ macro_rules! test_range {
             let items: Vec<_> =
                 items.into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
-            let fst = fst_map(items.clone());
-            let mut rdr = Stream::new(&fst, AlwaysMatch, $min, $max);
+            let fst: Fst = fst_map(items.clone()).into();
+            let fst_ref: Fst<&[u8]> = fst.to_ref_fst();
+            let mut rdr = Stream::new(fst_ref, AlwaysMatch, $min, $max);
             for i in $imin..$imax {
                 assert_eq!(rdr.next().unwrap(),
                            (items[i].0.as_bytes(), Output::new(items[i].1)));
@@ -460,27 +462,6 @@ test_range! {
     min: Bound::Included(vec![b'c']), max: Bound::Excluded(vec![b'd']),
     imin: 2, imax: 3,
     "a", "b", "c", "d", "e", "f"
-}
-
-#[test]
-fn one_vec_multiple_fsts() {
-    let mut bfst1 = Builder::memory();
-    bfst1.add(b"bar").unwrap();
-    bfst1.add(b"baz").unwrap();
-    let bytes = bfst1.into_inner().unwrap();
-    let fst1_len = bytes.len();
-
-    let mut bfst2 = Builder::new(bytes).unwrap();
-    bfst2.add(b"bar").unwrap();
-    bfst2.add(b"foo").unwrap();
-    let bytes = Arc::new(bfst2.into_inner().unwrap());
-
-    let fst1 = Fst::from_shared_bytes(bytes.clone(), 0, fst1_len).unwrap();
-    let fst2 = Fst::from_shared_bytes(
-        bytes.clone(), fst1_len, bytes.len() - fst1_len).unwrap();
-
-    assert_eq!(fst_inputs(&fst1), vec![b"bar".to_vec(), b"baz".to_vec()]);
-    assert_eq!(fst_inputs(&fst2), vec![b"bar".to_vec(), b"foo".to_vec()]);
 }
 
 #[test]

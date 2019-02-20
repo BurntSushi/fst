@@ -1,14 +1,14 @@
 use std::fmt;
 use std::iter::{self, FromIterator};
 use std::io;
-#[cfg(feature = "mmap")]
-use std::path::Path;
 
 use automaton::{Automaton, AlwaysMatch};
 use raw;
 pub use raw::IndexedValue as IndexedValue;
 use stream::{IntoStreamer, Streamer};
 use Result;
+use std::ops::Deref;
+use raw::FstData;
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///
@@ -54,25 +54,9 @@ use Result;
 /// Keys will always be byte strings; however, we may grow more conveniences
 /// around dealing with them (such as a serialization/deserialization step,
 /// although it isn't clear where exactly this should live).
-pub struct Map(raw::Fst);
+pub struct Map<Data>(raw::Fst<Data>);
 
-impl Map {
-    /// Opens a map stored at the given file path via a memory map.
-    ///
-    /// The map must have been written with a compatible finite state
-    /// transducer builder (`MapBuilder` qualifies). If the format is invalid
-    /// or if there is a mismatch between the API version of this library
-    /// and the map, then an error is returned.
-    ///
-    /// This is unsafe because Rust programs cannot guarantee that memory
-    /// backed by a memory mapped file won't be mutably aliased. It is up to
-    /// the caller to enforce that the memory map is not modified while it is
-    /// opened.
-    #[cfg(feature = "mmap")]
-    pub unsafe fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        raw::Fst::from_path(path).map(Map)
-    }
-
+impl Map<FstData> {
     /// Creates a map from its representation as a raw byte sequence.
     ///
     /// Note that this operation is very cheap (no allocations and no copies).
@@ -81,7 +65,7 @@ impl Map {
     /// transducer builder (`MapBuilder` qualifies). If the format is invalid
     /// or if there is a mismatch between the API version of this library
     /// and the map, then an error is returned.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Map<FstData>> {
         raw::Fst::from_bytes(bytes).map(Map)
     }
 
@@ -95,11 +79,15 @@ impl Map {
     /// To build a map that streams to an arbitrary `io::Write`, use
     /// `MapBuilder`.
     pub fn from_iter<K, I>(iter: I) -> Result<Self>
-            where K: AsRef<[u8]>, I: IntoIterator<Item=(K, u64)> {
+        where K: AsRef<[u8]>, I: IntoIterator<Item=(K, u64)> {
         let mut builder = MapBuilder::memory();
         builder.extend_iter(iter)?;
         Map::from_bytes(builder.into_inner()?)
     }
+}
+
+impl<Data: Deref<Target=[u8]>> Map<Data> {
+
 
     /// Tests the membership of a single key.
     ///
@@ -364,19 +352,13 @@ impl Map {
 
     /// Returns a reference to the underlying raw finite state transducer.
     #[inline]
-    pub fn as_fst(&self) -> &raw::Fst {
+    pub fn as_fst(&self) -> &raw::Fst<Data> {
         &self.0
     }
 }
 
-impl Default for Map {
-    #[inline]
-    fn default() -> Map {
-        Map::from_iter(iter::empty::<(&[u8], u64)>()).unwrap()
-    }
-}
 
-impl fmt::Debug for Map {
+impl<Data: Deref<Target=[u8]>> fmt::Debug for Map<Data> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Map([")?;
         let mut stream = self.stream();
@@ -393,22 +375,22 @@ impl fmt::Debug for Map {
 }
 
 // Construct a map from an Fst object.
-impl From<raw::Fst> for Map {
+impl<Data> From<raw::Fst<Data>> for Map<Data> {
     #[inline]
-    fn from(fst: raw::Fst) -> Map {
+    fn from(fst: raw::Fst<Data>) -> Self {
         Map(fst)
     }
 }
 
 /// Returns the underlying finite state transducer.
-impl AsRef<raw::Fst> for Map {
+impl<Data> AsRef<raw::Fst<Data>> for Map<Data> {
     #[inline]
-    fn as_ref(&self) -> &raw::Fst {
+    fn as_ref(&self) -> &raw::Fst<Data> {
         &self.0
     }
 }
 
-impl<'m, 'a> IntoStreamer<'a> for &'m Map {
+impl<'m, 'a, Data: Deref<Target=[u8]>> IntoStreamer<'a> for &'m Map<Data> {
     type Item = (&'a [u8], u64);
     type Into = Stream<'m>;
 
@@ -466,40 +448,6 @@ impl<'m, 'a> IntoStreamer<'a> for &'m Map {
 ///
 /// // At this point, the map has been constructed, but here's how to read it.
 /// let map = Map::from_bytes(bytes).unwrap();
-/// let mut stream = map.into_stream();
-/// let mut kvs = vec![];
-/// while let Some((k, v)) = stream.next() {
-///     kvs.push((k.to_vec(), v));
-/// }
-/// assert_eq!(kvs, vec![
-///     (b"bruce".to_vec(), 1),
-///     (b"clarence".to_vec(), 2),
-///     (b"stevie".to_vec(), 3),
-/// ]);
-/// ```
-///
-/// # Example: stream to file
-///
-/// This shows how to do stream construction of a map to a file.
-///
-/// ```rust,no_run
-/// use std::fs::File;
-/// use std::io;
-///
-/// use fst::{IntoStreamer, Streamer, Map, MapBuilder};
-///
-/// let mut wtr = io::BufWriter::new(File::create("map.fst").unwrap());
-/// let mut build = MapBuilder::new(wtr).unwrap();
-/// build.insert("bruce", 1).unwrap();
-/// build.insert("clarence", 2).unwrap();
-/// build.insert("stevie", 3).unwrap();
-///
-/// // If you want the writer back, then call `into_inner`. Otherwise, this
-/// // will finish construction and call `flush`.
-/// build.finish().unwrap();
-///
-/// // At this point, the map has been constructed, but here's how to read it.
-/// let map = unsafe { Map::from_path("map.fst").unwrap() };
 /// let mut stream = map.into_stream();
 /// let mut kvs = vec![];
 /// while let Some((k, v)) = stream.next() {

@@ -272,7 +272,7 @@ pub type CompiledAddr = usize;
 ///   (excellent for in depth overview)
 /// * [Comparison of Construction Algorithms for Minimal, Acyclic, Deterministic, Finite-State Automata from Sets of Strings](http://www.cs.mun.ca/~harold/Courses/Old/CS4750/Diary/q3p2qx4lv71m5vew.pdf)
 ///   (excellent for surface level overview)
-pub struct Fst<Data=FstData> {
+pub struct Fst<Data=Vec<u8>> {
     version: u64,
     data: Data,
     root_addr: CompiledAddr,
@@ -291,24 +291,11 @@ impl Fst<FstData> {
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     #[inline]
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Fst<FstData>> {
-        Fst::new(FstData::Cow(Cow::Owned(bytes)))
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Fst<Vec<u8>>> {
+        Fst::new(bytes)
     }
 
 }
-
-
-//impl<'a, Data: Deref<Target=[u8]>> Into<Fst<&'a [u8]>> for &'a Fst<Data> {
-//    fn into(self) -> Fst<&'a [u8]> {
-//        Fst {
-//            version: self.version,
-//            data: self.data.deref(),
-//            root_addr: self.root_addr,
-//            ty: self.ty,
-//            len: self.len
-//        }
-//    }
-//}
 
 impl<'f> Fst<&'f [u8]> {
     #[inline(always)]

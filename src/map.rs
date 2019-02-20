@@ -56,7 +56,7 @@ use raw::FstData;
 /// although it isn't clear where exactly this should live).
 pub struct Map<Data>(raw::Fst<Data>);
 
-impl Map<FstData> {
+impl Map<Vec<u8>> {
     /// Creates a map from its representation as a raw byte sequence.
     ///
     /// Note that this operation is very cheap (no allocations and no copies).
@@ -65,7 +65,7 @@ impl Map<FstData> {
     /// transducer builder (`MapBuilder` qualifies). If the format is invalid
     /// or if there is a mismatch between the API version of this library
     /// and the map, then an error is returned.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Map<FstData>> {
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Map<Vec<u8>>> {
         raw::Fst::from_bytes(bytes).map(Map)
     }
 

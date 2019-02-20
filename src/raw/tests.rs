@@ -8,7 +8,7 @@ use raw::FstData;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
-pub fn fst_set<I, S>(ss: I) -> Fst<FstData>
+pub fn fst_set<I, S>(ss: I) -> Fst
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<Vec<u8>> =
@@ -23,7 +23,7 @@ pub fn fst_set<I, S>(ss: I) -> Fst<FstData>
     fst
 }
 
-pub fn fst_map<I, S>(ss: I) -> Fst<FstData>
+pub fn fst_map<I, S>(ss: I) -> Fst
         where I: IntoIterator<Item=(S, u64)>, S: AsRef<[u8]> {
     let mut bfst = Builder::memory();
     let mut ss: Vec<(Vec<u8>, u64)> =
@@ -36,7 +36,7 @@ pub fn fst_map<I, S>(ss: I) -> Fst<FstData>
     Fst::from_bytes(bfst.into_inner().unwrap()).unwrap()
 }
 
-pub fn fst_inputs(fst: &Fst<FstData>) -> Vec<Vec<u8>> {
+pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
     let mut words = vec![];
     let mut rdr = fst.stream();
     while let Some((word, _)) = rdr.next() {
@@ -45,7 +45,7 @@ pub fn fst_inputs(fst: &Fst<FstData>) -> Vec<Vec<u8>> {
     words
 }
 
-pub fn fst_inputs_outputs(fst: &Fst<FstData>) -> Vec<(Vec<u8>, u64)> {
+pub fn fst_inputs_outputs(fst: &Fst) -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
     let mut rdr = fst.stream();
     while let Some((word, out)) = rdr.next() {

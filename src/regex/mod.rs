@@ -57,45 +57,6 @@ pub use self::error::Error;
 /// crate will grow facilities for detecting regular expressions that will
 /// scan a large portion of a transducer and optionally disallow them.
 ///
-/// # Example
-///
-/// This example shows how to run a regular expression on a `Set`.
-///
-/// ```rust
-/// extern crate fst;
-/// extern crate fst_regex;
-///
-/// use fst::{IntoStreamer, Streamer, Set};
-/// use fst_regex::Regex;
-///
-/// fn main() {
-///     let set = Set::from_iter(&["foo", "foo1", "foo2", "foo3", "foobar"])
-///                   .unwrap();
-///
-///     let re = Regex::new("f[a-z]+3?").unwrap();
-///     let mut stream = set.search(&re).into_stream();
-///
-///     let mut keys = vec![];
-///     while let Some(key) = stream.next() {
-///         keys.push(key.to_vec());
-///     }
-///     assert_eq!(keys, vec![
-///         "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
-///     ]);
-/// }
-/// ```
-///
-/// # Warning: experimental
-///
-/// While executing a regular expression against a finite state transducer will
-/// be very fast, *construction* of a regular expression automaton may not be.
-/// Namely, this implementation is a proof of concept. In particular, one of
-/// its major deficiencies is that it can use enormous amounts of memory.
-/// Note though, that the construction phase will return an error if the
-/// underlying automata grows too big (tens of MB).
-///
-/// This is important functionality, so one should count on this implementation
-/// being vastly improved in the future.
 pub struct Regex {
     original: String,
     dfa: dfa::Dfa,

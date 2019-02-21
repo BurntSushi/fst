@@ -1,16 +1,14 @@
 [package]
 name = "tantivy-fst"
-version = "0.3.2"
+version = "0.1.0"
 authors = ["Paul Masurel<paul.masurel@gmail.com>"] # forked from Andrew Gallant's work
 description = """
-Use finite state transducers to compactly represents sets or maps of many
-strings (> 1 billion is possible).
+This is a fork from the
 """
-documentation = "https://docs.rs/fst"
-homepage = "https://github.com/BurntSushi/fst"
-repository = "https://github.com/BurntSushi/fst"
+documentation = "https://docs.rs/tantivy-fst"
+repository = "https://github.com/tantivy-search/fst"
 readme = "README.md"
-keywords = ["search", "information", "retrieval", "dictionary", "map"]
+keywords = ["donotuseme"]
 license = "Unlicense/MIT"
 
 [[bench]]
@@ -27,8 +25,9 @@ bench = true
 
 [dependencies]
 byteorder = "1"
-regex-syntax = "0.3"
+regex-syntax = "0.4"
 utf8-ranges = "1"
+levenshtein_automata="0.1"
 
 [dev-dependencies]
 fnv = "1.0.5"

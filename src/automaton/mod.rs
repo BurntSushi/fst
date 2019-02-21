@@ -1,4 +1,7 @@
+extern crate levenshtein_automata;
+
 use self::StartsWithStateInternal::*;
+use self::levenshtein_automata::Distance;
 
 /// Automaton describes types that behave as a finite automaton.
 ///
@@ -116,6 +119,25 @@ impl<'a, T: Automaton> Automaton for &'a T {
 
     fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
         (*self).accept(state, byte)
+    }
+}
+
+impl Automaton for levenshtein_automata::DFA {
+    type State = u32;
+
+    fn start(&self) -> Self::State {
+        self.initial_state()
+    }
+
+    fn is_match(&self, state: &Self::State) -> bool {
+        match self.distance(*state) {
+            Distance::Exact(_) => true,
+            Distance::AtLeast(_) => false
+        }
+    }
+
+    fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
+        self.transition(*state, byte)
     }
 }
 

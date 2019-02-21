@@ -274,7 +274,7 @@ pub struct Fst<Data=Vec<u8>> {
     data: Data,
 }
 
-pub struct FstMeta {
+struct FstMeta {
     version: u64,
     root_addr: CompiledAddr,
     ty: FstType,
@@ -305,6 +305,7 @@ impl FstMeta {
 
 impl<Data: Deref<Target=[u8]>> Fst<Data> {
 
+    /// Open a `Fst` from a given data.
     pub fn new(data: Data) -> Result<Fst<Data>> {
         if data.len() < 32 {
             return Err(Error::Format.into());

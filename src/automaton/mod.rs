@@ -119,6 +119,79 @@ impl<'a, T: Automaton> Automaton for &'a T {
     }
 }
 
+/// An automaton that matches if the input equals to a specific string.
+///
+/// It can be used in combination with [`StartsWith`] to search strings
+/// starting with a given prefix.
+///
+/// ```rust
+/// extern crate fst;
+///
+/// use std::error::Error;
+///
+/// use fst::{Automaton, IntoStreamer, Streamer, Set};
+/// use fst::automaton::Str;
+///
+/// # fn main() { example().unwrap(); }
+/// fn example() -> Result<(), Box<Error>> {
+///     let paths = vec!["/home/projects/bar", "/home/projects/foo", "/tmp/foo"];
+///     let set = Set::from_iter(paths)?;
+///
+///     // Build our prefix query.
+///     let prefix = Str::new("/home").starts_with();
+///
+///     // Apply our query to the set we built.
+///     let mut stream = set.search(prefix).into_stream();
+///
+///     let matches = stream.into_strs()?;
+///     assert_eq!(matches, vec!["/home/projects/bar", "/home/projects/foo"]);
+///     Ok(())
+/// }
+/// ```
+#[derive(Clone, Debug)]
+pub struct Str<'a> {
+    string: &'a [u8]
+}
+
+impl<'a> Str<'a> {
+    /// Constructs automaton that matches an exact string.
+    #[inline]
+    pub fn new(string: &'a str) -> Str<'a> {
+        Str { string: string.as_bytes() }
+    }
+}
+
+impl<'a> Automaton for Str<'a> {
+    type State = Option<usize>;
+
+    #[inline]
+    fn start(&self) -> Option<usize> { Some(0) }
+
+    #[inline]
+    fn is_match(&self, pos: &Option<usize>) -> bool {
+        *pos == Some(self.string.len())
+    }
+
+    #[inline]
+    fn can_match(&self, pos: &Option<usize>) -> bool {
+        pos.is_some()
+    }
+
+    #[inline]
+    fn accept(&self, pos: &Option<usize>, byte: u8) -> Option<usize> {
+        // if we aren't already past the end...
+        if let Some(pos) = *pos {
+            // and there is still a matching byte at the current position...
+            if self.string.get(pos).cloned() == Some(byte) {
+                // then move forward
+                return Some(pos + 1);
+            }
+        }
+        // otherwise we're either past the end or didn't match the byte
+        None
+    }
+}
+
 /// An automaton that matches if the input contains a specific subsequence.
 ///
 /// It can be used to build a simple fuzzy-finder.

@@ -61,6 +61,28 @@ impl Set {
         raw::Fst::from_bytes(bytes).map(Set)
     }
 
+    /// Creates a set from its representation as a raw byte sequence.
+    ///
+    /// This accepts a static byte slice, which may be useful if the FST data is
+    /// embedded into the program.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use fst::Set;
+    ///
+    /// // File written from a build script using SetBuilder.
+    /// # const IGNORE: &str = stringify! {
+    /// static FST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/set.fst"));
+    /// # };
+    /// # static FST: &[u8] = &[];
+    ///
+    /// let set = Set::from_static_slice(FST).unwrap();
+    /// ```
+    pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
+        raw::Fst::from_static_slice(bytes).map(Set)
+    }
+
     /// Create a `Set` from an iterator of lexicographically ordered byte
     /// strings.
     ///

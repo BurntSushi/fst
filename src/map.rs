@@ -85,6 +85,28 @@ impl Map {
         raw::Fst::from_bytes(bytes).map(Map)
     }
 
+    /// Creates a map from its representation as a raw byte sequence.
+    ///
+    /// This accepts a static byte slice, which may be useful if the FST data is
+    /// embedded into the program.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use fst::Map;
+    ///
+    /// // File written from a build script using MapBuilder.
+    /// # const IGNORE: &str = stringify! {
+    /// static FST: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/map.fst"));
+    /// # };
+    /// # static FST: &[u8] = &[];
+    ///
+    /// let map = Map::from_static_slice(FST).unwrap();
+    /// ```
+    pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
+        raw::Fst::from_static_slice(bytes).map(Map)
+    }
+
     /// Create a `Map` from an iterator of lexicographically ordered byte
     /// strings and associated values.
     ///

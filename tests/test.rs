@@ -6,7 +6,7 @@ use fst_levenshtein::Levenshtein;
 use fst_regex::Regex;
 
 use fst::{Automaton, IntoStreamer, Streamer};
-use fst::automaton::Subsequence;
+use fst::automaton::{Str, Subsequence};
 use fst::raw::{Builder, Fst, Output};
 use fst::set::{Set, OpBuilder};
 
@@ -137,6 +137,26 @@ fn union_large() {
         assert_eq!(stream2.next(), Some(key1));
     }
     assert_eq!(stream2.next(), None);
+}
+
+#[test]
+fn str() {
+    let set = get_set();
+
+    let exact = Str::new("vatican");
+    let mut stream = set.search(&exact).into_stream();
+    assert_eq!(stream.next().unwrap(), b"vatican");
+    assert_eq!(stream.next(), None);
+
+    let exact_mismatch = Str::new("abracadabra");
+    let mut stream = set.search(&exact_mismatch).into_stream();
+    assert_eq!(stream.next(), None);
+
+    let starts_with = Str::new("vati").starts_with();
+    let mut stream = set.search(&starts_with).into_stream();
+    assert_eq!(stream.next().unwrap(), b"vatican");
+    assert_eq!(stream.next().unwrap(), b"vation");
+    assert_eq!(stream.next(), None);
 }
 
 #[test]

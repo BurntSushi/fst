@@ -660,6 +660,12 @@ impl<'m, A: Automaton> StreamBuilder<'m, A> {
     pub fn lt<T: AsRef<[u8]>>(self, bound: T) -> Self {
         StreamBuilder(self.0.lt(bound))
     }
+
+    /// Return this builder and gives the automaton states
+    /// along with the results.
+    pub fn with_state(self) -> StreamWithStateBuilder<'m, A> {
+        StreamWithStateBuilder(self.0.with_state())
+    }
 }
 
 impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
@@ -668,6 +674,32 @@ impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
 
     fn into_stream(self) -> Self::Into {
         Stream(self.0.into_stream())
+    }
+}
+
+/// A builder for constructing range queries of streams
+/// that returns results along with automaton states.
+///
+/// Once all bounds are set, one should call `into_stream` to get a
+/// `StreamWithState`.
+///
+/// Bounds are not additive. That is, if `ge` is called twice on the same
+/// builder, then the second setting wins.
+///
+/// The `A` type parameter corresponds to an optional automaton to filter
+/// the stream. By default, no filtering is done.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct StreamWithStateBuilder<'m, A=AlwaysMatch>(raw::StreamWithStateBuilder<'m, A>);
+
+impl<'m, 'a, A: 'a + Automaton> IntoStreamer<'a> for StreamWithStateBuilder<'m, A>
+    where A::State: Clone
+{
+    type Item = (&'a [u8], u64, A::State);
+    type Into = StreamWithState<'m, A>;
+
+    fn into_stream(self) -> Self::Into {
+        StreamWithState(self.0.into_stream())
     }
 }
 
@@ -993,5 +1025,23 @@ impl<'a, S> Streamer<'a> for StreamOutput<S>
 
     fn next(&'a mut self) -> Option<Self::Item> {
         self.0.next().map(|(k, v)| (k, raw::Output::new(v)))
+    }
+}
+
+/// A lexicographically ordered stream of key-value from a map
+/// along with the states of the automaton.
+///
+/// The `Stream` type is based on the `StreamWithState`.
+pub struct StreamWithState<'m, A=AlwaysMatch>(raw::StreamWithState<'m, A>) where A: Automaton;
+
+impl<'a, 'm, A: 'a + Automaton> Streamer<'a> for StreamWithState<'m, A>
+    where A::State: Clone
+{
+    type Item = (&'a [u8], u64, A::State);
+
+    fn next(&'a mut self) -> Option<Self::Item> {
+        /// My IDE Does not like this, and if I pub this function the compile fails, I'm a bit confused
+        /// why this works.
+        self.0.next().map(|(key, out, state)| (key, out.value(), state))
     }
 }

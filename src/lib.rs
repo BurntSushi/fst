@@ -2,6 +2,8 @@
 // Copyright 2019 Paul Masurel
 //
 //! This is a fork over Andrew Gallant `fst` crate.
+//! Parts of this crate were retrofitted from a PR by Clément Renault
+//! https://github.com/BurntSushi/fst/pull/61
 #![warn(missing_docs)]
 
 extern crate byteorder;
@@ -13,7 +15,7 @@ pub use error::{Error, Result};
 pub use map::{Map, MapBuilder};
 pub use stream::{IntoStreamer, Streamer};
 
-mod regex;
+pub mod regex;
 
 pub use self::regex::Regex;
 

@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/tantivy-search/fst.svg?branch=master)](https://travis-ci.org/tantivy-search/fst)
+
 tantivy-fst
 ===
 

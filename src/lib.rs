@@ -15,7 +15,7 @@ pub use error::{Error, Result};
 pub use map::{Map, MapBuilder};
 pub use stream::{IntoStreamer, Streamer};
 
-pub mod regex;
+mod regex;
 
 pub use self::regex::Regex;
 

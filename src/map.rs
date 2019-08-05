@@ -1040,8 +1040,6 @@ impl<'a, 'm, A: 'a + Automaton> Streamer<'a> for StreamWithState<'m, A>
     type Item = (&'a [u8], u64, A::State);
 
     fn next(&'a mut self) -> Option<Self::Item> {
-        /// My IDE Does not like this, and if I pub this function the compile fails, I'm a bit confused
-        /// why this works.
         self.0.next().map(|(key, out, state)| (key, out.value(), state))
     }
 }

@@ -260,7 +260,7 @@ impl<Data: Deref<Target=[u8]>> Map<Data> {
     /// use std::error::Error;
     ///
     /// use tantivy_fst::{IntoStreamer, Streamer, Map};
-    /// use tantivy_fst::regex::Regex;
+    /// use tantivy_fst::Regex;
     ///
     /// # fn main() { example().unwrap(); }
     /// fn example() -> Result<(), Box<Error>> {

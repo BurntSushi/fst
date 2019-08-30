@@ -54,6 +54,7 @@ use Result;
 /// Keys will always be byte strings; however, we may grow more conveniences
 /// around dealing with them (such as a serialization/deserialization step,
 /// although it isn't clear where exactly this should live).
+#[derive(Clone)]
 pub struct Map(raw::Fst);
 
 impl Map {

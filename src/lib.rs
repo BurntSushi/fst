@@ -66,11 +66,11 @@ extern crate fst_levenshtein; // the fst-levenshtein crate
 
 use std::error::Error;
 
-use fst::{IntoStreamer, Streamer, Set};
+use fst::{IntoStreamer, Set};
 use fst_levenshtein::Levenshtein;
 
 # fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<Error>> {
+fn example() -> Result<(), Box<dyn Error>> {
     // A convenient way to create sets in memory.
     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
     let set = Set::from_iter(keys)?;
@@ -79,7 +79,7 @@ fn example() -> Result<(), Box<Error>> {
     let lev = Levenshtein::new("foo", 1)?;
 
     // Apply our fuzzy query to the set we built.
-    let mut stream = set.search(lev).into_stream();
+    let stream = set.search(lev).into_stream();
 
     let keys = stream.into_strs()?;
     assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);

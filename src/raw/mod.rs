@@ -890,9 +890,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             } else {
                 let node = self.stack[last].node;
                 let trans = self.stack[last].trans;
+                let next_node = self.fst.node(node.transition(trans - 1).addr, self.data);
                 let done = false;
                 self.stack.push(StreamState {
-                    node: self.fst.node(node.transition(trans - 1).addr, self.data),
+                    node: next_node,
                     trans: 0,
                     out,
                     aut_state,
@@ -900,6 +901,15 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 });
             }
         }
+    }
+
+    fn starting_trans(&mut self, node: Node<'f>) -> usize {
+        0
+    }
+
+    fn next_trans(&mut self, node: Node<'f>) -> (usize, bool) {
+        // transition done
+        (0, false)
     }
 
     #[inline]

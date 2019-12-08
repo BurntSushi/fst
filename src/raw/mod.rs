@@ -785,6 +785,7 @@ struct StreamState<'f, S> {
     trans: usize,
     out: Output,
     aut_state: S,
+    done: bool,
 }
 
 impl<'f, A: Automaton> StreamWithState<'f, A> {
@@ -823,6 +824,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 trans: 0,
                 out: Output::zero(),
                 aut_state: self.aut.start(),
+                done: false,
             }];
             return;
         }
@@ -856,6 +858,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                         trans: i+1,
                         out,
                         aut_state: prev_state,
+                        done: false,
                     });
                     out = out.cat(t.out);
                     node = self.fst.node(t.addr, self.data);
@@ -873,6 +876,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                             .unwrap_or(node.len()),
                         out,
                         aut_state,
+                        done: false,
                     });
                     return;
                 }
@@ -886,11 +890,13 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             } else {
                 let node = self.stack[last].node;
                 let trans = self.stack[last].trans;
+                let done = false;
                 self.stack.push(StreamState {
                     node: self.fst.node(node.transition(trans - 1).addr, self.data),
                     trans: 0,
                     out,
                     aut_state,
+                    done,
                 });
             }
         }
@@ -934,6 +940,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 trans: 0,
                 out,
                 aut_state: next_state,
+                done: false,
             });
             if self.max.exceeded_by(&self.inp) {
                 // We are done, forever.

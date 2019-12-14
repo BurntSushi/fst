@@ -819,9 +819,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 self.empty_output = self.fst.empty_final_output(self.data);
             }
             self.stack.clear();
+            let node = self.fst.root(self.data);
             self.stack = vec![StreamState {
-                node:  self.fst.root(self.data),
-                trans: 0,
+                node: node, 
+                trans: self.starting_transition(&node),
                 out: Output::zero(),
                 aut_state: self.aut.start(),
                 done: false,
@@ -855,7 +856,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     self.inp.push(b);
                     self.stack.push(StreamState {
                         node,
-                        trans: i+1,
+                        trans: self.next_transition(&node, i).unwrap(),
                         out,
                         aut_state: prev_state,
                         done: false,
@@ -894,7 +895,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 let done = false;
                 self.stack.push(StreamState {
                     node: next_node,
-                    trans: 0,
+                    trans: self.starting_transition(&next_node),
                     out,
                     aut_state,
                     done,
@@ -903,13 +904,15 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         }
     }
 
-    fn starting_trans(&mut self, node: Node<'f>) -> usize {
+    #[inline]
+    fn starting_transition(&self, node: &Node<'f>) -> usize {
         0
     }
 
-    fn next_trans(&mut self, node: Node<'f>) -> (usize, bool) {
+    #[inline]
+    fn next_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
         // transition done
-        (0, false)
+        Some(current_transition + 1)
     }
 
     #[inline]
@@ -947,7 +950,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let ns = transform(&next_state);
             self.stack.push(StreamState {
                 node: next_node,
-                trans: 0,
+                trans: self.starting_transition(&next_node),
                 out,
                 aut_state: next_state,
                 done: false,

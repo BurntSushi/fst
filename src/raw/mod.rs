@@ -893,20 +893,23 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         }
         if !self.stack.is_empty() {
             let last = self.stack.len() - 1;
+            let state = &self.stack[last];
+            let (trans, done) = match self.previous_transition(&state.node, state.trans) {
+                Some(t) => { (t, false) }
+                None =>  { (0, true) }
+            };
             if inclusive {
-                self.stack[last].trans -= 1;
+                self.stack[last].trans = trans;
+                self.stack[last].done = done;
                 self.inp.pop();
             } else {
-                let node = self.stack[last].node;
-                let trans = self.stack[last].trans;
-                let next_node = self.fst.node(node.transition(trans - 1).addr, self.data);
-                let done = false;
+                let next_node = self.fst.node(state.node.transition(trans).addr, self.data);
                 self.stack.push(StreamState {
                     node: next_node,
                     trans: self.starting_transition(&next_node),
                     out,
                     aut_state,
-                    done,
+                    done: done,
                 });
             }
         }
@@ -923,7 +926,17 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     #[inline]
     fn next_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        if !self.reversed {
+        return self.next_or_previous_transition(node, current_transition, false)
+    }
+
+    #[inline]
+    fn previous_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
+        return self.next_or_previous_transition(node, current_transition, true)
+    }
+
+    #[inline]
+    fn next_or_previous_transition(&self, node: &Node<'f>, current_transition: usize, previous: bool) -> Option<usize> {
+        if (!self.reversed && !previous) || (self.reversed && previous) {
             if current_transition + 1 < node.len() {
                 Some(current_transition + 1)
             } else {
@@ -960,7 +973,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             }
         }
         while let Some(state) = self.stack.pop() {
-            if state.trans >= state.node.len() || !self.aut.can_match(&state.aut_state) {
+            if (state.trans >= state.node.len() || state.done) || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
                 }

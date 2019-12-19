@@ -864,7 +864,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     self.inp.push(b);
                     self.stack.push(StreamState {
                         node,
-                        trans: self.next_transition(&node, i).unwrap(),
+                        trans: self.next_transition(&node, i).unwrap_or(100000),
                         out,
                         aut_state: prev_state,
                         done: false,
@@ -914,13 +914,28 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     #[inline]
     fn starting_transition(&self, node: &Node<'f>) -> usize {
-        0
+        if !self.reversed {
+            0
+        } else {
+            node.len() - 1
+        }
     }
 
     #[inline]
     fn next_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        // transition done
-        Some(current_transition + 1)
+        if !self.reversed {
+            if current_transition + 1 < node.len() {
+                Some(current_transition + 1)
+            } else {
+                None
+            }
+        } else {
+            if current_transition > 0 && node.len() > 0 {
+                Some(current_transition - 1)
+            } else {
+                None
+            }
+        }
     }
 
     // Not sure how to make clone work.
@@ -958,7 +973,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let next_node = self.fst.node(trans.addr, self.data);
             self.inp.push(trans.inp);
             self.stack.push(StreamState {
-                trans: self.next_transition(&state.node, state.trans).unwrap(), .. state
+                trans: self.next_transition(&state.node, state.trans).unwrap_or(10000), .. state
             });
             let ns = transform(&next_state);
             self.stack.push(StreamState {

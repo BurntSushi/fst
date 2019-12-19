@@ -464,12 +464,46 @@ test_range! {
 #[test]
 fn reverse() {
     let items: Vec<_> =
-        vec!["123"].into_iter().enumerate()
+        vec!["1"].into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
     let fst: Fst = fst_map(items.clone()).into();
-    let mut stream = fst.stream();
-    let mut stream = stream.reverse();
+    let stream = fst.stream();
+    assert!(!stream.0.reversed);
+    let stream = stream.reverse();
     assert!(stream.0.reversed);
+    let stream = stream.reverse();
+    assert!(!stream.0.reversed);
+}
+
+#[test]
+fn starting_transition() {
+    let items: Vec<_> =
+        vec!["a", "b", "c", "d"].into_iter().enumerate()
+                     .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let stream = fst.stream();
+    let root = fst.root();
+    assert_eq!(stream.0.starting_transition(&root), 0);
+    let stream = stream.reverse();
+    assert_eq!(stream.0.starting_transition(&root), 3);
+}
+
+#[test]
+fn next_transition() {
+    let items: Vec<_> =
+        vec!["a", "ab", "ac", "ad"].into_iter().enumerate()
+                     .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let stream = fst.stream();
+    let a = fst.node(fst.root().transition(0).addr);
+    assert_eq!(a.len(), 3);
+    assert_eq!(stream.0.next_transition(&a, 0).unwrap(), 1);
+    assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 2);
+    assert_eq!(stream.0.next_transition(&a, 2), None);
+    let stream = stream.reverse();
+    assert_eq!(stream.0.next_transition(&a, 0), None);
+    assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 0);
+    assert_eq!(stream.0.next_transition(&a, 2).unwrap(), 1);
 }
 
 #[test]

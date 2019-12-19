@@ -462,6 +462,17 @@ test_range! {
 }
 
 #[test]
+fn reverse() {
+    let items: Vec<_> =
+        vec!["123"].into_iter().enumerate()
+                     .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let mut stream = fst.stream();
+    let mut stream = stream.reverse();
+    assert!(stream.0.reversed);
+}
+
+#[test]
 fn bytes_written() {
     let mut bfst1 = Builder::memory();
     bfst1.add(b"bar").unwrap();

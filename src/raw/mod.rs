@@ -651,7 +651,7 @@ impl<'a, 'f, A: 'a + Automaton> IntoStreamer<'a> for StreamWithStateBuilder<'f, 
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Bound {
     Included(Vec<u8>),
     Excluded(Vec<u8>),
@@ -687,7 +687,7 @@ pub struct Stream<'f, A=AlwaysMatch>(StreamWithState<'f, A>) where A: Automaton;
 
 impl<'f, A: Automaton> Stream<'f, A> {
     fn new(meta: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound) -> Self {
-        Stream(StreamWithState::new(meta, data, aut, min, max))
+        Self(StreamWithState::new(meta, data, aut, min, max))
     }
 
     /// Convert this stream into a vector of byte strings and outputs.
@@ -750,6 +750,11 @@ impl<'f, A: Automaton> Stream<'f, A> {
         }
         vs
     }
+
+    pub fn reverse(mut self) -> Self {
+        self.0.reverse();
+        self
+    }
 }
 
 impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
@@ -767,6 +772,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[derive(Clone)]
 pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     fst: &'f FstMeta,
     data: &'f [u8],
@@ -777,6 +783,7 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     min: Bound,
     max: Bound,
     has_seeked: bool,
+    reversed: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -801,6 +808,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             min: min,
             max: max,
             has_seeked: false,
+            reversed: false,
         };
         rdr
     }
@@ -915,6 +923,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         Some(current_transition + 1)
     }
 
+    // Not sure how to make clone work.
+    fn reverse(&mut self) {
+        self.reversed = !self.reversed;
+    }
+
     #[inline]
     fn next<F, T>(&mut self, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
         if !self.has_seeked {
@@ -945,7 +958,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let next_node = self.fst.node(trans.addr, self.data);
             self.inp.push(trans.inp);
             self.stack.push(StreamState {
-                trans: state.trans + 1, .. state
+                trans: self.next_transition(&state.node, state.trans).unwrap(), .. state
             });
             let ns = transform(&next_state);
             self.stack.push(StreamState {

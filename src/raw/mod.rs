@@ -884,14 +884,26 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     // Since this is a minimum bound, we need to find the
                     // first transition in this node that proceeds the current
                     // input byte.
+                    let mut done = false;
+                    let mut trans = self.starting_transition(&node).unwrap();
+                    loop {
+                        let transition = node.transition(trans);
+                        if transition.inp > b {
+                            break;
+                        }
+                        if let Some(t) = self.next_transition(&node, trans) {
+                            trans = t;
+                        } else {
+                            done = true;
+                            break;
+                        }
+                    }
                     self.stack.push(StreamState {
                         node,
-                        trans: node.transitions()
-                            .position(|t| t.inp > b)
-                            .unwrap_or(node.len()),
+                        trans,
                         out,
                         aut_state,
-                        done: false,
+                        done,
                     });
                     return;
                 }
@@ -980,7 +992,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             }
         }
         while let Some(state) = self.stack.pop() {
-            if (state.trans >= state.node.len() || state.done) || !self.aut.can_match(&state.aut_state) {
+            if state.done || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
                     if let Some(t) = self.return_stack.pop() {

@@ -830,7 +830,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let node = self.fst.root(self.data);
             self.stack = vec![StreamState {
                 node: node, 
-                trans: self.starting_transition(&node),
+                trans: self.starting_transition(&node).unwrap_or(10000),
                 out: Output::zero(),
                 aut_state: self.aut.start(),
                 done: false,
@@ -906,7 +906,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 let next_node = self.fst.node(state.node.transition(trans).addr, self.data);
                 self.stack.push(StreamState {
                     node: next_node,
-                    trans: self.starting_transition(&next_node),
+                    trans: self.starting_transition(&next_node).unwrap_or(10000),
                     out,
                     aut_state,
                     done: done,
@@ -916,11 +916,14 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     }
 
     #[inline]
-    fn starting_transition(&self, node: &Node<'f>) -> usize {
-        if !self.reversed {
-            0
+    fn starting_transition(&self, node: &Node<'f>) -> Option<usize> {
+        if node.len() == 0 {
+            None
+        }
+        else if !self.reversed {
+            Some(0)
         } else {
-            node.len() - 1
+            Some(node.len() - 1)
         }
     }
 
@@ -991,7 +994,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let ns = transform(&next_state);
             self.stack.push(StreamState {
                 node: next_node,
-                trans: self.starting_transition(&next_node),
+                trans: self.starting_transition(&next_node).unwrap_or(100000),
                 out,
                 aut_state: next_state,
                 done: false,

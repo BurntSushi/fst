@@ -483,10 +483,13 @@ fn starting_transition() {
     let fst: Fst = fst_map(items.clone()).into();
     let stream = fst.stream();
     let root = fst.root();
-    assert_eq!(stream.0.starting_transition(&root), 0);
+    assert_eq!(stream.0.starting_transition(&root).unwrap(), 0);
     let stream = stream.reverse();
-    assert_eq!(stream.0.starting_transition(&root), 3);
+    assert_eq!(stream.0.starting_transition(&root).unwrap(), 3);
+    let a = fst.node(root.transition(0).addr);
+    assert_eq!(stream.0.starting_transition(&a), None);
 }
+
 
 #[test]
 fn next_transition() {
@@ -500,11 +503,43 @@ fn next_transition() {
     assert_eq!(stream.0.next_transition(&a, 0).unwrap(), 1);
     assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 2);
     assert_eq!(stream.0.next_transition(&a, 2), None);
+    assert_eq!(stream.0.previous_transition(&a, 0), None);
+    assert_eq!(stream.0.previous_transition(&a, 1).unwrap(), 0);
+    assert_eq!(stream.0.previous_transition(&a, 2).unwrap(), 1);
     let stream = stream.reverse();
     assert_eq!(stream.0.next_transition(&a, 0), None);
     assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 0);
     assert_eq!(stream.0.next_transition(&a, 2).unwrap(), 1);
+    assert_eq!(stream.0.previous_transition(&a, 0).unwrap(), 1);
+    assert_eq!(stream.0.previous_transition(&a, 1).unwrap(), 2);
+    assert_eq!(stream.0.previous_transition(&a, 2), None);
 }
+
+fn test_reverse_from_arr(input: Vec<&str>) {
+    let items: Vec<_> =
+        input.into_iter().enumerate()
+             .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let mut stream = fst.stream();
+    stream = stream.reverse();
+    for i in 0..items.len() {
+        assert_eq!(stream.next().unwrap(), (items[items.len() - 1 - i].0.as_bytes(), Output::new(items[items.len() - 1 - i].1)));
+    }
+}
+
+#[test] 
+fn reverse_traversal_basic() {
+    test_reverse_from_arr(vec![]);
+    test_reverse_from_arr(vec!["a"]);
+    test_reverse_from_arr(vec!["a", "b"]);
+    test_reverse_from_arr(vec!["a", "b", "c"]);
+    test_reverse_from_arr(vec!["aa", "ab", "ac"]);
+}
+
+// #[test] 
+// fn reverse_traversal_final_state() {
+//     test_reverse_from_arr(vec!["a", "ab"]);
+// }
 
 #[test]
 fn bytes_written() {

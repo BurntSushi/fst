@@ -667,6 +667,14 @@ impl Bound {
         }
     }
 
+    fn subceeded_by(&self, inp: &[u8]) -> bool {
+        match *self {
+            Bound::Included(ref v) => inp < v,
+            Bound::Excluded(ref v) => inp <= v,
+            Bound::Unbounded => false,
+        }
+    }
+
     fn is_empty(&self) -> bool {
         match *self {
             Bound::Included(ref v) => v.is_empty(),
@@ -825,7 +833,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
     fn seek(&mut self) {
-        let bound: &Bound = &self.min;
+        let bound: &Bound = if !self.reversed { &self.min } else { &self.max };
         if bound.is_empty() {
             if bound.is_inclusive() {
                 self.empty_output = self.fst.empty_final_output(self.data);
@@ -840,6 +848,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 aut_state: self.aut.start(),
                 done: transition.is_none(),
             }];
+            // self.return_stack.push(Some((vec![], Output::zero())));
             return;
         }
         let (key, inclusive) = match bound {
@@ -875,6 +884,9 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                         aut_state: prev_state,
                         done: transition.is_none(),
                     });
+                    if self.reversed {
+                        self.return_stack.push(Some((self.inp.clone(), t.out)))
+                    }
                     out = out.cat(t.out);
                     node = self.fst.node(t.addr, self.data);
                 }
@@ -886,10 +898,17 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     // input byte.
                     let mut done = false;
                     let mut trans = self.starting_transition(&node).unwrap();
+                    let mut transition = node.transition(trans);
                     loop {
-                        let transition = node.transition(trans);
-                        if transition.inp > b {
-                            break;
+                        transition = node.transition(trans);
+                        if !self.reversed {
+                            if transition.inp > b {
+                                break;
+                            } 
+                        } else {
+                            if transition.inp < b {
+                                break;
+                            } 
                         }
                         if let Some(t) = self.next_transition(&node, trans) {
                             trans = t;
@@ -905,6 +924,9 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                         aut_state,
                         done,
                     });
+                    // if self.reversed {
+                    //     self.return_stack.push(Some((self.inp.clone(), transition.out)))
+                    // }
                     return;
                 }
             }
@@ -917,6 +939,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 self.stack[last].trans = transition.unwrap_or_default();
                 self.stack[last].done = transition.is_none();
                 self.inp.pop();
+                self.return_stack.pop();
             } else {
                 let next_node = self.fst.node(state.node.transition(transition.unwrap_or_default()).addr, self.data);
                 let starting_transition = self.starting_transition(&next_node);
@@ -972,7 +995,22 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     // Not sure how to make clone work.
     fn reverse(&mut self) {
+        self.inp.clear();
+        self.stack.clear();
+        self.has_seeked = false;
         self.reversed = !self.reversed;
+    }
+
+    fn out_of_bounds(&self, inp: &[u8]) -> bool {
+        if !self.reversed {
+            self.max.exceeded_by(inp)
+        } else {
+            self.min.subceeded_by(inp)
+        }
+    }
+    
+    fn out_of_bounds_absolute(&self, inp: &[u8]) -> bool {
+        self.min.subceeded_by(inp) || self.max.exceeded_by(inp)
     }
 
     #[inline]
@@ -982,7 +1020,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             self.has_seeked = true;
         }
         if let Some(out) = self.empty_output.take() {
-            if self.max.exceeded_by(&[]) {
+            if self.out_of_bounds(&[]) {
                 self.stack.clear();
                 return None;
             }
@@ -997,8 +1035,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     self.inp.pop().unwrap();
                     if let Some(t) = self.return_stack.pop() {
                         if let Some((inp, out)) = t {
-                            self.return_pointer = inp;
-                            return Some((&self.return_pointer, out, transform(&state.aut_state)))
+                            if !self.out_of_bounds_absolute(&inp) && self.aut.can_match(&state.aut_state) { 
+                                self.return_pointer = inp;
+                                return Some((&self.return_pointer, out, transform(&state.aut_state)))
+                            }
                         }
                     }
                 }
@@ -1023,7 +1063,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 aut_state: next_state,
                 done: next_transition.is_none(),
             });
-            if self.max.exceeded_by(&self.inp) {
+            if !self.reversed && self.out_of_bounds(&self.inp) {
                 // We are done, forever.
                 self.stack.clear();
                 return None;
@@ -1033,7 +1073,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 if !self.reversed {
                     return Some((&self.inp, out, ns));
                 } else {
-                    self.return_stack.push(Some((self.inp.clone(), out)))
+                    self.return_stack.push(Some((self.inp.clone(), out)));
+                }
+            } else {
+                if self.reversed {
+                    self.return_stack.push(None);
                 }
             }
         }

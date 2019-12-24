@@ -554,11 +554,12 @@ fn reverse_traversal() {
 
 #[test] 
 fn reverse_traversal_bounds() {
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "xyz"], Bound::Included(b"abd".to_vec()), Bound::Unbounded, 5, 6);
-    test_reverse_range(vec!["a", "b", "y", "z"], Bound::Included(vec![b'a']), Bound::Included(vec![b'z']), 0, 4);
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abd"], Bound::Unbounded, Bound::Included(b"abd".to_vec()), 0, 6);
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"], Bound::Unbounded, Bound::Included(b"abd".to_vec()), 0, 6);
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abe"],  Bound::Unbounded, Bound::Excluded(b"abd".to_vec()), 0, 5)
+    // test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "xyz"], Bound::Included(b"abd".to_vec()), Bound::Unbounded, 5, 6);
+    // test_reverse_range(vec!["a", "b", "y", "z"], Bound::Included(vec![b'a']), Bound::Included(vec![b'z']), 0, 4);
+    // test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abd"], Bound::Unbounded, Bound::Included(b"abd".to_vec()), 0, 6);
+    // test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"], Bound::Unbounded, Bound::Included(b"abd".to_vec()), 0, 6);
+    // test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abe"],  Bound::Unbounded, Bound::Excluded(b"abd".to_vec()), 0, 5)
+    test_reverse_range(vec!["", "a"], Bound::Included(vec![]), Bound::Unbounded, 0, 2);
 }
 
 #[test]

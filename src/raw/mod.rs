@@ -848,7 +848,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 aut_state: self.aut.start(),
                 done: transition.is_none(),
             }];
-            // self.return_stack.push(Some((vec![], Output::zero())));
             return;
         }
         let (key, inclusive) = match bound {
@@ -924,9 +923,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                         aut_state,
                         done,
                     });
-                    // if self.reversed {
-                    //     self.return_stack.push(Some((self.inp.clone(), transition.out)))
-                    // }
                     return;
                 }
             }
@@ -1019,14 +1015,16 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             self.seek();
             self.has_seeked = true;
         }
-        if let Some(out) = self.empty_output.take() {
-            if self.out_of_bounds(&[]) {
-                self.stack.clear();
-                return None;
-            }
-            let start = self.aut.start();
-            if self.aut.is_match(&start) {
-                return Some((&[], out, transform(&start)));
+        if !self.reversed {
+            if let Some(out) = self.empty_output.take() {
+                if self.out_of_bounds(&[]) {
+                    self.stack.clear();
+                    return None;
+                }
+                let start = self.aut.start();
+                if self.aut.is_match(&start) {
+                    return Some((&[], out, transform(&start)));
+                }
             }
         }
         while let Some(state) = self.stack.pop() {
@@ -1078,6 +1076,18 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             } else {
                 if self.reversed {
                     self.return_stack.push(None);
+                }
+            }
+        }
+        if self.reversed {
+            if let Some(out) = self.empty_output.take() {
+                if self.out_of_bounds(&[]) {
+                    self.stack.clear();
+                    return None;
+                }
+                let start = self.aut.start();
+                if self.aut.is_match(&start) {
+                    return Some((&[], out, transform(&start)));
                 }
             }
         }

@@ -832,12 +832,13 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             }
             self.stack.clear();
             let node = self.fst.root(self.data);
+            let transition = self.starting_transition(&node);
             self.stack = vec![StreamState {
                 node: node, 
-                trans: self.starting_transition(&node).unwrap_or(10000),
+                trans: transition.unwrap_or_default(),
                 out: Output::zero(),
                 aut_state: self.aut.start(),
-                done: false,
+                done: transition.is_none(),
             }];
             return;
         }
@@ -866,12 +867,13 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     let prev_state = aut_state;
                     aut_state = self.aut.accept(&prev_state, b);
                     self.inp.push(b);
+                    let transition = self.next_transition(&node, i);
                     self.stack.push(StreamState {
                         node,
-                        trans: self.next_transition(&node, i).unwrap_or(100000),
+                        trans: transition.unwrap_or_default(),
                         out,
                         aut_state: prev_state,
-                        done: false,
+                        done: transition.is_none(),
                     });
                     out = out.cat(t.out);
                     node = self.fst.node(t.addr, self.data);
@@ -898,22 +900,20 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         if !self.stack.is_empty() {
             let last = self.stack.len() - 1;
             let state = &self.stack[last];
-            let (trans, done) = match self.previous_transition(&state.node, state.trans) {
-                Some(t) => { (t, false) }
-                None =>  { (0, true) }
-            };
+            let transition = self.previous_transition(&state.node, state.trans);
             if inclusive {
-                self.stack[last].trans = trans;
-                self.stack[last].done = done;
+                self.stack[last].trans = transition.unwrap_or_default();
+                self.stack[last].done = transition.is_none();
                 self.inp.pop();
             } else {
-                let next_node = self.fst.node(state.node.transition(trans).addr, self.data);
+                let next_node = self.fst.node(state.node.transition(transition.unwrap_or_default()).addr, self.data);
+                let starting_transition = self.starting_transition(&next_node);
                 self.stack.push(StreamState {
                     node: next_node,
-                    trans: self.starting_transition(&next_node).unwrap_or(10000),
+                    trans: starting_transition.unwrap_or_default(),
                     out,
                     aut_state,
-                    done: done,
+                    done: starting_transition.is_none(),
                 });
             }
         }
@@ -998,16 +998,18 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let is_match = self.aut.is_match(&next_state);
             let next_node = self.fst.node(trans.addr, self.data);
             self.inp.push(trans.inp);
+            let current_transition = self.next_transition(&state.node, state.trans);
             self.stack.push(StreamState {
-                trans: self.next_transition(&state.node, state.trans).unwrap_or(10000), .. state
+                trans: current_transition.unwrap_or_default(), done: current_transition.is_none(), .. state
             });
             let ns = transform(&next_state);
+            let next_transition = self.starting_transition(&next_node);
             self.stack.push(StreamState {
                 node: next_node,
-                trans: self.starting_transition(&next_node).unwrap_or(100000),
+                trans: next_transition.unwrap_or_default(),
                 out,
                 aut_state: next_state,
-                done: false,
+                done: next_transition.is_none(),
             });
             if self.max.exceeded_by(&self.inp) {
                 // We are done, forever.

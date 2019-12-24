@@ -784,6 +784,8 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     max: Bound,
     has_seeked: bool,
     reversed: bool,
+    return_stack: Vec<Option<(Vec<u8>, Output)>>,
+    return_pointer: Vec<u8>,
 }
 
 #[derive(Clone, Debug)]
@@ -809,6 +811,8 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             max: max,
             has_seeked: false,
             reversed: false,
+            return_stack: Vec::new(),
+            return_pointer: Vec::new(),
         };
         rdr
     }
@@ -979,6 +983,12 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             if (state.trans >= state.node.len() || state.done) || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
+                    if let Some(t) = self.return_stack.pop() {
+                        if let Some((inp, out)) = t {
+                            self.return_pointer = inp;
+                            return Some((&self.return_pointer, out, transform(&state.aut_state)))
+                        }
+                    }
                 }
                 continue;
             }
@@ -1006,7 +1016,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             }
             if next_node.is_final() && is_match {
                 let out = out.cat(next_node.final_output());
-                return Some((&self.inp, out, ns));
+                if !self.reversed {
+                    return Some((&self.inp, out, ns));
+                } else {
+                    self.return_stack.push(Some((self.inp.clone(), out)))
+                }
             }
         }
         None

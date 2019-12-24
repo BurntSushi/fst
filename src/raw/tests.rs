@@ -523,8 +523,11 @@ fn test_reverse_from_arr(input: Vec<&str>) {
     let mut stream = fst.stream();
     stream = stream.reverse();
     for i in 0..items.len() {
-        assert_eq!(stream.next().unwrap(), (items[items.len() - 1 - i].0.as_bytes(), Output::new(items[items.len() - 1 - i].1)));
+        let next = stream.next();
+        assert!(next.is_some());
+        assert_eq!(next.unwrap(), (items[items.len() - 1 - i].0.as_bytes(), Output::new(items[items.len() - 1 - i].1)));
     }
+    assert_eq!(stream.next(), None);
 }
 
 #[test] 
@@ -536,10 +539,10 @@ fn reverse_traversal_basic() {
     test_reverse_from_arr(vec!["aa", "ab", "ac"]);
 }
 
-// #[test] 
-// fn reverse_traversal_final_state() {
-//     test_reverse_from_arr(vec!["a", "ab"]);
-// }
+#[test] 
+fn reverse_traversal_final_state() {
+    test_reverse_from_arr(vec!["a", "ab"]);
+}
 
 #[test]
 fn bytes_written() {

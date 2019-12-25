@@ -481,6 +481,33 @@ fn reverse() {
     assert!(!stream.0.reversed);
 }
 
+
+#[test]
+fn test_range_ge() {
+    use crate::{Streamer, IntoStreamer};
+    let items: Vec<_> =
+        vec!["a", "aaa", "aba", "aca"].into_iter().enumerate()
+            .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let stream = fst.range().ge("aaa").into_stream();
+    let keys = stream.into_str_keys().unwrap();
+    assert_eq!(&keys[..],
+    &["aaa", "aba", "aca"]);
+}
+
+#[test]
+fn test_range_gt() {
+    use crate::{Streamer, IntoStreamer};
+    let items: Vec<_> =
+        vec!["aaa", "aba", "aca"].into_iter().enumerate()
+            .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let stream = fst.range().gt("aaa").into_stream();
+    let keys = stream.into_str_keys().unwrap();
+    assert_eq!(&keys[..],
+               &["aba", "aca"]);
+}
+
 #[test]
 fn starting_transition() {
     let items: Vec<_> =

@@ -808,7 +808,7 @@ struct StreamState<'f, S> {
 impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     fn new(fst: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound) -> Self {
-        let mut rdr = StreamWithState {
+        StreamWithState {
             fst,
             data,
             aut,
@@ -821,8 +821,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             reversed: false,
             return_stack: 0,
             return_pointer: Vec::new(),
-        };
-        rdr
+        }
     }
 
     /// Seeks the underlying stream such that the next key to be read is the
@@ -897,9 +896,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     // input byte.
                     let mut done = false;
                     let mut trans = self.starting_transition(&node).unwrap();
-                    let mut transition = node.transition(trans);
+
+                    // TODO(halvorboe) If the following line     is useful can we have a unit test that fails if it is removed?
+                    let mut _transition2 = node.transition(trans);
                     loop {
-                        transition = node.transition(trans);
+                        let transition = node.transition(trans);
                         if !self.reversed {
                             if transition.inp > b {
                                 break;
@@ -964,30 +965,48 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         }
     }
 
+    /// Returns the next transition.
+    ///
+    /// The concept of `next` transition is dependent on whether the stream is in reverse mode or
+    /// not. If all the transitions of this node have been emitted, this method returns None.
     #[inline]
     fn next_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        return self.next_or_previous_transition(node, current_transition, false)
+        if self.reversed {
+            Self::backward_transition(node, current_transition)
+        } else {
+            Self::forward_transition(node, current_transition)
+        }
     }
 
+    /// See `StreamWithState::next_transition`.
     #[inline]
     fn previous_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        return self.next_or_previous_transition(node, current_transition, true)
+        if self.reversed {
+            Self::forward_transition(node, current_transition)
+        } else {
+            Self::backward_transition(node, current_transition)
+        }
     }
 
+    /// Returns the next logical transition.
+    ///
+    /// This is independent from whether the stream is in backward mode or not.
     #[inline]
-    fn next_or_previous_transition(&self, node: &Node<'f>, current_transition: usize, previous: bool) -> Option<usize> {
-        if (!self.reversed && !previous) || (self.reversed && previous) {
-            if current_transition + 1 < node.len() {
-                Some(current_transition + 1)
-            } else {
-                None
-            }
+    fn forward_transition(node: &Node<'f>, current_transition: usize) -> Option<usize> {
+        if current_transition + 1 < node.len() {
+            Some(current_transition + 1)
         } else {
-            if current_transition > 0 && node.len() > 0 {
-                Some(current_transition - 1)
-            } else {
-                None
-            }
+            None
+        }
+    }
+
+    /// See [Stream::forward_transition].
+    #[inline]
+    fn backward_transition(node: &Node<'f>, current_transition: usize) -> Option<usize> {
+        if current_transition > 0 && node.len() > 0 {
+            Some(current_transition - 1)
+        } else {
+            None
         }
     }
 

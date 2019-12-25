@@ -1000,14 +1000,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     }
 
     fn out_of_bounds(&self, inp: &[u8]) -> bool {
-        if !self.reversed {
-            self.max.exceeded_by(inp)
-        } else {
-            self.min.subceeded_by(inp)
-        }
-    }
-    
-    fn out_of_bounds_absolute(&self, inp: &[u8]) -> bool {
         self.min.subceeded_by(inp) || self.max.exceeded_by(inp)
     }
 
@@ -1036,7 +1028,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     self.inp.pop().unwrap();
                     if self.return_stack > 0 {
                         self.return_stack -= 1;
-                        if state.node.is_final() && !self.out_of_bounds_absolute(&inp_two) && self.aut.can_match(&state.aut_state) { 
+                        if state.node.is_final() && !self.out_of_bounds(&inp_two) && self.aut.can_match(&state.aut_state) { 
                             self.return_pointer = inp_two;
                             return Some((&self.return_pointer, state.out, transform(&state.aut_state)))
                         }

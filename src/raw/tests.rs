@@ -587,6 +587,22 @@ fn starting_transition() {
     assert_eq!(stream.0.starting_transition(&a), None);
 }
 
+#[test]
+fn last_transition() {
+    let items: Vec<_> =
+        vec!["a", "b", "c", "d"].into_iter().enumerate()
+                     .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let stream = fst.stream();
+    let root = fst.root();
+    assert_eq!(stream.0.last_transition(&root).unwrap(), 3);
+    let stream = stream.reverse();
+    assert_eq!(stream.0.last_transition(&root).unwrap(), 0);
+    let a = fst.node(root.transition(0).addr);
+    assert_eq!(stream.0.last_transition(&a), None);
+}
+
+
 
 #[test]
 fn next_transition() {

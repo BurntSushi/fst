@@ -793,7 +793,7 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     has_seeked: bool,
     reversed: bool,
     return_stack: usize,
-    return_pointer: Vec<u8>,
+    inp_return: Vec<u8>,
 }
 
 #[derive(Clone, Debug)]
@@ -819,8 +819,8 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             max: max,
             has_seeked: false,
             reversed: false,
-            return_stack: 0,
-            return_pointer: Vec::new(),
+            return_stack: 0,  // Keeps track of number of values that should be returned.
+            inp_return: Vec::new(),
         }
     }
 
@@ -899,14 +899,8 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
                     loop {
                         let transition = node.transition(trans);
-                        if !self.reversed {
-                            if transition.inp > b {
-                                break;
-                            } 
-                        } else {
-                            if transition.inp < b {
-                                break;
-                            } 
+                        if (!self.reversed && transition.inp > b) || (self.reversed && transition.inp < b) {
+                            break;
                         }
                         if let Some(t) = self.next_transition(&node, trans) {
                             trans = t;
@@ -915,13 +909,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                             break;
                         }
                     }
-                    self.stack.push(StreamState {
-                        node,
-                        trans,
-                        out,
-                        aut_state,
-                        done,
-                    });
+                    self.stack.push(StreamState {node, trans, out, aut_state, done});
                     return;
                 }
             }
@@ -938,9 +926,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 self.stack[last].trans = transition.unwrap_or_default();
                 self.stack[last].done = transition.is_none();
                 self.inp.pop();
-                if self.return_stack > 0 { 
-                    self.return_stack -= 1;
-                }
             } else {
                 let next_node = self.fst.node(state.node.transition(transition.unwrap_or_default()).addr, self.data);
                 let starting_transition = self.starting_transition(&next_node);
@@ -963,26 +948,18 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         }
         if !self.reversed {
             if let Some(out) = self.empty_output.take() {
-                if self.out_of_bounds(&[]) {
-                    self.stack.clear();
-                    return None;
-                }
-                let start = self.aut.start();
-                if self.aut.is_match(&start) {
-                    return Some((&[], out, transform(&start)));
-                }
+                return self.build_empty_output(out, transform);
             }
         }
         while let Some(state) = self.stack.pop() {
             if state.done || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
-                    let inp_two = self.inp.clone();
+                    self.inp_return = self.inp.clone();
                     self.inp.pop().unwrap();
                     if self.return_stack > 0 {
                         self.return_stack -= 1;
-                        if state.node.is_final() && !self.out_of_bounds(&inp_two) && self.aut.can_match(&state.aut_state) { 
-                            self.return_pointer = inp_two;
-                            return Some((&self.return_pointer, state.out, transform(&state.aut_state)))
+                        if state.node.is_final() && !self.out_of_bounds(&self.inp_return) && self.aut.can_match(&state.aut_state) { 
+                            return Some((&self.inp_return, state.out, transform(&state.aut_state)))
                         }
                     }
                 }
@@ -1027,17 +1004,23 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         }
         if self.reversed {
             if let Some(out) = self.empty_output.take() {
-                if self.out_of_bounds(&[]) {
-                    self.stack.clear();
-                    return None;
-                }
-                let start = self.aut.start();
-                if self.aut.is_match(&start) {
-                    return Some((&[], out, transform(&start)));
-                }
+                return self.build_empty_output(out, transform);
             }
         }
         None
+    }
+
+    #[inline]
+    fn build_empty_output<F, T>(&mut self, out: Output, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
+        let start = self.aut.start();
+        if self.out_of_bounds(&[]) {
+            self.stack.clear();
+            None
+        } else if self.aut.is_match(&start) {
+            Some((&[], out, transform(&start)))
+        } else {
+            None
+        }
     }
 
 

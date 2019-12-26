@@ -791,9 +791,9 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     stack: Vec<StreamState<'f, A::State>>,
     min: Bound,
     max: Bound,
-    has_seeked: bool,
-    reversed: bool,
-    inp_return: Vec<u8>,
+    has_seeked: bool,  // Seeks lazily. Signifies whether the seek operation has been executed.
+    reversed: bool, 
+    inp_return: Vec<u8>,  // Holds output when 'self.inp' is not the same as return value.
 }
 
 #[derive(Clone, Debug)]
@@ -802,7 +802,8 @@ struct StreamState<'f, S> {
     trans: usize,
     out: Output,
     aut_state: S,
-    done: bool,
+    done: bool,  // ('done' = true) means that there are no unexplored transitions in the current state. 
+                 // 'trans' value should be ignored when done is true.
 }
 
 impl<'f, A: Automaton> StreamWithState<'f, A> {
@@ -819,7 +820,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             max: max,
             has_seeked: false,
             reversed: false,
-            inp_return: Vec::new(),
+            inp_return: Vec::new(), 
         }
     }
 
@@ -890,22 +891,8 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     // Since this is a minimum bound, we need to find the
                     // first transition in this node that proceeds the current
                     // input byte.
-                    let mut done = false;
-                    let mut trans = self.starting_transition(&node).unwrap();
-
-                    loop {
-                        let transition = node.transition(trans);
-                        if (!self.reversed && transition.inp > b) || (self.reversed && transition.inp < b) {
-                            break;
-                        }
-                        if let Some(t) = self.next_transition(&node, trans) {
-                            trans = t;
-                        } else {
-                            done = true;
-                            break;
-                        }
-                    }
-                    self.stack.push(StreamState {node, trans, out, aut_state, done});
+                    let trans = self.transition_within_bound(&node, b);
+                    self.stack.push(StreamState{node, trans: trans.unwrap_or_default(), out, aut_state, done: trans.is_none()});
                     return;
                 }
             }
@@ -937,14 +924,31 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     }
 
     #[inline]
+    fn transition_within_bound(&self, node: &Node<'f>, bound: u8) -> Option<usize> {
+        let mut trans = self.starting_transition(&node).unwrap();
+        loop {
+            let transition = node.transition(trans);
+            if (!self.reversed && transition.inp > bound) || (self.reversed && transition.inp < bound) {
+                return Some(trans);
+            }
+            if let Some(t) = self.next_transition(&node, trans) {
+                trans = t;
+            } else {
+                return None;
+            }
+        }
+    }
+
+    #[inline]
     fn next<F, T>(&mut self, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
         if !self.has_seeked {
             self.seek();
             self.has_seeked = true;
         }
         if !self.reversed {
+            // Inorder empty output (will be first).
             if let Some(out) = self.empty_output.take() {
-                return self.build_empty_output(out, transform);
+                return self.resolve_empty_output(out, transform);
             }
         }
         while let Some(state) = self.stack.pop() {
@@ -952,10 +956,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp_return = self.inp.clone();
                     self.inp.pop().unwrap();
-                    if self.reversed && self.stack.len() > 0 {
-                        if state.node.is_final() && !self.out_of_bounds(&self.inp_return) && self.aut.can_match(&state.aut_state) { 
-                            return Some((&self.inp_return, state.out, transform(&state.aut_state)))
-                        }
+                    // Reversed return next logic.
+                    // If the stack is empty the value should not be returned. 
+                    if self.reversed && self.stack.len() > 0 && state.node.is_final() && 
+                      !self.out_of_bounds(&self.inp_return) && self.aut.can_match(&state.aut_state) {
+                        return Some((&self.inp_return, state.out, transform(&state.aut_state)))
                     }
                 }
                 continue;
@@ -979,34 +984,35 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 aut_state: next_state,
                 done: next_transition.is_none(),
             });
-            if !self.reversed && self.out_of_bounds(&self.inp) {
-                // We are done, forever.
-                self.stack.clear();
-                return None;
-            }
-            if !self.reversed && next_node.is_final() && is_match {
-                return Some((&self.inp, out.cat(next_node.final_output()), ns));
+            // Inorder return next logic.
+            if !self.reversed {
+                if self.out_of_bounds(&self.inp) {
+                    // We are done, forever.
+                    self.stack.clear();
+                    return None;
+                } else if !self.reversed && next_node.is_final() && is_match {
+                    return Some((&self.inp, out.cat(next_node.final_output()), ns));
+                }
             }
         }
         if self.reversed {
+            // Reverse order empty output (will be last).
             if let Some(out) = self.empty_output.take() {
-                return self.build_empty_output(out, transform);
+                return self.resolve_empty_output(out, transform);
             }
         }
         None
     }
 
+    /// Resolves value of the empty output. Will be none if the empty output should not be returned.
     #[inline]
-    fn build_empty_output<F, T>(&mut self, out: Output, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
+    fn resolve_empty_output<F, T>(&mut self, out: Output, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
         let start = self.aut.start();
-        if self.out_of_bounds(&[]) {
-            self.stack.clear();
-            None
-        } else if self.aut.is_match(&start) {
+        if !self.out_of_bounds(&[]) && self.aut.is_match(&start) {
             Some((&[], out, transform(&start)))
         } else {
             None
-        }
+        } 
     }
 
 

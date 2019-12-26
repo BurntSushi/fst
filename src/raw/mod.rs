@@ -954,75 +954,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     }
 
     #[inline]
-    fn starting_transition(&self, node: &Node<'f>) -> Option<usize> {
-        if node.len() == 0 {
-            None
-        }
-        else if !self.reversed {
-            Some(0)
-        } else {
-            Some(node.len() - 1)
-        }
-    }
-
-    /// Returns the next transition.
-    ///
-    /// The concept of `next` transition is dependent on whether the stream is in reverse mode or
-    /// not. If all the transitions of this node have been emitted, this method returns None.
-    #[inline]
-    fn next_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        if self.reversed {
-            Self::backward_transition(node, current_transition)
-        } else {
-            Self::forward_transition(node, current_transition)
-        }
-    }
-
-    /// See `StreamWithState::next_transition`.
-    #[inline]
-    fn previous_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        if self.reversed {
-            Self::forward_transition(node, current_transition)
-        } else {
-            Self::backward_transition(node, current_transition)
-        }
-    }
-
-    /// Returns the next logical transition.
-    ///
-    /// This is independent from whether the stream is in backward mode or not.
-    #[inline]
-    fn forward_transition(node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        if current_transition + 1 < node.len() {
-            Some(current_transition + 1)
-        } else {
-            None
-        }
-    }
-
-    /// See [Stream::forward_transition].
-    #[inline]
-    fn backward_transition(node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        if current_transition > 0 && node.len() > 0 {
-            Some(current_transition - 1)
-        } else {
-            None
-        }
-    }
-
-    // Not sure how to make clone work.
-    fn reverse(&mut self) {
-        self.inp.clear();
-        self.stack.clear();
-        self.has_seeked = false;
-        self.reversed = !self.reversed;
-    }
-
-    fn out_of_bounds(&self, inp: &[u8]) -> bool {
-        self.min.subceeded_by(inp) || self.max.exceeded_by(inp)
-    }
-
-    #[inline]
     fn next<F, T>(&mut self, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
         if !self.has_seeked {
             self.seek();
@@ -1105,6 +1036,77 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             }
         }
         None
+    }
+
+
+    #[inline]
+    fn starting_transition(&self, node: &Node<'f>) -> Option<usize> {
+        if node.len() == 0 {
+            None
+        }
+        else if !self.reversed {
+            Some(0)
+        } else {
+            Some(node.len() - 1)
+        }
+    }
+
+    /// Returns the next transition.
+    ///
+    /// The concept of `next` transition is dependent on whether the stream is in reverse mode or
+    /// not. If all the transitions of this node have been emitted, this method returns None.
+    #[inline]
+    fn next_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
+        if self.reversed {
+            Self::backward_transition(node, current_transition)
+        } else {
+            Self::forward_transition(node, current_transition)
+        }
+    }
+
+    /// See `StreamWithState::next_transition`.
+    #[inline]
+    fn previous_transition(&self, node: &Node<'f>, current_transition: usize) -> Option<usize> {
+        if self.reversed {
+            Self::forward_transition(node, current_transition)
+        } else {
+            Self::backward_transition(node, current_transition)
+        }
+    }
+
+    /// Returns the next logical transition.
+    ///
+    /// This is independent from whether the stream is in backward mode or not.
+    #[inline]
+    fn forward_transition(node: &Node<'f>, current_transition: usize) -> Option<usize> {
+        if current_transition + 1 < node.len() {
+            Some(current_transition + 1)
+        } else {
+            None
+        }
+    }
+
+    /// See [Stream::forward_transition].
+    #[inline]
+    fn backward_transition(node: &Node<'f>, current_transition: usize) -> Option<usize> {
+        if current_transition > 0 && node.len() > 0 {
+            Some(current_transition - 1)
+        } else {
+            None
+        }
+    }
+
+    /// Reverses the stream. Will reset the iterator.
+    fn reverse(&mut self) {
+        self.inp.clear();
+        self.stack.clear();
+        self.has_seeked = false;
+        self.reversed = !self.reversed;
+    }
+
+    /// Checks if an input is out of the current bounds.
+    fn out_of_bounds(&self, inp: &[u8]) -> bool {
+        self.min.subceeded_by(inp) || self.max.exceeded_by(inp)
     }
 }
 

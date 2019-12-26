@@ -474,6 +474,63 @@ test_range! {
     "a", "aaa", "aba", "aca"
 }
 
+test_range! {
+    fst_range_21,
+    min: Bound::Included(b"aab".to_vec()), max: Bound::Unbounded,
+    imin: 2, imax: 4,
+    "a", "aaa", "aba", "aca"
+}
+
+test_range! {
+    fst_range_22,
+    min: Bound::Excluded(b"aab".to_vec()), max: Bound::Unbounded,
+    imin: 2, imax: 4,
+    "a", "aaa", "aba", "aca"
+}
+
+test_range! {
+    fst_range_23,
+    min: Bound::Included(b"a".to_vec()), max: Bound::Included(b"a".to_vec()),
+    imin: 0, imax: 1,
+    "a", "aaa", "aba", "aca"
+}
+
+test_range! {
+    fst_range_24,
+    min: Bound::Included(b"aca".to_vec()), max: Bound::Included(b"aca".to_vec()),
+    imin: 3, imax: 4,
+    "a", "aaa", "aba", "aca"
+}
+
+test_range! {
+    fst_range_25,
+    min: Bound::Included(b"aba".to_vec()), max: Bound::Included(b"aba".to_vec()),
+    imin: 2, imax: 3,
+    "a", "aaa", "aba", "aca"
+}
+
+test_range! {
+    fst_range_26,
+    min: Bound::Included(b"aaa".to_vec()), max: Bound::Unbounded,
+    imin: 2, imax: 3,
+    "a", "aa", "aaa"
+}
+
+test_range! {
+    fst_range_27,
+    min: Bound::Included(b"aa".to_vec()), max: Bound::Unbounded,
+    imin: 1, imax: 3,
+    "a", "aa", "aaa"
+}
+
+test_range! {
+    fst_range_28,
+    min: Bound::Included(b"a".to_vec()), max: Bound::Unbounded,
+    imin: 0, imax: 3,
+    "a", "aa", "aaa"
+}
+
+
 #[test]
 fn reverse() {
     let items: Vec<_> =

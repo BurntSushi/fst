@@ -248,7 +248,7 @@ macro_rules! test_range {
                            (items[i].0.as_bytes(), Output::new(items[i].1)));
             }
             assert_eq!(rdr.next(), None);
-            let mut rdr = rdr.reverse();
+            let mut rdr = rdr.rev();
             for i in ($imin..$imax).rev() {
                 assert_eq!(rdr.next().unwrap(),
                            (items[i].0.as_bytes(), Output::new(items[i].1)));
@@ -539,9 +539,9 @@ fn reverse() {
     let fst: Fst = fst_map(items.clone()).into();
     let stream = fst.stream();
     assert!(!stream.0.reversed);
-    let stream = stream.reverse();
+    let stream = stream.rev();
     assert!(stream.0.reversed);
-    let stream = stream.reverse();
+    let stream = stream.rev();
     assert!(!stream.0.reversed);
 }
 
@@ -581,7 +581,7 @@ fn starting_transition() {
     let stream = fst.stream();
     let root = fst.root();
     assert_eq!(stream.0.starting_transition(&root).unwrap(), 0);
-    let stream = stream.reverse();
+    let stream = stream.rev();
     assert_eq!(stream.0.starting_transition(&root).unwrap(), 3);
     let a = fst.node(root.transition(0).addr);
     assert_eq!(stream.0.starting_transition(&a), None);
@@ -596,7 +596,7 @@ fn last_transition() {
     let stream = fst.stream();
     let root = fst.root();
     assert_eq!(stream.0.last_transition(&root).unwrap(), 3);
-    let stream = stream.reverse();
+    let stream = stream.rev();
     assert_eq!(stream.0.last_transition(&root).unwrap(), 0);
     let a = fst.node(root.transition(0).addr);
     assert_eq!(stream.0.last_transition(&a), None);
@@ -619,7 +619,7 @@ fn next_transition() {
     assert_eq!(stream.0.previous_transition(&a, 0), None);
     assert_eq!(stream.0.previous_transition(&a, 1).unwrap(), 0);
     assert_eq!(stream.0.previous_transition(&a, 2).unwrap(), 1);
-    let stream = stream.reverse();
+    let stream = stream.rev();
     assert_eq!(stream.0.next_transition(&a, 0), None);
     assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 0);
     assert_eq!(stream.0.next_transition(&a, 2).unwrap(), 1);
@@ -639,7 +639,7 @@ fn test_reverse_range(input: Vec<&str>, min: Bound, max: Bound, imin: usize, ima
          .map(|(i, k)| (k, i as u64)).collect();
     let fst: Fst = fst_map(items.clone()).into();
     let mut stream = Stream::new(&fst.meta, fst.data.deref(), AlwaysMatch, min, max);
-    stream = stream.reverse();
+    stream = stream.rev();
     for i in (imin..imax).rev() {
         let next = stream.next();
         assert!(next.is_some());

@@ -759,7 +759,8 @@ impl<'f, A: Automaton> Stream<'f, A> {
         vs
     }
 
-    pub fn reverse(mut self) -> Self {
+    /// Reverses the stream. Will reset any ongoing iteration.
+    pub fn rev(mut self) -> Self {
         self.0.reverse();
         self
     }

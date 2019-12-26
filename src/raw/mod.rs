@@ -897,8 +897,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     let mut done = false;
                     let mut trans = self.starting_transition(&node).unwrap();
 
-                    // TODO(halvorboe) If the following line     is useful can we have a unit test that fails if it is removed?
-                    let mut _transition2 = node.transition(trans);
                     loop {
                         let transition = node.transition(trans);
                         if !self.reversed {
@@ -931,7 +929,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         if !self.stack.is_empty() {
             let last = self.stack.len() - 1;
             let state = &self.stack[last];
-            let transition = self.previous_transition(&state.node, state.trans);
+            let transition = if !state.done { 
+                self.previous_transition(&state.node, state.trans)
+            } else {
+                self.last_transition(&state.node)
+            };
             if inclusive {
                 self.stack[last].trans = transition.unwrap_or_default();
                 self.stack[last].done = transition.is_none();
@@ -1045,6 +1047,18 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             None
         }
         else if !self.reversed {
+            Some(0)
+        } else {
+            Some(node.len() - 1)
+        }
+    }
+
+    #[inline]
+    fn last_transition(&self, node: &Node<'f>) -> Option<usize> {
+        if node.len() == 0 {
+            None
+        }
+        else if self.reversed {
             Some(0)
         } else {
             Some(node.len() - 1)

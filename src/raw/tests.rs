@@ -467,6 +467,13 @@ test_range! {
     "a", "b", "c", "d", "e", "f"
 }
 
+test_range! {
+    fst_range_20,
+    min: Bound::Included(vec![b'a', b'a', b'a']), max: Bound::Unbounded,
+    imin: 1, imax: 4,
+    "a", "aaa", "aba", "aca"
+}
+
 #[test]
 fn reverse() {
     let items: Vec<_> =
@@ -587,6 +594,7 @@ fn reverse_traversal_bounds() {
     test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"], Bound::Unbounded, Bound::Included(b"abd".to_vec()), 0, 6);
     test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abe"],  Bound::Unbounded, Bound::Excluded(b"abd".to_vec()), 0, 5);
     test_reverse_range(vec!["", "a"], Bound::Included(vec![]), Bound::Unbounded, 0, 2);
+    test_reverse_range(vec!["a", "aaa", "aba", "aca"], Bound::Included(b"aaa".to_vec()), Bound::Unbounded, 1, 4);
 }
 
 #[test]

@@ -996,8 +996,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let transition = node.transition(trans);
             if (!self.reversed && transition.inp > bound) || (self.reversed && transition.inp < bound) {
                 return Some(trans);
-            }
-            if let Some(t) = self.next_transition(&node, trans) {
+            } else if let Some(t) = self.next_transition(&node, trans) {
                 trans = t;
             } else {
                 return None;
@@ -1021,8 +1020,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     fn starting_transition(&self, node: &Node<'f>) -> Option<usize> {
         if node.len() == 0 {
             None
-        }
-        else if !self.reversed {
+        } else if !self.reversed {
             Some(0)
         } else {
             Some(node.len() - 1)
@@ -1033,8 +1031,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     fn last_transition(&self, node: &Node<'f>) -> Option<usize> {
         if node.len() == 0 {
             None
-        }
-        else if self.reversed {
+        } else if self.reversed {
             Some(0)
         } else {
             Some(node.len() - 1)

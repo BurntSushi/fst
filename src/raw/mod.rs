@@ -792,7 +792,6 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     max: Bound,
     has_seeked: bool,
     reversed: bool,
-    return_stack: usize,
     inp_return: Vec<u8>,
 }
 
@@ -819,7 +818,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             max: max,
             has_seeked: false,
             reversed: false,
-            return_stack: 0,  // Keeps track of number of values that should be returned.
             inp_return: Vec::new(),
         }
     }
@@ -882,9 +880,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                         aut_state: prev_state,
                         done: transition.is_none(),
                     });
-                    if self.reversed {
-                        self.return_stack += 1;
-                    }
                     out = out.cat(t.out);
                     node = self.fst.node(t.addr, self.data);
                 }
@@ -956,8 +951,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp_return = self.inp.clone();
                     self.inp.pop().unwrap();
-                    if self.return_stack > 0 {
-                        self.return_stack -= 1;
+                    if self.reversed && self.stack.len() > 0 {
                         if state.node.is_final() && !self.out_of_bounds(&self.inp_return) && self.aut.can_match(&state.aut_state) { 
                             return Some((&self.inp_return, state.out, transform(&state.aut_state)))
                         }
@@ -989,17 +983,8 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 self.stack.clear();
                 return None;
             }
-            if next_node.is_final() && is_match {
-                let out = out.cat(next_node.final_output());
-                if !self.reversed {
-                    return Some((&self.inp, out, ns));
-                } else {
-                    self.return_stack += 1;
-                }
-            } else {
-                if self.reversed {
-                    self.return_stack += 1;
-                }
+            if !self.reversed && next_node.is_final() && is_match {
+                return Some((&self.inp, out.cat(next_node.final_output()), ns));
             }
         }
         if self.reversed {

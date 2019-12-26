@@ -924,22 +924,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     }
 
     #[inline]
-    fn transition_within_bound(&self, node: &Node<'f>, bound: u8) -> Option<usize> {
-        let mut trans = self.starting_transition(&node).unwrap();
-        loop {
-            let transition = node.transition(trans);
-            if (!self.reversed && transition.inp > bound) || (self.reversed && transition.inp < bound) {
-                return Some(trans);
-            }
-            if let Some(t) = self.next_transition(&node, trans) {
-                trans = t;
-            } else {
-                return None;
-            }
-        }
-    }
-
-    #[inline]
     fn next<F, T>(&mut self, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
         if !self.has_seeked {
             self.seek();
@@ -1002,6 +986,23 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             }
         }
         None
+    }
+
+    // The first transition that is in a bound for a given node.
+    #[inline]
+    fn transition_within_bound(&self, node: &Node<'f>, bound: u8) -> Option<usize> {
+        let mut trans = self.starting_transition(&node).unwrap();
+        loop {
+            let transition = node.transition(trans);
+            if (!self.reversed && transition.inp > bound) || (self.reversed && transition.inp < bound) {
+                return Some(trans);
+            }
+            if let Some(t) = self.next_transition(&node, trans) {
+                trans = t;
+            } else {
+                return None;
+            }
+        }
     }
 
     /// Resolves value of the empty output. Will be none if the empty output should not be returned.

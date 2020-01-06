@@ -68,6 +68,9 @@ const EMPTY_ADDRESS: CompiledAddr = 0;
 /// This is never the address of a node in a serialized transducer.
 const NONE_ADDRESS: CompiledAddr = 1;
 
+/// Default input capacity of a stream.
+const STREAM_INPUT_CAPACITY: usize = 16;
+
 /// FstType is a convention used to indicate the type of the underlying
 /// transducer.
 ///
@@ -813,7 +816,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             fst,
             data,
             aut,
-            inp: Vec::with_capacity(16),
+            inp: Vec::with_capacity(STREAM_INPUT_CAPACITY),
             empty_output: None,
             stack: vec![],
             min: min,

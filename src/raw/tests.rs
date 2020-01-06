@@ -469,7 +469,7 @@ test_range! {
 
 test_range! {
     fst_range_20,
-    min: Bound::Included(vec![b'a', b'a', b'a']), max: Bound::Unbounded,
+    min: Bound::Included(b"aaa".to_vec()), max: Bound::Unbounded,
     imin: 1, imax: 4,
     "a", "aaa", "aba", "aca"
 }

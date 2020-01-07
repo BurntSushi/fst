@@ -3,6 +3,7 @@ use error::Error;
 use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
 use stream::Streamer;
 use std::ops::Deref;
+use ::{IntoStreamer, Regex};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -585,6 +586,18 @@ fn starting_transition() {
     assert_eq!(stream.0.starting_transition(&root).unwrap(), 3);
     let a = fst.node(root.transition(0).addr);
     assert_eq!(stream.0.starting_transition(&a), None);
+}
+
+#[test]
+fn test_return_node_on_reverse_only_if_match() {
+    let items: Vec<_> =
+        vec!["a", "ab"].into_iter().enumerate()
+            .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let automaton = Regex::new("ab").unwrap();
+    let mut stream = fst.search(automaton).into_stream().rev();
+    assert_eq!(stream.next(), Some((&b"ab"[..], Output::new(1u64))));
+    assert_eq!(stream.next(), None);
 }
 
 #[test]

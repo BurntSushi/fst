@@ -941,7 +941,9 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         while let Some(state) = self.stack.pop() {
             if state.done || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
-                    self.inp_return = self.inp.clone();
+                    self.inp_return.clear();
+                    self.inp_return.resize(self.inp.len(), 0);
+                    self.inp_return.copy_from_slice(&self.inp);
                     self.inp.pop().unwrap();
                     // Reversed return next logic.
                     // If the stack is empty the value should not be returned. 

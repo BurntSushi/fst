@@ -1,3 +1,4 @@
+use inner_automaton::Automaton;
 use std::collections::HashSet;
 use automaton::AlwaysMatch;
 use error::Error;
@@ -532,6 +533,12 @@ test_range! {
     "a", "aa", "aaa"
 }
 
+test_range! {
+    fst_range_29,
+    min: Bound::Included(b"ka".to_vec()), max: Bound::Unbounded,
+    imin: 3, imax: 2,
+    "a", "k"
+}
 
 #[test]
 fn reverse() {
@@ -642,22 +649,80 @@ fn next_transition() {
     assert_eq!(stream.0.previous_transition(&a, 2), None);
 }
 
+#[test]
+fn test_transition_within_bound() {
+    let items: Vec<_> =
+        vec!["a", "ab", "ac", "ad"].into_iter().enumerate()
+                     .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let stream = fst.stream();
+    let a = fst.node(fst.root().transition(0).addr);
+    assert_eq!(stream.0.transition_within_bound(&a, 'z' as u8), None);
+    assert_eq!(stream.0.transition_within_bound(&a, 'd' as u8), None);
+    assert_eq!(stream.0.transition_within_bound(&a, 'c' as u8), Some(2));
+    assert_eq!(stream.0.transition_within_bound(&a, 'b' as u8), Some(1));
+    assert_eq!(stream.0.transition_within_bound(&a, 'a' as u8), Some(0));
+}
+
 fn test_reverse(input: Vec<&str>) {
     let len = input.len();
     test_reverse_range(input, Bound::Unbounded, Bound::Unbounded, 0, len);
 }
 
 fn test_reverse_range(input: Vec<&str>, min: Bound, max: Bound, imin: usize, imax: usize) {
+    test_reverse_range_with_aut(input, AlwaysMatch, AlwaysMatch, min, max, imin, imax);
+}
+
+fn test_reverse_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, max: Bound, imin: usize, imax: usize) where A: Automaton {
     let items: Vec<_> =
     input.into_iter().enumerate()
          .map(|(i, k)| (k, i as u64)).collect();
     let fst: Fst = fst_map(items.clone()).into();
-    let mut stream = Stream::new(&fst.meta, fst.data.deref(), AlwaysMatch, min, max);
+    let mut stream = Stream::new(&fst.meta, fst.data.deref(), aut, min, max);
     stream = stream.rev();
     for i in (imin..imax).rev() {
         let next = stream.next();
-        assert!(next.is_some());
-        assert_eq!(next.unwrap(), (items[i].0.as_bytes(), Output::new(items[i].1)));
+        if next.is_some() {
+            assert_eq!(next.unwrap(), (items[i].0.as_bytes(), Output::new(items[i].1)));
+            let mut state = aut_check.start();
+            for c in next.unwrap().0 {
+                state = aut_check.accept(&state, *c);
+            } 
+            assert!(aut_check.is_match(&state));
+        } else {
+            let mut state = aut_check.start();
+            for c in items[i].0.as_bytes() {
+                state = aut_check.accept(&state, *c);
+            } 
+            assert!(!aut_check.is_match(&state));
+        }
+    }
+    assert_eq!(stream.next(), None);
+}
+
+
+fn test_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, max: Bound, imin: usize, imax: usize) where A: Automaton {
+    let items: Vec<_> =
+    input.into_iter().enumerate()
+         .map(|(i, k)| (k, i as u64)).collect();
+    let fst: Fst = fst_map(items.clone()).into();
+    let mut stream = Stream::new(&fst.meta, fst.data.deref(), aut, min, max);
+    for i in imin..imax {
+        let next = stream.next();
+        if next.is_some() {
+            assert_eq!(next.unwrap(), (items[i].0.as_bytes(), Output::new(items[i].1)));
+            let mut state = aut_check.start();
+            for c in next.unwrap().0 {
+                state = aut_check.accept(&state, *c);
+            } 
+            assert!(aut_check.is_match(&state));
+        } else {
+            let mut state = aut_check.start();
+            for c in items[i].0.as_bytes() {
+                state = aut_check.accept(&state, *c);
+            } 
+            assert!(!aut_check.is_match(&state));
+        }
     }
     assert_eq!(stream.next(), None);
 }
@@ -794,20 +859,58 @@ test_range_with_aut! {
 
 use proptest::prelude::*;
 
-fn string_to_static_str(s: String) -> &'static str {
-    Box::leak(s.into_boxed_str())
+const vec_of_words: &'static str = "([a-z]+[|])*[a-z]+";
+const regex_string: &'static str = "[a-z]*";
+
+prop_compose! {
+    fn in_bound()(
+        bound in "[a-z]*"
+    ) -> Bound {
+        Bound::Included(bound.as_bytes().to_vec())
+    }
 }
 
-const reg: &'static str = "(.*[|])*.*";
+prop_compose! {
+    fn ex_bound()(
+        bound in "[a-z]*"
+    ) -> Bound {
+        Bound::Excluded(bound.as_bytes().to_vec())
+    }
+}
+
+fn bound_strategy() -> BoxedStrategy<Bound> {
+    prop_oneof![
+        Just(Bound::Unbounded),
+        in_bound(),
+        ex_bound(),
+    ].boxed()
+}
 
 proptest! {
+
     #[test]
-    fn proptest_reverse_traversal(s in reg) {
-        let mut vec: Vec<&str> = s.split("|").collect();
+    fn proptest_traversal(vec_as_string in vec_of_words, r in regex_string, min in bound_strategy(), max in bound_strategy()) {
+        let mut vec: Vec<&str> = vec_as_string.split("|").collect();
         let set: HashSet<_> = vec.drain(..).collect(); // dedup
         vec.extend(set.into_iter());
         vec.sort();
-        dbg!(&vec);
-        test_reverse(vec);
+        let imin = match min {
+            Bound::Unbounded => 0,
+            Bound::Excluded(ref r) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            Bound::Included(ref r) => std::cmp::max(vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len() + 1), 1) - 1,
+            _ => 0,
+        };
+        let imax = match max {
+            Bound::Unbounded => vec.len(),
+            Bound::Included(ref r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            Bound::Excluded(ref r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            _ => 0,
+        };
+        dbg!((imin, imax, &min, &max, &vec));
+        let min2 = min.clone(); 
+        let max2 = max.clone();
+        test_range_with_aut(vec.clone(), Regex::new(&r).unwrap(), Regex::new(&r).unwrap(), min, max, imin, imax);
+        test_reverse_range_with_aut(vec.clone(), Regex::new(&r).unwrap(), Regex::new(&r).unwrap(), min2, max2, imin, imax);
     }
 }
+

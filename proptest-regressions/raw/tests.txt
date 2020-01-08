@@ -5,3 +5,7 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc ffc4a167f07ce7f712d0c5169671821701e7c9701c4c18b29ded22c8454fb756 # shrinks to s = "aaaaa|"
+cc f664a4852cbfac6b135c07c93b3d84f35f8c9aa2b83cb4b6173178ce5eb9721b # shrinks to vec_as_string = "|", r = "", min = Unbounded, max = Unbounded
+cc e7b34fa01f1aa9a5650e627c81058343060cf4e390eab17351e4495401ec7a96 # shrinks to vec_as_string = "&|", r = "", min = Unbounded, max = Unbounded
+cc fe9bf9bbb7dcf2fd57a057d17158d119d14a86c39c81cddc2c9b04d2d847c20d # shrinks to vec_as_string = "k|a", r = "", min = Unbounded, max = Excluded([107, 0])
+cc 1d1d05a5fbe8bfeac4ac00d3599b235d6426c8aabc1b70f7528c3c118deeabac # shrinks to vec_as_string = "m|a", r = "", min = Unbounded, max = Excluded([109, 97])

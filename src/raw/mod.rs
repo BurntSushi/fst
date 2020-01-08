@@ -996,8 +996,13 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     // The first transition that is in a bound for a given node.
     #[inline]
     fn transition_within_bound(&self, node: &Node<'f>, bound: u8) -> Option<usize> {
-        let mut trans = self.starting_transition(&node).unwrap();
-        loop {
+        let mut trans = 0;
+        if let Some(t) = self.starting_transition(&node) {
+           trans = t;
+       } else {
+           return None
+       }
+       loop {
             let transition = node.transition(trans);
             if (!self.reversed && transition.inp > bound) || (self.reversed && transition.inp < bound) {
                 return Some(trans);

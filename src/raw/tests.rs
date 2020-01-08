@@ -531,6 +531,13 @@ test_range! {
     "a", "aa", "aaa"
 }
 
+test_range! {
+    fst_range_29,
+    min: Bound::Included(b"ka".to_vec()), max: Bound::Unbounded,
+    imin: 3, imax: 2,
+    "a", "k"
+}
+
 
 #[test]
 fn reverse() {

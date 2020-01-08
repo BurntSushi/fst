@@ -946,7 +946,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     // Reversed return next logic.
                     // If the stack is empty the value should not be returned. 
                     if self.reversed && self.stack.len() > 0 && state.node.is_final() && 
-                      !self.out_of_bounds(&self.inp_return) && self.aut.can_match(&state.aut_state) {
+                      !self.out_of_bounds(&self.inp_return) && self.aut.is_match(&state.aut_state) {
                         return Some((&self.inp_return, state.out, transform(&state.aut_state)))
                     }
                 }

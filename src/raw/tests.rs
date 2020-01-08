@@ -694,3 +694,98 @@ fn bytes_written() {
     let footer_size = 24;
     assert_eq!(counted_len + footer_size, fst1_len);
 }
+
+macro_rules! test_range_with_aut {
+    (
+        $name:ident,
+        min: $min:expr,
+        max: $max:expr,
+        imin: $imin:expr,
+        imax: $imax:expr,
+        aut: $aut:expr,
+        input: $input:expr,
+        output: $output:expr,
+    ) => {
+        #[test]
+        fn $name() {
+            let items: Vec<&'static str> = $input;
+            let items: Vec<_> =
+                items.into_iter().enumerate()
+                     .map(|(i, k)| (k, i as u64)).collect();
+            let output: Vec<&'static str> = $output;
+            let output: Vec<_> =
+                output.into_iter()
+                    .map(|k| (k, items.iter().position(|&t| t.0 == k).unwrap() as u64)).collect();
+            let fst: Fst = fst_map(items.clone()).into();
+            let mut rdr = Stream::new(&fst.meta, fst.data.deref(), $aut, $min, $max);
+            for i in $imin..$imax {
+                assert_eq!(rdr.next().unwrap(),
+                           (output[i].0.as_bytes(), Output::new(output[i].1)));
+            }
+            assert_eq!(rdr.next(), None);
+            let mut rdr = rdr.rev();
+            for i in ($imin..$imax).rev() {
+                assert_eq!(rdr.next().unwrap(),
+                           (output[i].0.as_bytes(), Output::new(output[i].1)));
+            }
+            assert_eq!(rdr.next(), None);
+        }
+    }
+}
+
+
+
+test_range_with_aut! {
+    fst_range_aut_1,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 3,
+    aut: Regex::new("a*").unwrap(),
+    input: vec!["a", "aa", "aaa"],
+    output: vec!["a", "aa", "aaa"],
+}
+
+test_range_with_aut! {
+    fst_range_aut_2,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 2,
+    aut: Regex::new("a*").unwrap(),
+    input: vec!["b", "aa", "aaa"],
+    output: vec!["aa", "aaa"],
+}
+
+test_range_with_aut! {
+    fst_range_aut_3,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 0,
+    aut: Regex::new("").unwrap(),
+    input: vec!["b", "aa", "aaa"],
+    output: vec![],
+}
+
+test_range_with_aut! {
+    fst_range_aut_4,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 1,
+    aut: Regex::new("b").unwrap(),
+    input: vec!["b", "aa", "aaa"],
+    output: vec!["b"],
+}
+
+test_range_with_aut! {
+    fst_range_aut_5,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 0,
+    aut: Regex::new("c").unwrap(),
+    input: vec!["b", "aa", "aaa"],
+    output: vec![],
+}
+
+test_range_with_aut! {
+    fst_range_aut_6,
+    min: Bound::Unbounded, max: Bound::Unbounded,
+    imin: 0, imax: 0,
+    aut: Regex::new("a").unwrap(),
+    input: vec![],
+    output: vec![],
+}
+

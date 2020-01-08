@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use automaton::AlwaysMatch;
 use error::Error;
 use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
@@ -789,3 +790,24 @@ test_range_with_aut! {
     output: vec![],
 }
 
+
+
+use proptest::prelude::*;
+
+fn string_to_static_str(s: String) -> &'static str {
+    Box::leak(s.into_boxed_str())
+}
+
+const reg: &'static str = "(.*[|])*.*";
+
+proptest! {
+    #[test]
+    fn proptest_reverse_traversal(s in reg) {
+        let mut vec: Vec<&str> = s.split("|").collect();
+        let set: HashSet<_> = vec.drain(..).collect(); // dedup
+        vec.extend(set.into_iter());
+        vec.sort();
+        dbg!(&vec);
+        test_reverse(vec);
+    }
+}

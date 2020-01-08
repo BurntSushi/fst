@@ -9,6 +9,7 @@
 extern crate byteorder;
 #[cfg(test)] extern crate quickcheck;
 #[cfg(test)] extern crate rand;
+#[cfg(test)] extern crate proptest;
 
 pub use automaton::Automaton;
 pub use error::{Error, Result};

@@ -1,7 +1,7 @@
 #![feature(test)]
 
 extern crate fnv;
-extern crate fst;
+extern crate tantivy_fst;
 #[macro_use] extern crate lazy_static;
 extern crate test;
 
@@ -24,7 +24,7 @@ macro_rules! search {
             use std::hash::BuildHasherDefault;
 
             use fnv::FnvHasher;
-            use fst::raw::{Builder, Fst};
+            use tantivy_fst::raw::{Builder, Fst};
             use test::Bencher;
 
             #[bench]
@@ -36,7 +36,7 @@ macro_rules! search {
                             bfst.add(word).unwrap();
                         }
                         let bytes = bfst.into_inner().unwrap();
-                        Fst::from_bytes(bytes).unwrap()
+                        Fst::new(bytes).unwrap()
                     };
                 }
                 let mut i = 0;

@@ -897,15 +897,13 @@ proptest! {
         vec.sort();
         let imin = match min {
             Bound::Unbounded => 0,
-            Bound::Excluded(ref r) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
-            Bound::Included(ref r) => std::cmp::max(vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len() + 1), 1) - 1,
-            _ => 0,
+            Bound::Excluded(ref _r) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            Bound::Included(ref _r) => std::cmp::max(vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len() + 1), 1) - 1,
         };
         let imax = match max {
             Bound::Unbounded => vec.len(),
-            Bound::Included(ref r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
-            Bound::Excluded(ref r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
-            _ => 0,
+            Bound::Included(ref _r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            Bound::Excluded(ref _r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
         };
         dbg!((imin, imax, &min, &max, &vec));
         let min2 = min.clone(); 

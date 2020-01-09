@@ -6,7 +6,7 @@ use raw::Output;
 use stream::{IntoStreamer, Streamer};
 
 /// Permits stream operations to be hetergeneous with respect to streams.
-type BoxedStream<'f> = Box<for<'a> Streamer<'a, Item=(&'a [u8], Output)> + 'f>;
+type BoxedStream<'f> = Box<dyn for<'a> Streamer<'a, Item=(&'a [u8], Output)> + 'f>;
 
 /// A value indexed by a stream.
 ///

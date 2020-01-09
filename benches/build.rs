@@ -1,11 +1,11 @@
 #![feature(test)]
 
-extern crate fst;
+extern crate tantivy_fst;
 extern crate test;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use fst::raw::{Builder, Fst};
+use tantivy_fst::raw::{Builder, Fst};
 use test::Bencher;
 
 const WORDS: &'static str = include_str!("./../data/words-10000");
@@ -27,7 +27,7 @@ fn build_fst_set(b: &mut Bencher) {
         for word in &words {
             bfst.add(word).unwrap();
         }
-        Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
+        Fst::new(bfst.into_inner().unwrap()).unwrap();
     });
 }
 
@@ -40,7 +40,7 @@ fn build_fst_map(b: &mut Bencher) {
         for &(ref word, len) in &words {
             bfst.insert(word, len).unwrap();
         }
-        Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
+        Fst::new(bfst.into_inner().unwrap()).unwrap();
     });
 }
 

@@ -31,7 +31,7 @@ levenshtein_automata="0.1"
 
 [dev-dependencies]
 fnv = "1.0.5"
-lazy_static = "0.2.8"
+lazy_static = "1.4"
 quickcheck = { version = "0.7", default-features = false }
 rand = "0.5"
 proptest = "0.9.4"

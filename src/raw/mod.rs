@@ -694,6 +694,8 @@ impl Bound {
     }
 }
 
+
+
 pub struct Stream<'f, A=AlwaysMatch>(StreamWithState<'f, A>) where A: Automaton;
 
 impl<'f, A: Automaton> Stream<'f, A> {

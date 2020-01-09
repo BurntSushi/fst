@@ -664,91 +664,101 @@ fn test_transition_within_bound() {
     assert_eq!(stream.0.transition_within_bound(&a, 'a' as u8), Some(0));
 }
 
-fn test_reverse(input: Vec<&str>) {
-    let len = input.len();
-    test_reverse_range(input, Bound::Unbounded, Bound::Unbounded, 0, len);
-}
-
-fn test_reverse_range(input: Vec<&str>, min: Bound, max: Bound, imin: usize, imax: usize) {
-    test_reverse_range_with_aut(input, AlwaysMatch, AlwaysMatch, min, max, imin, imax);
-}
-
-
-fn test_reverse_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, max: Bound, imin: usize, imax: usize) where A: Automaton {
-    let items: Vec<_> =
-    input.into_iter().enumerate()
-         .map(|(i, k)| (k, i as u64)).collect();
-    let fst: Fst = fst_map(items.clone()).into();
-    let mut stream = Stream::new(&fst.meta, fst.data.deref(), aut, min, max);
-    stream = stream.rev();
-    for i in (imin..imax).rev() {
-        let next = stream.next();
-        let mut state = aut_check.start();
-        for c in items[i].0.as_bytes() {
-            state = aut_check.accept(&state, *c);
-        } 
-        if !aut_check.is_match(&state) {
-            continue;
+fn automaton_match<A: Automaton>(aut: &A, inp: &[u8]) -> bool {
+    let mut state = aut.start();
+    for &b in inp {
+        if !aut.can_match(&state) {
+            return false;
         }
-        if next.is_some() {
-            assert_eq!(next.unwrap(), (items[i].0.as_bytes(), Output::new(items[i].1)));
-            let mut state = aut_check.start();
-            for c in next.unwrap().0 {
-                state = aut_check.accept(&state, *c);
-            } 
-            assert!(aut_check.is_match(&state));
-        } 
+        state = aut.accept(&state, b);
     }
-    assert_eq!(stream.next(), None);
+    aut.is_match(&state)
 }
 
-fn test_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, max: Bound, imin: usize, imax: usize) where A: Automaton {
-    let items: Vec<_> =
-    input.into_iter().enumerate()
-         .map(|(i, k)| (k, i as u64)).collect();
+fn contains(min: &Bound, max: &Bound, bytes: &[u8]) -> bool {
+    (match min {
+        Bound::Included(ref start) => start.as_slice() <= bytes,
+        Bound::Excluded(ref start) => start.as_slice() < bytes,
+        Bound::Unbounded => true,
+    }) && (match max {
+        Bound::Included(ref end) => bytes <= end.as_slice(),
+        Bound::Excluded(ref end) => bytes < end.as_slice(),
+        Bound::Unbounded => true,
+    })
+}
+
+fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound) where A: Automaton {
+    let items: Vec<_> = input.into_iter().enumerate()
+             .map(|(i, k)| (k, i as u64)).collect();
+    let expected_items: Vec<(&str, u64)> =
+        items
+            .iter()
+            .filter(|&&(k,_v )| {
+                contains(&min, &max, k.as_bytes()) && automaton_match(&aut, k.as_bytes())
+            })
+            .cloned()
+            .collect();
+
+
     let fst: Fst = fst_map(items.clone()).into();
-    let mut stream = Stream::new(&fst.meta, fst.data.deref(), aut, min, max);
-    for i in imin..imax {
-        let next = stream.next();
-        let mut state = aut_check.start();
-        for c in items[i].0.as_bytes() {
-            state = aut_check.accept(&state, *c);
-        } 
-        if !aut_check.is_match(&state) {
-            continue;
+    dbg!(&expected_items);
+    { // test forward
+        let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min.clone(), max.clone());
+        for &(exp_k, exp_v) in &expected_items {
+            if let Some((k, v)) = stream.next() {
+                assert_eq!(k, exp_k.as_bytes());
+                assert_eq!(v, Output::new(exp_v));
+            } else {
+                assert!(false);
+            }
         }
-        if next.is_some() {
-            assert_eq!(next.unwrap(), (items[i].0.as_bytes(), Output::new(items[i].1)));
-            let mut state = aut_check.start();
-            for c in next.unwrap().0 {
-                state = aut_check.accept(&state, *c);
-            } 
-            assert!(aut_check.is_match(&state));
-        } 
+        assert!(stream.next().is_none());
     }
-    assert_eq!(stream.next(), None);
+    { // test backward
+        let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min, max).rev();
+        for &(exp_k, exp_v) in expected_items.iter().rev() {
+            if let Some((k, v)) = stream.next() {
+                assert_eq!(k, exp_k.as_bytes());
+                assert_eq!(v, Output::new(exp_v));
+            } else {
+                assert!(false);
+            }
+        }
+        assert!(stream.next().is_none());
+    }
+
+}
+
+#[test]
+fn test_simple() {
+    let items: Vec<_> = vec![("", 0u64), ("aa", 1u64)];
+    let fst: Fst = fst_map(items.clone()).into();
+    let a = Regex::new("..").unwrap();
+    let mut stream = Stream::new(&fst.meta, fst.data.deref(), &a, Bound::Unbounded, Bound::Unbounded);
+    assert_eq!(stream.next(), Some((&b"aa"[..], Output::new(1u64))));
+    assert!(stream.next().is_none());
 }
 
 #[test] 
 fn reverse_traversal() {
-    test_reverse(vec!["a"]);
-    test_reverse(vec!["a", "b"]);
-    test_reverse(vec!["a", "b", "c"]);
-    test_reverse(vec!["aa", "ab", "ac"]);
-    test_reverse(vec!["a", "ab"]);
-    test_reverse(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"]);
-    test_reverse(vec!["a", "ab", "abc", "abcd", "abcde", "abe"]);
+    test_range_with_aut_fn(vec!["a"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
+    test_range_with_aut_fn(vec!["a", "b"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
+    test_range_with_aut_fn(vec!["a", "b", "c"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
+    test_range_with_aut_fn(vec!["aa", "ab", "ac"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
+    test_range_with_aut_fn(vec!["a", "ab"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
+    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
+    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abe"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
 }
 
 #[test] 
 fn reverse_traversal_bounds() {
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "xyz"], Bound::Included(b"abd".to_vec()), Bound::Unbounded, 5, 6);
-    test_reverse_range(vec!["a", "b", "y", "z"], Bound::Included(vec![b'a']), Bound::Included(vec![b'z']), 0, 4);
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abd"], Bound::Unbounded, Bound::Included(b"abd".to_vec()), 0, 6);
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"], Bound::Unbounded, Bound::Included(b"abd".to_vec()), 0, 6);
-    test_reverse_range(vec!["a", "ab", "abc", "abcd", "abcde", "abe"],  Bound::Unbounded, Bound::Excluded(b"abd".to_vec()), 0, 5);
-    test_reverse_range(vec!["", "a"], Bound::Included(vec![]), Bound::Unbounded, 0, 2);
-    test_reverse_range(vec!["a", "aaa", "aba", "aca"], Bound::Included(b"aaa".to_vec()), Bound::Unbounded, 1, 4);
+    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "xyz"], AlwaysMatch,Bound::Included(b"abd".to_vec()), Bound::Unbounded);
+    test_range_with_aut_fn(vec!["a", "b", "y", "z"], AlwaysMatch,Bound::Included(vec![b'a']), Bound::Included(vec![b'z']));
+    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abd"], AlwaysMatch,Bound::Unbounded, Bound::Included(b"abd".to_vec()));
+    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"],AlwaysMatch, Bound::Unbounded, Bound::Included(b"abd".to_vec()));
+    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abe"],AlwaysMatch,  Bound::Unbounded, Bound::Excluded(b"abd".to_vec()));
+    test_range_with_aut_fn(vec!["", "a"], AlwaysMatch,Bound::Included(vec![]), Bound::Unbounded);
+    test_range_with_aut_fn(vec!["a", "aaa", "aba", "aca"], AlwaysMatch,Bound::Included(b"aaa".to_vec()), Bound::Unbounded);
 }
 
 #[test]
@@ -896,7 +906,6 @@ fn bound_strategy() -> BoxedStrategy<Bound> {
 }
 
 proptest! {
-
     #[test]
     fn proptest_traversal(set in prop::collection::hash_set("[a-c]{0,3}", 0..39),
                           r in REGEX_STRING,
@@ -904,20 +913,6 @@ proptest! {
                           max in bound_strategy()) {
         let mut vec: Vec<&str> = set.iter().map(|s| s.as_str()).collect();
         vec.sort();
-        let imin = match min {
-            Bound::Unbounded => 0,
-            Bound::Included(_) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
-            Bound::Excluded(_) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()) + 1,
-        };
-        let imax = match max {
-            Bound::Unbounded => vec.len(),
-            Bound::Included(_) => vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
-            Bound::Excluded(ref bound) => std::cmp::max(vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len() + 1), 1) - 1,
-        };
-        dbg!((imin, imax, &min, &max, &vec));
-        let min2 = min.clone();
-        let max2 = max.clone();
-        test_range_with_aut(vec.clone(), Regex::new(&r).unwrap(), Regex::new(&r).unwrap(), min, max, imin, imax);
-        test_reverse_range_with_aut(vec.clone(), Regex::new(&r).unwrap(), Regex::new(&r).unwrap(), min2, max2, imin, imax);
+        test_range_with_aut_fn(vec.clone(), Regex::new(&r).unwrap(), min, max);
     }
 }

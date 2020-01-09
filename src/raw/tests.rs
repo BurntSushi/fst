@@ -860,12 +860,12 @@ test_range_with_aut! {
 
 use proptest::prelude::*;
 
-const vec_of_words: &'static str = "([a-z]+[|])*[a-z]+";
-const regex_string: &'static str = "[a-z]*";
+const VEC_OF_WORDS: &'static str = "([a-c]+[|])*[a-c]+";
+const REGEX_STRING: &'static str = "[a-c]*";
 
 prop_compose! {
     fn in_bound()(
-        bound in "[a-z]*"
+        bound in "[a-c]*"
     ) -> Bound {
         Bound::Included(bound.as_bytes().to_vec())
     }
@@ -873,7 +873,7 @@ prop_compose! {
 
 prop_compose! {
     fn ex_bound()(
-        bound in "[a-z]*"
+        bound in "[a-c]*"
     ) -> Bound {
         Bound::Excluded(bound.as_bytes().to_vec())
     }
@@ -890,7 +890,7 @@ fn bound_strategy() -> BoxedStrategy<Bound> {
 proptest! {
 
     #[test]
-    fn proptest_traversal(vec_as_string in vec_of_words, r in regex_string, min in bound_strategy(), max in bound_strategy()) {
+    fn proptest_traversal(vec_as_string in VEC_OF_WORDS, r in REGEX_STRING, min in bound_strategy(), max in bound_strategy()) {
         let mut vec: Vec<&str> = vec_as_string.split("|").collect();
         let set: HashSet<_> = vec.drain(..).collect(); // dedup
         vec.extend(set.into_iter());

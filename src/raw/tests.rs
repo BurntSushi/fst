@@ -674,6 +674,7 @@ fn test_reverse_range(input: Vec<&str>, min: Bound, max: Bound, imin: usize, ima
     test_reverse_range_with_aut(input, AlwaysMatch, AlwaysMatch, min, max, imin, imax);
 }
 
+
 fn test_reverse_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, max: Bound, imin: usize, imax: usize) where A: Automaton {
     let items: Vec<_> =
     input.into_iter().enumerate()
@@ -683,6 +684,13 @@ fn test_reverse_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: B
     stream = stream.rev();
     for i in (imin..imax).rev() {
         let next = stream.next();
+        let mut state = aut_check.start();
+        for c in items[i].0.as_bytes() {
+            state = aut_check.accept(&state, *c);
+        } 
+        if !aut_check.is_match(&state) {
+            continue;
+        }
         if next.is_some() {
             assert_eq!(next.unwrap(), (items[i].0.as_bytes(), Output::new(items[i].1)));
             let mut state = aut_check.start();
@@ -690,17 +698,10 @@ fn test_reverse_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: B
                 state = aut_check.accept(&state, *c);
             } 
             assert!(aut_check.is_match(&state));
-        } else {
-            let mut state = aut_check.start();
-            for c in items[i].0.as_bytes() {
-                state = aut_check.accept(&state, *c);
-            } 
-            assert!(!aut_check.is_match(&state));
-        }
+        } 
     }
     assert_eq!(stream.next(), None);
 }
-
 
 fn test_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, max: Bound, imin: usize, imax: usize) where A: Automaton {
     let items: Vec<_> =
@@ -710,6 +711,13 @@ fn test_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, ma
     let mut stream = Stream::new(&fst.meta, fst.data.deref(), aut, min, max);
     for i in imin..imax {
         let next = stream.next();
+        let mut state = aut_check.start();
+        for c in items[i].0.as_bytes() {
+            state = aut_check.accept(&state, *c);
+        } 
+        if !aut_check.is_match(&state) {
+            continue;
+        }
         if next.is_some() {
             assert_eq!(next.unwrap(), (items[i].0.as_bytes(), Output::new(items[i].1)));
             let mut state = aut_check.start();
@@ -717,13 +725,7 @@ fn test_range_with_aut<A>(input: Vec<&str>, aut: A, aut_check: A, min: Bound, ma
                 state = aut_check.accept(&state, *c);
             } 
             assert!(aut_check.is_match(&state));
-        } else {
-            let mut state = aut_check.start();
-            for c in items[i].0.as_bytes() {
-                state = aut_check.accept(&state, *c);
-            } 
-            assert!(!aut_check.is_match(&state));
-        }
+        } 
     }
     assert_eq!(stream.next(), None);
 }
@@ -856,6 +858,14 @@ test_range_with_aut! {
     output: vec![],
 }
 
+test_range_with_aut! {
+    fst_range_aut_7,
+    min: Bound::Excluded(b"a".to_vec()), max: Bound::Excluded(b"ca".to_vec()),
+    imin: 0, imax: 1,
+    aut: Regex::new("c").unwrap(),
+    input: vec!["a", "ba", "bb", "c"],
+    output: vec!["c"],
+}
 
 
 use proptest::prelude::*;
@@ -897,13 +907,13 @@ proptest! {
         vec.sort();
         let imin = match min {
             Bound::Unbounded => 0,
-            Bound::Excluded(ref _r) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
-            Bound::Included(ref _r) => std::cmp::max(vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len() + 1), 1) - 1,
+            Bound::Included(_) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            Bound::Excluded(_) => vec.iter().position(|it| min.exceeded_by(it.as_bytes())).unwrap_or(vec.len()) + 1,
         };
         let imax = match max {
             Bound::Unbounded => vec.len(),
-            Bound::Included(ref _r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
-            Bound::Excluded(ref _r) => vec.iter().position(|it| max.subceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            Bound::Included(_) => vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len()),
+            Bound::Excluded(ref bound) => std::cmp::max(vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len() + 1), 1) - 1,
         };
         dbg!((imin, imax, &min, &max, &vec));
         let min2 = min.clone(); 
@@ -912,4 +922,3 @@ proptest! {
         test_reverse_range_with_aut(vec.clone(), Regex::new(&r).unwrap(), Regex::new(&r).unwrap(), min2, max2, imin, imax);
     }
 }
-

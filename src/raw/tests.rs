@@ -556,7 +556,7 @@ fn reverse() {
 
 #[test]
 fn test_range_ge() {
-    use crate::{Streamer, IntoStreamer};
+    use crate::IntoStreamer;
     let items: Vec<_> =
         vec!["a", "aaa", "aba", "aca"].into_iter().enumerate()
             .map(|(i, k)| (k, i as u64)).collect();
@@ -569,7 +569,7 @@ fn test_range_ge() {
 
 #[test]
 fn test_range_gt() {
-    use crate::{Streamer, IntoStreamer};
+    use crate::IntoStreamer;
     let items: Vec<_> =
         vec!["aaa", "aba", "aca"].into_iter().enumerate()
             .map(|(i, k)| (k, i as u64)).collect();

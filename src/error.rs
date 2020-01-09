@@ -50,7 +50,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         use self::Error::*;
         match *self {
             Fst(ref err) => Some(err),

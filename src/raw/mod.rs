@@ -942,8 +942,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             if state.done || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp_return.clear();
-                    self.inp_return.resize(self.inp.len(), 0);
-                    self.inp_return.copy_from_slice(&self.inp);
+                    self.inp_return.extend_from_slice(&self.inp);
                     self.inp.pop().unwrap();
                     // Reversed return next logic.
                     // If the stack is empty the value should not be returned. 
@@ -996,7 +995,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     // The first transition that is in a bound for a given node.
     #[inline]
     fn transition_within_bound(&self, node: &Node<'f>, bound: u8) -> Option<usize> {
-        let mut trans = 0;
+        let mut trans;
         if let Some(t) = self.starting_transition(&node) {
            trans = t;
        } else {

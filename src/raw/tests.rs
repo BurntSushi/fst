@@ -1,5 +1,4 @@
 use inner_automaton::Automaton;
-use std::collections::HashSet;
 use automaton::AlwaysMatch;
 use error::Error;
 use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
@@ -870,8 +869,7 @@ test_range_with_aut! {
 
 use proptest::prelude::*;
 
-const VEC_OF_WORDS: &'static str = "([a-c]+[|])*[a-c]+";
-const REGEX_STRING: &'static str = "[a-c]*";
+const REGEX_STRING: &'static str = "[a-c\\.]{0,4}";
 
 prop_compose! {
     fn in_bound()(
@@ -900,10 +898,11 @@ fn bound_strategy() -> BoxedStrategy<Bound> {
 proptest! {
 
     #[test]
-    fn proptest_traversal(vec_as_string in VEC_OF_WORDS, r in REGEX_STRING, min in bound_strategy(), max in bound_strategy()) {
-        let mut vec: Vec<&str> = vec_as_string.split("|").collect();
-        let set: HashSet<_> = vec.drain(..).collect(); // dedup
-        vec.extend(set.into_iter());
+    fn proptest_traversal(set in prop::collection::hash_set("[a-c]{0,3}", 0..39),
+                          r in REGEX_STRING,
+                          min in bound_strategy(),
+                          max in bound_strategy()) {
+        let mut vec: Vec<&str> = set.iter().map(|s| s.as_str()).collect();
         vec.sort();
         let imin = match min {
             Bound::Unbounded => 0,
@@ -916,7 +915,7 @@ proptest! {
             Bound::Excluded(ref bound) => std::cmp::max(vec.iter().position(|it| max.exceeded_by(it.as_bytes())).unwrap_or(vec.len() + 1), 1) - 1,
         };
         dbg!((imin, imax, &min, &max, &vec));
-        let min2 = min.clone(); 
+        let min2 = min.clone();
         let max2 = max.clone();
         test_range_with_aut(vec.clone(), Regex::new(&r).unwrap(), Regex::new(&r).unwrap(), min, max, imin, imax);
         test_reverse_range_with_aut(vec.clone(), Regex::new(&r).unwrap(), Regex::new(&r).unwrap(), min2, max2, imin, imax);

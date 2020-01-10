@@ -701,7 +701,6 @@ fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound)
 
 
     let fst: Fst = fst_map(items.clone()).into();
-    dbg!(&expected_items);
     { // test forward
         let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min.clone(), max.clone());
         for &(exp_k, exp_v) in &expected_items {
@@ -731,11 +730,11 @@ fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound)
 
 #[test]
 fn test_simple() {
-    let items: Vec<_> = vec![("", 0u64), ("aa", 1u64)];
+    let items: Vec<_> = vec![("", 0u64)];
     let fst: Fst = fst_map(items.clone()).into();
-    let a = Regex::new("..").unwrap();
-    let mut stream = Stream::new(&fst.meta, fst.data.deref(), &a, Bound::Unbounded, Bound::Unbounded);
-    assert_eq!(stream.next(), Some((&b"aa"[..], Output::new(1u64))));
+    let a = Regex::new("").unwrap();
+    let mut stream = Stream::new(&fst.meta, fst.data.deref(), &a, Bound::Unbounded, Bound::Included(b"a".to_vec())).rev();
+    assert_eq!(stream.next(), Some((&b""[..], Output::new(0u64))));
     assert!(stream.next().is_none());
 }
 

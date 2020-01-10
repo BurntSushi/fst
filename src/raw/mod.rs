@@ -821,8 +821,8 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             inp: Vec::with_capacity(STREAM_INPUT_CAPACITY),
             empty_output: None,
             stack: vec![],
-            min: min,
-            max: max,
+            min,
+            max,
             has_seeked: false,
             reversed: false,
             inp_return: Vec::new(), 
@@ -837,6 +837,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
     fn seek(&mut self) {
+        // TODO Bug here
         let bound: &Bound = if !self.reversed { &self.min } else { &self.max };
         if bound.is_empty() {
             if bound.is_inclusive() {
@@ -846,7 +847,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let node = self.fst.root(self.data);
             let transition = self.starting_transition(&node);
             self.stack = vec![StreamState {
-                node: node, 
+                node,
                 trans: transition.unwrap_or_default(),
                 out: Output::zero(),
                 aut_state: self.aut.start(),
@@ -937,7 +938,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         if !self.reversed {
             // Inorder empty output (will be first).
             if let Some(out) = self.empty_output.take() {
-                return self.resolve_empty_output(out, transform);
+                let empty_item = self.resolve_empty_output(out, &transform);
+                if empty_item.is_some() {
+                    return empty_item;
+                }
             }
         }
         while let Some(state) = self.stack.pop() {
@@ -988,7 +992,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         if self.reversed {
             // Reverse order empty output (will be last).
             if let Some(out) = self.empty_output.take() {
-                return self.resolve_empty_output(out, transform);
+                let empty_item = self.resolve_empty_output(out, &transform);
+                if empty_item.is_some() {
+                    return empty_item;
+                }
             }
         }
         None
@@ -1017,10 +1024,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     /// Resolves value of the empty output. Will be none if the empty output should not be returned.
     #[inline]
-    fn resolve_empty_output<F, T>(&mut self, out: Output, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
+    fn resolve_empty_output<F, T>(&mut self, out: Output, transform: &F) -> Option<(&'static [u8], Output, T)> where F: Fn(&A::State) -> T {
         let start = self.aut.start();
         if !self.out_of_bounds(&[]) && self.aut.is_match(&start) {
-            Some((&[], out, transform(&start)))
+            Some((b"", out, (*transform)(&start)))
         } else {
             None
         } 

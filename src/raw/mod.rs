@@ -839,10 +839,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     fn seek(&mut self) {
         // TODO Bug here
         let bound: &Bound = if !self.reversed { &self.min } else { &self.max };
+        if self.min.is_empty() && self.min.is_inclusive() {
+            self.empty_output = self.fst.empty_final_output(self.data);
+        }
         if bound.is_empty() {
-            if bound.is_inclusive() {
-                self.empty_output = self.fst.empty_final_output(self.data);
-            }
             self.stack.clear();
             let node = self.fst.root(self.data);
             let transition = self.starting_transition(&node);

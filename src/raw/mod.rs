@@ -563,6 +563,7 @@ pub struct StreamBuilder<'f, A=AlwaysMatch> {
     aut: A,
     min: Bound,
     max: Bound,
+    backward: bool
 }
 
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
@@ -573,6 +574,7 @@ impl<'f, A: Automaton> StreamBuilder<'f, A> {
             aut,
             min: Bound::Unbounded,
             max: Bound::Unbounded,
+            backward: false,
         }
     }
 
@@ -600,16 +602,15 @@ impl<'f, A: Automaton> StreamBuilder<'f, A> {
         self
     }
 
+    pub fn backward(mut self) -> Self {
+        self.backward = true;
+        self
+    }
+
     /// Return this builder and gives the automaton states
     /// along with the results.
     pub fn with_state(self) -> StreamWithStateBuilder<'f, A> {
-        StreamWithStateBuilder {
-            meta: self.meta,
-            data: self.data,
-            aut: self.aut,
-            min: self.min,
-            max: self.max,
-        }
+        StreamWithStateBuilder(self)
     }
 }
 
@@ -618,7 +619,7 @@ impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
     type Into = Stream<'f, A>;
 
     fn into_stream(self) -> Stream<'f, A> {
-        Stream::new(self.meta, self.data, self.aut, self.min, self.max)
+        Stream::new(self.meta, self.data, self.aut, self.min, self.max, self.backward)
     }
 }
 
@@ -635,13 +636,7 @@ impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
-pub struct StreamWithStateBuilder<'f, A=AlwaysMatch> {
-    meta: &'f FstMeta,
-    data: &'f [u8],
-    aut: A,
-    min: Bound,
-    max: Bound,
-}
+pub struct StreamWithStateBuilder<'f, A=AlwaysMatch>(StreamBuilder<'f, A>);
 
 impl<'a, 'f, A: 'a + Automaton> IntoStreamer<'a> for StreamWithStateBuilder<'f, A>
     where A::State: Clone
@@ -650,7 +645,7 @@ impl<'a, 'f, A: 'a + Automaton> IntoStreamer<'a> for StreamWithStateBuilder<'f, 
     type Into = StreamWithState<'f, A>;
 
     fn into_stream(self) -> StreamWithState<'f, A> {
-        StreamWithState::new(self.meta, self.data, self.aut, self.min, self.max)
+        StreamWithState::new(self.0.meta, self.0.data, self.0.aut, self.0.min, self.0.max, self.0.backward)
     }
 }
 
@@ -699,8 +694,8 @@ impl Bound {
 pub struct Stream<'f, A=AlwaysMatch>(StreamWithState<'f, A>) where A: Automaton;
 
 impl<'f, A: Automaton> Stream<'f, A> {
-    fn new(meta: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound) -> Self {
-        Self(StreamWithState::new(meta, data, aut, min, max))
+    fn new(meta: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound, backward: bool) -> Self {
+        Self(StreamWithState::new(meta, data, aut, min, max, backward))
     }
 
     /// Convert this stream into a vector of byte strings and outputs.
@@ -763,12 +758,6 @@ impl<'f, A: Automaton> Stream<'f, A> {
         }
         vs
     }
-
-    /// Reverses the stream. Will reset any ongoing iteration.
-    pub fn rev(mut self) -> Self {
-        self.0.reverse();
-        self
-    }
 }
 
 impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
@@ -813,7 +802,7 @@ struct StreamState<'f, S> {
 
 impl<'f, A: Automaton> StreamWithState<'f, A> {
 
-    fn new(fst: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound) -> Self {
+    fn new(fst: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound, backward: bool) -> Self {
         StreamWithState {
             fst,
             data,
@@ -824,7 +813,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             min,
             max,
             has_seeked: false,
-            reversed: false,
+            reversed: backward,
             inp_return: Vec::new(), 
         }
     }
@@ -1099,14 +1088,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         } else {
             None
         }
-    }
-
-    /// Reverses the stream. Will reset the iterator.
-    fn reverse(&mut self) {
-        self.inp.clear();
-        self.stack.clear();
-        self.has_seeked = false;
-        self.reversed = !self.reversed;
     }
 
     /// Checks if an input is out of the current bounds.

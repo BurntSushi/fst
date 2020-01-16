@@ -244,18 +244,22 @@ macro_rules! test_range {
                 items.into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
             let fst: Fst = fst_map(items.clone()).into();
-            let mut rdr = Stream::new(&fst.meta, fst.data.deref(), AlwaysMatch, $min, $max);
-            for i in $imin..$imax {
-                assert_eq!(rdr.next().unwrap(),
-                           (items[i].0.as_bytes(), Output::new(items[i].1)));
+            {
+                let mut rdr = Stream::new(&fst.meta, fst.data.deref(), AlwaysMatch, $min, $max, false);
+                for i in $imin..$imax {
+                    assert_eq!(rdr.next().unwrap(),
+                               (items[i].0.as_bytes(), Output::new(items[i].1)));
+                }
+                assert_eq!(rdr.next(), None);
             }
-            assert_eq!(rdr.next(), None);
-            let mut rdr = rdr.rev();
-            for i in ($imin..$imax).rev() {
-                assert_eq!(rdr.next().unwrap(),
-                           (items[i].0.as_bytes(), Output::new(items[i].1)));
+            {
+                let mut rdr = Stream::new(&fst.meta, fst.data.deref(), AlwaysMatch, $min, $max, true);
+                for i in ($imin..$imax).rev() {
+                    assert_eq!(rdr.next().unwrap(),
+                               (items[i].0.as_bytes(), Output::new(items[i].1)));
+                }
+                assert_eq!(rdr.next(), None);
             }
-            assert_eq!(rdr.next(), None);
         }
     }
 }
@@ -541,21 +545,6 @@ test_range! {
 
 
 #[test]
-fn reverse() {
-    let items: Vec<_> =
-        vec!["1"].into_iter().enumerate()
-                     .map(|(i, k)| (k, i as u64)).collect();
-    let fst: Fst = fst_map(items.clone()).into();
-    let stream = fst.stream();
-    assert!(!stream.0.reversed);
-    let stream = stream.rev();
-    assert!(stream.0.reversed);
-    let stream = stream.rev();
-    assert!(!stream.0.reversed);
-}
-
-
-#[test]
 fn test_range_ge() {
     use crate::IntoStreamer;
     let items: Vec<_> =
@@ -587,13 +576,17 @@ fn starting_transition() {
         vec!["a", "b", "c", "d"].into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
     let fst: Fst = fst_map(items.clone()).into();
-    let stream = fst.stream();
     let root = fst.root();
-    assert_eq!(stream.0.starting_transition(&root).unwrap(), 0);
-    let stream = stream.rev();
-    assert_eq!(stream.0.starting_transition(&root).unwrap(), 3);
-    let a = fst.node(root.transition(0).addr);
-    assert_eq!(stream.0.starting_transition(&a), None);
+    {
+        let stream = fst.stream();
+        assert_eq!(stream.0.starting_transition(&root).unwrap(), 0);
+    }
+    {
+        let stream = fst.range().backward().into_stream();
+        assert_eq!(stream.0.starting_transition(&root).unwrap(), 3);
+        let a = fst.node(root.transition(0).addr);
+        assert_eq!(stream.0.starting_transition(&a), None);
+    }
 }
 
 #[test]
@@ -603,7 +596,7 @@ fn test_return_node_on_reverse_only_if_match() {
             .map(|(i, k)| (k, i as u64)).collect();
     let fst: Fst = fst_map(items.clone()).into();
     let automaton = Regex::new("ab").unwrap();
-    let mut stream = fst.search(automaton).into_stream().rev();
+    let mut stream = fst.search(automaton).backward().into_stream();
     assert_eq!(stream.next(), Some((&b"ab"[..], Output::new(1u64))));
     assert_eq!(stream.next(), None);
 }
@@ -614,13 +607,18 @@ fn last_transition() {
         vec!["a", "b", "c", "d"].into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
     let fst: Fst = fst_map(items.clone()).into();
-    let stream = fst.stream();
     let root = fst.root();
-    assert_eq!(stream.0.last_transition(&root).unwrap(), 3);
-    let stream = stream.rev();
-    assert_eq!(stream.0.last_transition(&root).unwrap(), 0);
-    let a = fst.node(root.transition(0).addr);
-    assert_eq!(stream.0.last_transition(&a), None);
+    {
+        let stream = fst.stream();
+        assert_eq!(stream.0.last_transition(&root).unwrap(), 3);
+    }
+    {
+        let stream = fst.range().backward().into_stream();
+        assert_eq!(stream.0.last_transition(&root).unwrap(), 0);
+        let a = fst.node(root.transition(0).addr);
+        assert_eq!(stream.0.last_transition(&a), None);
+
+    }
 }
 
 
@@ -631,22 +629,26 @@ fn next_transition() {
         vec!["a", "ab", "ac", "ad"].into_iter().enumerate()
                      .map(|(i, k)| (k, i as u64)).collect();
     let fst: Fst = fst_map(items.clone()).into();
-    let stream = fst.stream();
     let a = fst.node(fst.root().transition(0).addr);
-    assert_eq!(a.len(), 3);
-    assert_eq!(stream.0.next_transition(&a, 0).unwrap(), 1);
-    assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 2);
-    assert_eq!(stream.0.next_transition(&a, 2), None);
-    assert_eq!(stream.0.previous_transition(&a, 0), None);
-    assert_eq!(stream.0.previous_transition(&a, 1).unwrap(), 0);
-    assert_eq!(stream.0.previous_transition(&a, 2).unwrap(), 1);
-    let stream = stream.rev();
-    assert_eq!(stream.0.next_transition(&a, 0), None);
-    assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 0);
-    assert_eq!(stream.0.next_transition(&a, 2).unwrap(), 1);
-    assert_eq!(stream.0.previous_transition(&a, 0).unwrap(), 1);
-    assert_eq!(stream.0.previous_transition(&a, 1).unwrap(), 2);
-    assert_eq!(stream.0.previous_transition(&a, 2), None);
+    {
+        let stream = fst.stream();
+        assert_eq!(a.len(), 3);
+        assert_eq!(stream.0.next_transition(&a, 0).unwrap(), 1);
+        assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 2);
+        assert_eq!(stream.0.next_transition(&a, 2), None);
+        assert_eq!(stream.0.previous_transition(&a, 0), None);
+        assert_eq!(stream.0.previous_transition(&a, 1).unwrap(), 0);
+        assert_eq!(stream.0.previous_transition(&a, 2).unwrap(), 1);
+    }
+    {
+        let stream = fst.range().backward().into_stream();
+        assert_eq!(stream.0.next_transition(&a, 0), None);
+        assert_eq!(stream.0.next_transition(&a, 1).unwrap(), 0);
+        assert_eq!(stream.0.next_transition(&a, 2).unwrap(), 1);
+        assert_eq!(stream.0.previous_transition(&a, 0).unwrap(), 1);
+        assert_eq!(stream.0.previous_transition(&a, 1).unwrap(), 2);
+        assert_eq!(stream.0.previous_transition(&a, 2), None);
+    }
 }
 
 #[test]
@@ -702,7 +704,7 @@ fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound)
 
     let fst: Fst = fst_map(items.clone()).into();
     { // test forward
-        let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min.clone(), max.clone());
+        let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min.clone(), max.clone(), false);
         for &(exp_k, exp_v) in &expected_items {
             if let Some((k, v)) = stream.next() {
                 assert_eq!(k, exp_k.as_bytes());
@@ -714,7 +716,7 @@ fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound)
         assert!(stream.next().is_none());
     }
     { // test backward
-        let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min, max).rev();
+        let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min, max, true);
         for &(exp_k, exp_v) in expected_items.iter().rev() {
             if let Some((k, v)) = stream.next() {
                 assert_eq!(k, exp_k.as_bytes());
@@ -733,7 +735,7 @@ fn test_simple() {
     let items: Vec<_> = vec![("", 0u64)];
     let fst: Fst = fst_map(items.clone()).into();
     let a = Regex::new("").unwrap();
-    let mut stream = Stream::new(&fst.meta, fst.data.deref(), &a, Bound::Unbounded, Bound::Included(b"a".to_vec())).rev();
+    let mut stream = Stream::new(&fst.meta, fst.data.deref(), &a, Bound::Unbounded, Bound::Included(b"a".to_vec()), true);
     assert_eq!(stream.next(), Some((&b""[..], Output::new(0u64))));
     assert!(stream.next().is_none());
 }
@@ -794,18 +796,22 @@ macro_rules! test_range_with_aut {
                 output.into_iter()
                     .map(|k| (k, items.iter().position(|&t| t.0 == k).unwrap() as u64)).collect();
             let fst: Fst = fst_map(items.clone()).into();
-            let mut rdr = Stream::new(&fst.meta, fst.data.deref(), $aut, $min, $max);
-            for i in $imin..$imax {
-                assert_eq!(rdr.next().unwrap(),
-                           (output[i].0.as_bytes(), Output::new(output[i].1)));
+            {
+                let mut rdr = Stream::new(&fst.meta, fst.data.deref(), $aut, $min, $max, false);
+                for i in $imin..$imax {
+                    assert_eq!(rdr.next().unwrap(),
+                               (output[i].0.as_bytes(), Output::new(output[i].1)));
+                }
+                assert_eq!(rdr.next(), None);
             }
-            assert_eq!(rdr.next(), None);
-            let mut rdr = rdr.rev();
-            for i in ($imin..$imax).rev() {
-                assert_eq!(rdr.next().unwrap(),
-                           (output[i].0.as_bytes(), Output::new(output[i].1)));
+            {
+                let mut rdr = Stream::new(&fst.meta, fst.data.deref(), $aut, $min, $max, true);
+                for i in ($imin..$imax).rev() {
+                    assert_eq!(rdr.next().unwrap(),
+                               (output[i].0.as_bytes(), Output::new(output[i].1)));
+                }
+                assert_eq!(rdr.next(), None);
             }
-            assert_eq!(rdr.next(), None);
         }
     }
 }

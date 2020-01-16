@@ -785,8 +785,7 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     stack: Vec<StreamState<'f, A::State>>,
     min: Bound,
     max: Bound,
-    has_seeked: bool,  // Seeks lazily. Signifies whether the seek operation has been executed.
-    reversed: bool, 
+    reversed: bool,
     inp_return: Vec<u8>,  // Holds output when 'self.inp' is not the same as return value.
 }
 
@@ -803,7 +802,7 @@ struct StreamState<'f, S> {
 impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     fn new(fst: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound, backward: bool) -> Self {
-        StreamWithState {
+        let mut stream = StreamWithState {
             fst,
             data,
             aut,
@@ -812,10 +811,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             stack: vec![],
             min,
             max,
-            has_seeked: false,
             reversed: backward,
             inp_return: Vec::new(), 
-        }
+        };
+        stream.seek();
+        stream
     }
 
     /// Seeks the underlying stream such that the next key to be read is the
@@ -920,10 +920,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     #[inline]
     fn next<F, T>(&mut self, transform: F) -> Option<(&[u8], Output, T)> where F: Fn(&A::State) -> T {
-        if !self.has_seeked {
-            self.seek();
-            self.has_seeked = true;
-        }
         if !self.reversed {
             // Inorder empty output (will be first).
             if let Some(out) = self.empty_output.take() {

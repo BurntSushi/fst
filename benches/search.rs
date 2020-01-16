@@ -46,6 +46,32 @@ macro_rules! search {
                 })
             }
 
+
+            #[bench]
+            fn fst_streams(b: &mut Bencher) {
+                use tantivy_fst::{Streamer, IntoStreamer};
+                lazy_static! {
+                    static ref FST: Fst = {
+                        let mut bfst = Builder::memory();
+                        for word in $keys.iter() {
+                            bfst.add(word).unwrap();
+                        }
+                        let bytes = bfst.into_inner().unwrap();
+                        Fst::new(bytes).unwrap()
+                    };
+                }
+                b.iter(|| {
+                    let start = 1000;
+                    let stop = 2000;
+                    let mut stream = FST.range().ge(&$keys[start]).lt(&$keys[stop]).into_stream();
+                    let mut count = 0;
+                    while stream.next().is_some() {
+                        count += 1;
+                    }
+                    assert_eq!(count, stop - start);
+                })
+            }
+
             #[bench]
             fn hash_fnv_contains(b: &mut Bencher) {
                 type Fnv = BuildHasherDefault<FnvHasher>;

@@ -905,6 +905,7 @@ fn bound_strategy() -> BoxedStrategy<Bound> {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(1000))]
     #[test]
     fn proptest_traversal(set in prop::collection::hash_set("[a-c]{0,3}", 0..39),
                           r in REGEX_STRING,

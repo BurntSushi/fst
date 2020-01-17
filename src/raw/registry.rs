@@ -1,11 +1,11 @@
-use raw::{NONE_ADDRESS, CompiledAddr};
 use raw::build::BuilderNode;
+use raw::{CompiledAddr, NONE_ADDRESS};
 
 #[derive(Debug)]
 pub struct Registry {
     table: Vec<RegistryCell>,
     table_size: usize, // number of rows
-    mru_size: usize, // number of columns
+    mru_size: usize,   // number of columns
 }
 
 #[derive(Debug)]
@@ -44,7 +44,10 @@ impl Registry {
         let bucket = self.hash(node);
         let start = self.mru_size * bucket;
         let end = start + self.mru_size;
-        RegistryCache { cells: &mut self.table[start..end] }.entry(node)
+        RegistryCache {
+            cells: &mut self.table[start..end],
+        }
+        .entry(node)
     }
 
     fn hash(&self, node: &BuilderNode) -> usize {
@@ -94,7 +97,7 @@ impl<'a> RegistryCache<'a> {
     fn promote(&mut self, mut i: usize) {
         assert!(i < self.cells.len());
         while i > 0 {
-            self.cells.swap(i-1, i);
+            self.cells.swap(i - 1, i);
             i -= 1;
         }
     }
@@ -119,11 +122,9 @@ impl RegistryCell {
 
 #[cfg(test)]
 mod tests {
-    use raw::{Output, Transition};
+    use super::{Registry, RegistryCache, RegistryCell, RegistryEntry};
     use raw::build::BuilderNode;
-    use super::{
-        Registry, RegistryCell, RegistryEntry, RegistryCache,
-    };
+    use raw::{Output, Transition};
 
     fn assert_rejected(entry: RegistryEntry) {
         match entry {
@@ -179,23 +180,31 @@ mod tests {
             is_final: false,
             final_output: Output::zero(),
             trans: vec![Transition {
-                addr: 0, inp: b'a', out: Output::zero(),
+                addr: 0,
+                inp: b'a',
+                out: Output::zero(),
             }],
         };
         assert_insert_and_found(&mut reg, &bnode);
-        assert_not_found(
-            reg.entry(&BuilderNode { is_final: true, .. bnode.clone() }));
         assert_not_found(reg.entry(&BuilderNode {
-            trans: vec![Transition {
-                addr: 0, inp: b'b', out: Output::zero(),
-            }],
-            .. bnode.clone()
+            is_final: true,
+            ..bnode.clone()
         }));
         assert_not_found(reg.entry(&BuilderNode {
             trans: vec![Transition {
-                addr: 0, inp: b'a', out: Output::new(1),
+                addr: 0,
+                inp: b'b',
+                out: Output::zero(),
             }],
-            .. bnode.clone()
+            ..bnode.clone()
+        }));
+        assert_not_found(reg.entry(&BuilderNode {
+            trans: vec![Transition {
+                addr: 0,
+                inp: b'a',
+                out: Output::new(1),
+            }],
+            ..bnode.clone()
         }));
     }
 
@@ -203,11 +212,15 @@ mod tests {
     fn cache_works() {
         let mut reg = Registry::new(1, 1);
 
-        let bnode1 = BuilderNode { is_final: true, ..BuilderNode::default() };
+        let bnode1 = BuilderNode {
+            is_final: true,
+            ..BuilderNode::default()
+        };
         assert_insert_and_found(&mut reg, &bnode1);
 
         let bnode2 = BuilderNode {
-            final_output: Output::new(1), ..bnode1.clone()
+            final_output: Output::new(1),
+            ..bnode1.clone()
         };
         assert_insert_and_found(&mut reg, &bnode2);
         assert_not_found(reg.entry(&bnode1));
@@ -217,10 +230,22 @@ mod tests {
     fn promote() {
         let bn = BuilderNode::default();
         let mut bnodes = vec![
-            RegistryCell { addr: 1, node: bn.clone() },
-            RegistryCell { addr: 2, node: bn.clone() },
-            RegistryCell { addr: 3, node: bn.clone() },
-            RegistryCell { addr: 4, node: bn.clone() },
+            RegistryCell {
+                addr: 1,
+                node: bn.clone(),
+            },
+            RegistryCell {
+                addr: 2,
+                node: bn.clone(),
+            },
+            RegistryCell {
+                addr: 3,
+                node: bn.clone(),
+            },
+            RegistryCell {
+                addr: 4,
+                node: bn.clone(),
+            },
         ];
         let mut cache = RegistryCache { cells: &mut bnodes };
 

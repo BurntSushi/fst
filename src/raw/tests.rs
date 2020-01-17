@@ -1,10 +1,10 @@
-use inner_automaton::Automaton;
 use automaton::AlwaysMatch;
 use error::Error;
-use raw::{self, VERSION, Buffer, Builder, Bound, Fst, Stream, Output};
-use stream::Streamer;
+use inner_automaton::Automaton;
+use raw::{self, Bound, Buffer, Builder, Fst, Output, Stream, VERSION};
 use std::ops::Deref;
-use ::{IntoStreamer, Regex};
+use stream::Streamer;
+use {IntoStreamer, Regex};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
@@ -21,10 +21,12 @@ fn test_buffer() {
 }
 
 pub fn fst_set<I, S>(ss: I) -> Fst
-        where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<[u8]>,
+{
     let mut bfst = Builder::memory();
-    let mut ss: Vec<Vec<u8>> =
-        ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
+    let mut ss: Vec<Vec<u8>> = ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
     ss.sort();
     for s in ss.iter().into_iter() {
         bfst.add(s).unwrap();
@@ -36,10 +38,15 @@ pub fn fst_set<I, S>(ss: I) -> Fst
 }
 
 pub fn fst_map<I, S>(ss: I) -> Fst
-        where I: IntoIterator<Item=(S, u64)>, S: AsRef<[u8]> {
+where
+    I: IntoIterator<Item = (S, u64)>,
+    S: AsRef<[u8]>,
+{
     let mut bfst = Builder::memory();
-    let mut ss: Vec<(Vec<u8>, u64)> =
-        ss.into_iter().map(|(s, o)| (s.as_ref().to_vec(), o)).collect();
+    let mut ss: Vec<(Vec<u8>, u64)> = ss
+        .into_iter()
+        .map(|(s, o)| (s.as_ref().to_vec(), o))
+        .collect();
     ss.sort();
     ss.dedup();
     for (s, o) in ss.into_iter() {
@@ -111,15 +118,15 @@ test_set_fail!(fst_set_order2, "a", "b", "c", "a");
 
 #[test]
 fn fst_set_100000() {
-    let words: Vec<Vec<u8>> = TEXT.lines()
-                                  .map(|s| s.as_bytes().to_vec())
-                                  .collect();
+    let words: Vec<Vec<u8>> = TEXT.lines().map(|s| s.as_bytes().to_vec()).collect();
     let fst = fst_set(words.clone());
     assert_eq!(words, fst_inputs(&fst));
     for word in &words {
-        assert!(fst.get(word).is_some(),
-                "failed to find word: {}",
-                ::std::str::from_utf8(word).unwrap());
+        assert!(
+            fst.get(word).is_some(),
+            "failed to find word: {}",
+            ::std::str::from_utf8(word).unwrap()
+        );
     }
 }
 
@@ -162,8 +169,18 @@ test_map!(fst_map_two, "a", 1, "b", 2);
 test_map!(fst_map_many1, "a", 34786, "ab", 26);
 test_map!(
     fst_map_many2,
-    "a", 34786, "ab", 26, "abc", 58976, "abcd", 25,
-    "z", 58, "zabc", 6798
+    "a",
+    34786,
+    "ab",
+    26,
+    "abc",
+    58976,
+    "abcd",
+    25,
+    "z",
+    58,
+    "zabc",
+    6798
 );
 test_map!(fst_map_many3, "a", 1, "ab", 0, "abc", 0);
 
@@ -175,11 +192,11 @@ test_map_fail!(fst_map_order2, "a", 0, "b", 0, "c", 0, "a", 0);
 
 #[test]
 fn fst_map_100000_increments() {
-    let words: Vec<(Vec<u8>, u64)> =
-        TEXT.lines()
-            .enumerate()
-            .map(|(i, s)| (s.as_bytes().to_vec(), i as u64))
-            .collect();
+    let words: Vec<(Vec<u8>, u64)> = TEXT
+        .lines()
+        .enumerate()
+        .map(|(i, s)| (s.as_bytes().to_vec(), i as u64))
+        .collect();
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
     for &(ref word, out) in &words {
@@ -189,10 +206,10 @@ fn fst_map_100000_increments() {
 
 #[test]
 fn fst_map_100000_lengths() {
-    let words: Vec<(Vec<u8>, u64)> =
-        TEXT.lines()
-            .map(|s| (s.as_bytes().to_vec(), s.len() as u64))
-            .collect();
+    let words: Vec<(Vec<u8>, u64)> = TEXT
+        .lines()
+        .map(|s| (s.as_bytes().to_vec(), s.len() as u64))
+        .collect();
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
     for &(ref word, out) in &words {
@@ -555,38 +572,41 @@ test_range! {
     "a", "k"
 }
 
-
 #[test]
 fn test_range_ge() {
     use crate::IntoStreamer;
-    let items: Vec<_> =
-        vec!["a", "aaa", "aba", "aca"].into_iter().enumerate()
-            .map(|(i, k)| (k, i as u64)).collect();
+    let items: Vec<_> = vec!["a", "aaa", "aba", "aca"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
     let fst: Fst = fst_map(items.clone()).into();
     let stream = fst.range().ge("aaa").into_stream();
     let keys = stream.into_str_keys().unwrap();
-    assert_eq!(&keys[..],
-    &["aaa", "aba", "aca"]);
+    assert_eq!(&keys[..], &["aaa", "aba", "aca"]);
 }
 
 #[test]
 fn test_range_gt() {
     use crate::IntoStreamer;
-    let items: Vec<_> =
-        vec!["aaa", "aba", "aca"].into_iter().enumerate()
-            .map(|(i, k)| (k, i as u64)).collect();
+    let items: Vec<_> = vec!["aaa", "aba", "aca"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
     let fst: Fst = fst_map(items.clone()).into();
     let stream = fst.range().gt("aaa").into_stream();
     let keys = stream.into_str_keys().unwrap();
-    assert_eq!(&keys[..],
-               &["aba", "aca"]);
+    assert_eq!(&keys[..], &["aba", "aca"]);
 }
 
 #[test]
 fn starting_transition() {
-    let items: Vec<_> =
-        vec!["a", "b", "c", "d"].into_iter().enumerate()
-                     .map(|(i, k)| (k, i as u64)).collect();
+    let items: Vec<_> = vec!["a", "b", "c", "d"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
     let fst: Fst = fst_map(items.clone()).into();
     let root = fst.root();
     {
@@ -603,9 +623,11 @@ fn starting_transition() {
 
 #[test]
 fn test_return_node_on_reverse_only_if_match() {
-    let items: Vec<_> =
-        vec!["a", "ab"].into_iter().enumerate()
-            .map(|(i, k)| (k, i as u64)).collect();
+    let items: Vec<_> = vec!["a", "ab"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
     let fst: Fst = fst_map(items.clone()).into();
     let automaton = Regex::new("ab").unwrap();
     let mut stream = fst.search(automaton).backward().into_stream();
@@ -615,9 +637,11 @@ fn test_return_node_on_reverse_only_if_match() {
 
 #[test]
 fn last_transition() {
-    let items: Vec<_> =
-        vec!["a", "b", "c", "d"].into_iter().enumerate()
-                     .map(|(i, k)| (k, i as u64)).collect();
+    let items: Vec<_> = vec!["a", "b", "c", "d"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
     let fst: Fst = fst_map(items.clone()).into();
     let root = fst.root();
     {
@@ -629,17 +653,16 @@ fn last_transition() {
         assert_eq!(stream.0.last_transition(&root).unwrap(), 0);
         let a = fst.node(root.transition(0).addr);
         assert_eq!(stream.0.last_transition(&a), None);
-
     }
 }
 
-
-
 #[test]
 fn next_transition() {
-    let items: Vec<_> =
-        vec!["a", "ab", "ac", "ad"].into_iter().enumerate()
-                     .map(|(i, k)| (k, i as u64)).collect();
+    let items: Vec<_> = vec!["a", "ab", "ac", "ad"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
     let fst: Fst = fst_map(items.clone()).into();
     let a = fst.node(fst.root().transition(0).addr);
     {
@@ -665,9 +688,11 @@ fn next_transition() {
 
 #[test]
 fn test_transition_within_bound() {
-    let items: Vec<_> =
-        vec!["a", "ab", "ac", "ad"].into_iter().enumerate()
-                     .map(|(i, k)| (k, i as u64)).collect();
+    let items: Vec<_> = vec!["a", "ab", "ac", "ad"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
     let fst: Fst = fst_map(items.clone()).into();
     let stream = fst.stream();
     let a = fst.node(fst.root().transition(0).addr);
@@ -701,22 +726,34 @@ fn contains(min: &Bound, max: &Bound, bytes: &[u8]) -> bool {
     })
 }
 
-fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound) where A: Automaton {
-    let items: Vec<_> = input.into_iter().enumerate()
-             .map(|(i, k)| (k, i as u64)).collect();
-    let expected_items: Vec<(&str, u64)> =
-        items
-            .iter()
-            .filter(|&&(k,_v )| {
-                contains(&min, &max, k.as_bytes()) && automaton_match(&aut, k.as_bytes())
-            })
-            .cloned()
-            .collect();
-
+fn test_range_with_aut_fn<A>(input: Vec<&str>, aut: A, min: Bound, max: Bound)
+where
+    A: Automaton,
+{
+    let items: Vec<_> = input
+        .into_iter()
+        .enumerate()
+        .map(|(i, k)| (k, i as u64))
+        .collect();
+    let expected_items: Vec<(&str, u64)> = items
+        .iter()
+        .filter(|&&(k, _v)| {
+            contains(&min, &max, k.as_bytes()) && automaton_match(&aut, k.as_bytes())
+        })
+        .cloned()
+        .collect();
 
     let fst: Fst = fst_map(items.clone()).into();
-    { // test forward
-        let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min.clone(), max.clone(), false);
+    {
+        // test forward
+        let mut stream = Stream::new(
+            &fst.meta,
+            fst.data.deref(),
+            &aut,
+            min.clone(),
+            max.clone(),
+            false,
+        );
         for &(exp_k, exp_v) in &expected_items {
             if let Some((k, v)) = stream.next() {
                 assert_eq!(k, exp_k.as_bytes());
@@ -727,7 +764,8 @@ fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound)
         }
         assert!(stream.next().is_none());
     }
-    { // test backward
+    {
+        // test backward
         let mut stream = Stream::new(&fst.meta, fst.data.deref(), &aut, min, max, true);
         for &(exp_k, exp_v) in expected_items.iter().rev() {
             if let Some((k, v)) = stream.next() {
@@ -739,7 +777,6 @@ fn  test_range_with_aut_fn<A>(input: Vec<&str>, aut: A,  min: Bound, max: Bound)
         }
         assert!(stream.next().is_none());
     }
-
 }
 
 #[test]
@@ -747,31 +784,103 @@ fn test_simple() {
     let items: Vec<_> = vec![("", 0u64)];
     let fst: Fst = fst_map(items.clone()).into();
     let a = Regex::new("").unwrap();
-    let mut stream = Stream::new(&fst.meta, fst.data.deref(), &a, Bound::Unbounded, Bound::Included(b"a".to_vec()), true);
+    let mut stream = Stream::new(
+        &fst.meta,
+        fst.data.deref(),
+        &a,
+        Bound::Unbounded,
+        Bound::Included(b"a".to_vec()),
+        true,
+    );
     assert_eq!(stream.next(), Some((&b""[..], Output::new(0u64))));
     assert!(stream.next().is_none());
 }
 
-#[test] 
+#[test]
 fn reverse_traversal() {
     test_range_with_aut_fn(vec!["a"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
-    test_range_with_aut_fn(vec!["a", "b"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
-    test_range_with_aut_fn(vec!["a", "b", "c"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
-    test_range_with_aut_fn(vec!["aa", "ab", "ac"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
-    test_range_with_aut_fn(vec!["a", "ab"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
-    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
-    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abe"], AlwaysMatch, Bound::Unbounded, Bound::Unbounded);
+    test_range_with_aut_fn(
+        vec!["a", "b"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Unbounded,
+    );
+    test_range_with_aut_fn(
+        vec!["a", "b", "c"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Unbounded,
+    );
+    test_range_with_aut_fn(
+        vec!["aa", "ab", "ac"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Unbounded,
+    );
+    test_range_with_aut_fn(
+        vec!["a", "ab"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Unbounded,
+    );
+    test_range_with_aut_fn(
+        vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Unbounded,
+    );
+    test_range_with_aut_fn(
+        vec!["a", "ab", "abc", "abcd", "abcde", "abe"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Unbounded,
+    );
 }
 
-#[test] 
+#[test]
 fn reverse_traversal_bounds() {
-    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "xyz"], AlwaysMatch,Bound::Included(b"abd".to_vec()), Bound::Unbounded);
-    test_range_with_aut_fn(vec!["a", "b", "y", "z"], AlwaysMatch,Bound::Included(vec![b'a']), Bound::Included(vec![b'z']));
-    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abd"], AlwaysMatch,Bound::Unbounded, Bound::Included(b"abd".to_vec()));
-    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"],AlwaysMatch, Bound::Unbounded, Bound::Included(b"abd".to_vec()));
-    test_range_with_aut_fn(vec!["a", "ab", "abc", "abcd", "abcde", "abe"],AlwaysMatch,  Bound::Unbounded, Bound::Excluded(b"abd".to_vec()));
-    test_range_with_aut_fn(vec!["", "a"], AlwaysMatch,Bound::Included(vec![]), Bound::Unbounded);
-    test_range_with_aut_fn(vec!["a", "aaa", "aba", "aca"], AlwaysMatch,Bound::Included(b"aaa".to_vec()), Bound::Unbounded);
+    test_range_with_aut_fn(
+        vec!["a", "ab", "abc", "abcd", "abcde", "xyz"],
+        AlwaysMatch,
+        Bound::Included(b"abd".to_vec()),
+        Bound::Unbounded,
+    );
+    test_range_with_aut_fn(
+        vec!["a", "b", "y", "z"],
+        AlwaysMatch,
+        Bound::Included(vec![b'a']),
+        Bound::Included(vec![b'z']),
+    );
+    test_range_with_aut_fn(
+        vec!["a", "ab", "abc", "abcd", "abcde", "abd"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Included(b"abd".to_vec()),
+    );
+    test_range_with_aut_fn(
+        vec!["a", "ab", "abc", "abcd", "abcde", "abd", "abdx"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Included(b"abd".to_vec()),
+    );
+    test_range_with_aut_fn(
+        vec!["a", "ab", "abc", "abcd", "abcde", "abe"],
+        AlwaysMatch,
+        Bound::Unbounded,
+        Bound::Excluded(b"abd".to_vec()),
+    );
+    test_range_with_aut_fn(
+        vec!["", "a"],
+        AlwaysMatch,
+        Bound::Included(vec![]),
+        Bound::Unbounded,
+    );
+    test_range_with_aut_fn(
+        vec!["a", "aaa", "aba", "aca"],
+        AlwaysMatch,
+        Bound::Included(b"aaa".to_vec()),
+        Bound::Unbounded,
+    );
 }
 
 #[test]
@@ -800,35 +909,40 @@ macro_rules! test_range_with_aut {
         #[test]
         fn $name() {
             let items: Vec<&'static str> = $input;
-            let items: Vec<_> =
-                items.into_iter().enumerate()
-                     .map(|(i, k)| (k, i as u64)).collect();
+            let items: Vec<_> = items
+                .into_iter()
+                .enumerate()
+                .map(|(i, k)| (k, i as u64))
+                .collect();
             let output: Vec<&'static str> = $output;
-            let output: Vec<_> =
-                output.into_iter()
-                    .map(|k| (k, items.iter().position(|&t| t.0 == k).unwrap() as u64)).collect();
+            let output: Vec<_> = output
+                .into_iter()
+                .map(|k| (k, items.iter().position(|&t| t.0 == k).unwrap() as u64))
+                .collect();
             let fst: Fst = fst_map(items.clone()).into();
             {
                 let mut rdr = Stream::new(&fst.meta, fst.data.deref(), $aut, $min, $max, false);
                 for i in $imin..$imax {
-                    assert_eq!(rdr.next().unwrap(),
-                               (output[i].0.as_bytes(), Output::new(output[i].1)));
+                    assert_eq!(
+                        rdr.next().unwrap(),
+                        (output[i].0.as_bytes(), Output::new(output[i].1))
+                    );
                 }
                 assert_eq!(rdr.next(), None);
             }
             {
                 let mut rdr = Stream::new(&fst.meta, fst.data.deref(), $aut, $min, $max, true);
                 for i in ($imin..$imax).rev() {
-                    assert_eq!(rdr.next().unwrap(),
-                               (output[i].0.as_bytes(), Output::new(output[i].1)));
+                    assert_eq!(
+                        rdr.next().unwrap(),
+                        (output[i].0.as_bytes(), Output::new(output[i].1))
+                    );
                 }
                 assert_eq!(rdr.next(), None);
             }
         }
-    }
+    };
 }
-
-
 
 test_range_with_aut! {
     fst_range_aut_1,
@@ -893,7 +1007,6 @@ test_range_with_aut! {
     output: vec!["c"],
 }
 
-
 use proptest::prelude::*;
 
 const REGEX_STRING: &'static str = "[a-c\\.]{0,4}";
@@ -915,11 +1028,7 @@ prop_compose! {
 }
 
 fn bound_strategy() -> BoxedStrategy<Bound> {
-    prop_oneof![
-        Just(Bound::Unbounded),
-        in_bound(),
-        ex_bound(),
-    ].boxed()
+    prop_oneof![Just(Bound::Unbounded), in_bound(), ex_bound(),].boxed()
 }
 
 proptest! {

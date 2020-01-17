@@ -2,7 +2,8 @@
 
 extern crate fnv;
 extern crate tantivy_fst;
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 extern crate test;
 
 const STR_WORDS: &'static str = include_str!("./../data/words-100000");
@@ -46,10 +47,9 @@ macro_rules! search {
                 })
             }
 
-
             #[bench]
             fn fst_streams(b: &mut Bencher) {
-                use tantivy_fst::{Streamer, IntoStreamer};
+                use tantivy_fst::{IntoStreamer, Streamer};
                 lazy_static! {
                     static ref FST: Fst = {
                         let mut bfst = Builder::memory();
@@ -76,9 +76,7 @@ macro_rules! search {
             fn hash_fnv_contains(b: &mut Bencher) {
                 type Fnv = BuildHasherDefault<FnvHasher>;
                 lazy_static! {
-                    static ref SET: HashSet<String, Fnv> = {
-                        $keys.clone().into_iter().collect()
-                    };
+                    static ref SET: HashSet<String, Fnv> = { $keys.clone().into_iter().collect() };
                 }
                 let mut i = 0;
                 b.iter(|| {
@@ -90,9 +88,7 @@ macro_rules! search {
             #[bench]
             fn hash_sip_contains(b: &mut Bencher) {
                 lazy_static! {
-                    static ref SET: HashSet<String> = {
-                        $keys.clone().into_iter().collect()
-                    };
+                    static ref SET: HashSet<String> = { $keys.clone().into_iter().collect() };
                 }
                 let mut i = 0;
                 b.iter(|| {
@@ -104,9 +100,7 @@ macro_rules! search {
             #[bench]
             fn btree_contains(b: &mut Bencher) {
                 lazy_static! {
-                    static ref SET: BTreeSet<String> = {
-                        $keys.clone().into_iter().collect()
-                    };
+                    static ref SET: BTreeSet<String> = { $keys.clone().into_iter().collect() };
                 }
                 let mut i = 0;
                 b.iter(|| {
@@ -115,7 +109,7 @@ macro_rules! search {
                 })
             }
         }
-    }
+    };
 }
 
 search!(words, ::WORDS);

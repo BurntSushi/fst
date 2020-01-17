@@ -114,7 +114,7 @@ pub trait IntoStreamer<'a> {
     /// The type of the item emitted by the stream.
     type Item: 'a;
     /// The type of the stream to be constructed.
-    type Into: Streamer<'a, Item=Self::Item>;
+    type Into: Streamer<'a, Item = Self::Item>;
 
     /// Construct a stream from `Self`.
     fn into_stream(self) -> Self::Into;

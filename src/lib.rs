@@ -7,9 +7,12 @@
 #![warn(missing_docs)]
 
 extern crate byteorder;
-#[cfg(test)] extern crate quickcheck;
-#[cfg(test)] extern crate rand;
-#[cfg(test)] extern crate proptest;
+#[cfg(test)]
+extern crate proptest;
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)]
+extern crate rand;
 
 pub use automaton::Automaton;
 pub use error::{Error, Result};
@@ -20,9 +23,9 @@ mod regex;
 
 pub use self::regex::Regex;
 
+mod error;
 #[path = "automaton/mod.rs"]
 mod inner_automaton;
-mod error;
 #[path = "map.rs"]
 mod inner_map;
 pub mod raw;

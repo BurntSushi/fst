@@ -51,20 +51,31 @@ impl fmt::Display for Error {
         use self::Error::*;
         match *self {
             Syntax(ref err) => err.fmt(f),
-            CompiledTooBig(size_limit) => {
-                write!(f, "Compiled regex exceeds size limit of {} bytes",
-                       size_limit)
-            }
-            TooManyStates(size_limit) => {
-                write!(f, "Compiled regex exceeds size limit of {} states",
-                       size_limit)
-            }
-            NoLazy => write!(f, "Lazy reptition operators such as '+?' are \
-                                 not allowed."),
-            NoWordBoundary => write!(f, "Word boundary operators are not \
-                                           allowed."),
-            NoEmpty => write!(f, "Empty match operators are not allowed \
-                                  (hopefully temporary)."),
+            CompiledTooBig(size_limit) => write!(
+                f,
+                "Compiled regex exceeds size limit of {} bytes",
+                size_limit
+            ),
+            TooManyStates(size_limit) => write!(
+                f,
+                "Compiled regex exceeds size limit of {} states",
+                size_limit
+            ),
+            NoLazy => write!(
+                f,
+                "Lazy reptition operators such as '+?' are \
+                                 not allowed."
+            ),
+            NoWordBoundary => write!(
+                f,
+                "Word boundary operators are not \
+                                           allowed."
+            ),
+            NoEmpty => write!(
+                f,
+                "Empty match operators are not allowed \
+                                  (hopefully temporary)."
+            ),
             NoBytes => write!(f, "Byte literals are not allowed."),
         }
     }

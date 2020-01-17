@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
+use super::sparse::SparseSet;
 use super::Error;
 use super::Inst;
-use super::sparse::SparseSet;
 
 const STATE_LIMIT: usize = 1_000; // currently at least 2MB >_<
 
@@ -58,8 +58,13 @@ impl DfaBuilder {
         Ok(self.dfa)
     }
 
-    fn run_state(&mut self, cur: &mut SparseSet, next: &mut SparseSet,
-                 state: usize, byte: u8) -> Option<usize> {
+    fn run_state(
+        &mut self,
+        cur: &mut SparseSet,
+        next: &mut SparseSet,
+        state: usize,
+        byte: u8,
+    ) -> Option<usize> {
         cur.clear();
         for &ip in &self.dfa.states[state].insts {
             cur.add(ip);
@@ -71,8 +76,8 @@ impl DfaBuilder {
     }
 
     fn cached_state(&mut self, set: &SparseSet) -> Option<usize> {
-        use std::collections::hash_map::Entry;
         use super::Inst::*;
+        use std::collections::hash_map::Entry;
 
         // There are probably many ways to optimize this routine. ---AG
 
@@ -143,7 +148,7 @@ impl Dfa {
                 Match => is_match = true,
                 Range(s, e) => {
                     if s <= byte && byte <= e {
-                        self.add(to, ip+1);
+                        self.add(to, ip + 1);
                     }
                 }
             }

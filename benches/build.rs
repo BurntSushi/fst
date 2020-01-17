@@ -15,7 +15,10 @@ fn get_words() -> Vec<String> {
 }
 
 fn get_words_outputs() -> Vec<(String, u64)> {
-    WORDS.lines().map(|s| (s.to_owned(), s.len() as u64)).collect()
+    WORDS
+        .lines()
+        .map(|s| (s.to_owned(), s.len() as u64))
+        .collect()
 }
 
 #[bench]

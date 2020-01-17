@@ -12,7 +12,6 @@ mod sparse;
 
 pub use self::error::Error;
 
-
 /// A regular expression for searching FSTs with Unicode support.
 ///
 /// Regular expressions are compiled down to a deterministic finite automaton
@@ -89,7 +88,10 @@ impl Regex {
         let expr = regex_syntax::Expr::parse(re)?;
         let insts = self::compile::Compiler::new(size).compile(&expr)?;
         let dfa = self::dfa::DfaBuilder::new(insts).build()?;
-        Ok(Regex { original: re.to_owned(), dfa })
+        Ok(Regex {
+            original: re.to_owned(),
+            dfa,
+        })
     }
 }
 
@@ -97,7 +99,9 @@ impl Automaton for Regex {
     type State = Option<usize>;
 
     #[inline]
-    fn start(&self) -> Option<usize> { Some(0) }
+    fn start(&self) -> Option<usize> {
+        Some(0)
+    }
 
     #[inline]
     fn is_match(&self, state: &Option<usize>) -> bool {

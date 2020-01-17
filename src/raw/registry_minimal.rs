@@ -13,8 +13,8 @@
 
 use std::collections::hash_map::{Entry, HashMap};
 
-use raw::CompiledAddr;
 use raw::build::BuilderNode;
+use raw::CompiledAddr;
 
 #[derive(Debug)]
 pub struct Registry {
@@ -33,15 +33,15 @@ pub struct RegistryCell(CompiledAddr);
 
 impl Registry {
     pub fn new(table_size: usize, _lru_size: usize) -> Registry {
-        Registry { table: HashMap::with_capacity(table_size) }
+        Registry {
+            table: HashMap::with_capacity(table_size),
+        }
     }
 
     pub fn entry<'a>(&'a mut self, bnode: &BuilderNode) -> RegistryEntry<'a> {
         match self.table.entry(bnode.clone()) {
             Entry::Occupied(v) => RegistryEntry::Found(v.get().0),
-            Entry::Vacant(v) => {
-                RegistryEntry::NotFound(v.insert(RegistryCell(0)))
-            }
+            Entry::Vacant(v) => RegistryEntry::NotFound(v.insert(RegistryCell(0))),
         }
     }
 }

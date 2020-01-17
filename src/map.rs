@@ -1,13 +1,13 @@
 use std::fmt;
-use std::iter::FromIterator;
 use std::io;
+use std::iter::FromIterator;
 
-use automaton::{Automaton, AlwaysMatch};
+use automaton::{AlwaysMatch, Automaton};
 use raw;
-pub use raw::IndexedValue as IndexedValue;
+pub use raw::IndexedValue;
+use std::ops::Deref;
 use stream::{IntoStreamer, Streamer};
 use Result;
-use std::ops::Deref;
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///
@@ -78,16 +78,17 @@ impl Map<Vec<u8>> {
     /// To build a map that streams to an arbitrary `io::Write`, use
     /// `MapBuilder`.
     pub fn from_iter<K, I>(iter: I) -> Result<Self>
-        where K: AsRef<[u8]>, I: IntoIterator<Item=(K, u64)> {
+    where
+        K: AsRef<[u8]>,
+        I: IntoIterator<Item = (K, u64)>,
+    {
         let mut builder = MapBuilder::memory();
         builder.extend_iter(iter)?;
         Map::from_bytes(builder.into_inner()?)
     }
 }
 
-impl<Data: Deref<Target=[u8]>> Map<Data> {
-
-
+impl<Data: Deref<Target = [u8]>> Map<Data> {
     /// Tests the membership of a single key.
     ///
     /// # Example
@@ -355,8 +356,7 @@ impl<Data: Deref<Target=[u8]>> Map<Data> {
     }
 }
 
-
-impl<Data: Deref<Target=[u8]>> fmt::Debug for Map<Data> {
+impl<Data: Deref<Target = [u8]>> fmt::Debug for Map<Data> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Map([")?;
         let mut stream = self.stream();
@@ -388,7 +388,7 @@ impl<Data> AsRef<raw::Fst<Data>> for Map<Data> {
     }
 }
 
-impl<'m, 'a, Data: Deref<Target=[u8]>> IntoStreamer<'a> for &'m Map<Data> {
+impl<'m, 'a, Data: Deref<Target = [u8]>> IntoStreamer<'a> for &'m Map<Data> {
     type Item = (&'a [u8], u64);
     type Into = Stream<'m>;
 
@@ -496,9 +496,12 @@ impl<W: io::Write> MapBuilder<W> {
     /// added, then an error is returned. Similarly, if there was a problem
     /// writing to the underlying writer, an error is returned.
     pub fn extend_iter<K, I>(&mut self, iter: I) -> Result<()>
-            where K: AsRef<[u8]>, I: IntoIterator<Item=(K, u64)> {
-        self.0.extend_iter(iter.into_iter()
-                               .map(|(k, v)| (k, raw::Output::new(v))))
+    where
+        K: AsRef<[u8]>,
+        I: IntoIterator<Item = (K, u64)>,
+    {
+        self.0
+            .extend_iter(iter.into_iter().map(|(k, v)| (k, raw::Output::new(v))))
     }
 
     /// Calls insert on each item in the stream.
@@ -510,8 +513,10 @@ impl<W: io::Write> MapBuilder<W> {
     /// added, then an error is returned. Similarly, if there was a problem
     /// writing to the underlying writer, an error is returned.
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], u64)>,
+        S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], u64)>,
+    {
         self.0.extend_stream(StreamOutput(stream.into_stream()))
     }
 
@@ -537,7 +542,6 @@ impl<W: io::Write> MapBuilder<W> {
     pub fn bytes_written(&self) -> u64 {
         self.0.bytes_written()
     }
-
 }
 
 /// A lexicographically ordered stream of key-value pairs from a map.
@@ -546,7 +550,9 @@ impl<W: io::Write> MapBuilder<W> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
-pub struct Stream<'m, A=AlwaysMatch>(raw::Stream<'m, A>) where A: Automaton;
+pub struct Stream<'m, A = AlwaysMatch>(raw::Stream<'m, A>)
+where
+    A: Automaton;
 
 impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     type Item = (&'a [u8], u64);
@@ -638,7 +644,7 @@ impl<'a, 'm> Streamer<'a> for Values<'m> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
-pub struct StreamBuilder<'m, A=AlwaysMatch>(raw::StreamBuilder<'m, A>);
+pub struct StreamBuilder<'m, A = AlwaysMatch>(raw::StreamBuilder<'m, A>);
 
 impl<'m, A: Automaton> StreamBuilder<'m, A> {
     /// Specify a greater-than-or-equal-to bound.
@@ -690,10 +696,11 @@ impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
-pub struct StreamWithStateBuilder<'m, A=AlwaysMatch>(raw::StreamWithStateBuilder<'m, A>);
+pub struct StreamWithStateBuilder<'m, A = AlwaysMatch>(raw::StreamWithStateBuilder<'m, A>);
 
 impl<'m, 'a, A: 'a + Automaton> IntoStreamer<'a> for StreamWithStateBuilder<'m, A>
-    where A::State: Clone
+where
+    A::State: Clone,
 {
     type Item = (&'a [u8], u64, A::State);
     type Into = StreamWithState<'m, A>;
@@ -737,8 +744,10 @@ impl<'m> OpBuilder<'m> {
     /// The stream must emit a lexicographically ordered sequence of key-value
     /// pairs.
     pub fn add<I, S>(mut self, streamable: I) -> Self
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 'm + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], u64)>,
+        S: 'm + for<'a> Streamer<'a, Item = (&'a [u8], u64)>,
+    {
         self.push(streamable);
         self
     }
@@ -748,8 +757,10 @@ impl<'m> OpBuilder<'m> {
     /// The stream must emit a lexicographically ordered sequence of key-value
     /// pairs.
     pub fn push<I, S>(&mut self, streamable: I)
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
-                  S: 'm + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], u64)>,
+        S: 'm + for<'a> Streamer<'a, Item = (&'a [u8], u64)>,
+    {
         self.0.push(StreamOutput(streamable.into_stream()));
     }
 
@@ -930,9 +941,14 @@ impl<'m> OpBuilder<'m> {
 }
 
 impl<'f, I, S> Extend<I> for OpBuilder<'f>
-    where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
-          S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
-    fn extend<T>(&mut self, it: T) where T: IntoIterator<Item=I> {
+where
+    I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], u64)>,
+    S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], u64)>,
+{
+    fn extend<T>(&mut self, it: T)
+    where
+        T: IntoIterator<Item = I>,
+    {
         for stream in it {
             self.push(stream);
         }
@@ -940,9 +956,14 @@ impl<'f, I, S> Extend<I> for OpBuilder<'f>
 }
 
 impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
-    where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], u64)>,
-          S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], u64)> {
-    fn from_iter<T>(it: T) -> Self where T: IntoIterator<Item=I> {
+where
+    I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], u64)>,
+    S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], u64)>,
+{
+    fn from_iter<T>(it: T) -> Self
+    where
+        T: IntoIterator<Item = I>,
+    {
         let mut op = OpBuilder::new();
         op.extend(it);
         op
@@ -1020,7 +1041,9 @@ impl<'a, 'm> Streamer<'a> for SymmetricDifference<'m> {
 struct StreamOutput<S>(S);
 
 impl<'a, S> Streamer<'a> for StreamOutput<S>
-        where S: Streamer<'a, Item=(&'a [u8], u64)> {
+where
+    S: Streamer<'a, Item = (&'a [u8], u64)>,
+{
     type Item = (&'a [u8], raw::Output);
 
     fn next(&'a mut self) -> Option<Self::Item> {
@@ -1032,14 +1055,19 @@ impl<'a, S> Streamer<'a> for StreamOutput<S>
 /// along with the states of the automaton.
 ///
 /// The `Stream` type is based on the `StreamWithState`.
-pub struct StreamWithState<'m, A=AlwaysMatch>(raw::StreamWithState<'m, A>) where A: Automaton;
+pub struct StreamWithState<'m, A = AlwaysMatch>(raw::StreamWithState<'m, A>)
+where
+    A: Automaton;
 
 impl<'a, 'm, A: 'a + Automaton> Streamer<'a> for StreamWithState<'m, A>
-    where A::State: Clone
+where
+    A::State: Clone,
 {
     type Item = (&'a [u8], u64, A::State);
 
     fn next(&'a mut self) -> Option<Self::Item> {
-        self.0.next().map(|(key, out, state)| (key, out.value(), state))
+        self.0
+            .next()
+            .map(|(key, out, state)| (key, out.value(), state))
     }
 }

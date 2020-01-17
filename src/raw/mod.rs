@@ -18,7 +18,7 @@ option of specifying a merge strategy for output values.
 
 Most of the rest of the types are streams from set operations.
 */
-use std::cmp;
+use std::{cmp, mem};
 use std::fmt;
 use std::ops::Deref;
 
@@ -68,8 +68,8 @@ const EMPTY_ADDRESS: CompiledAddr = 0;
 /// This is never the address of a node in a serialized transducer.
 const NONE_ADDRESS: CompiledAddr = 1;
 
-/// Default input capacity of a stream.
-const STREAM_INPUT_CAPACITY: usize = 16;
+/// Default capacity for the key buffer of a stream.
+const KEY_BUFFER_CAPACITY: usize = 128;
 
 /// FstType is a convention used to indicate the type of the underlying
 /// transducer.
@@ -465,8 +465,8 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+        where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+              S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         self.op().add(stream).intersection().next().is_none()
     }
 
@@ -476,8 +476,8 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+        where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+              S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         let mut op = self.op().add(stream).intersection();
         let mut count = 0;
         while let Some(_) = op.next() {
@@ -492,8 +492,8 @@ impl<Data: Deref<Target=[u8]>> Fst<Data> {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+        where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
+              S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
         let mut op = self.op().add(stream).union();
         let mut count = 0;
         while let Some(_) = op.next() {
@@ -602,6 +602,7 @@ impl<'f, A: Automaton> StreamBuilder<'f, A> {
         self
     }
 
+    /// Sets the `StreamBuilder` to stream the `(key, value)` backward.
     pub fn backward(mut self) -> Self {
         self.backward = true;
         self
@@ -689,8 +690,7 @@ impl Bound {
     }
 }
 
-
-
+/// Stream of `key, value` not exposing the state of the automaton.
 pub struct Stream<'f, A=AlwaysMatch>(StreamWithState<'f, A>) where A: Automaton;
 
 impl<'f, A: Automaton> Stream<'f, A> {
@@ -780,14 +780,13 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     fst: &'f FstMeta,
     data: &'f [u8],
     aut: A,
-    inp: Vec<u8>,
+    inp: Buffer,
     empty_output: Option<Output>,
     stack: Vec<StreamState<'f, A::State>>,
     end_at: Bound,
     min: Bound,
     max: Bound,
     reversed: bool,
-    inp_return: Vec<u8>,  // Holds output when 'self.inp' is not the same as return value.
 }
 
 #[derive(Clone, Debug)]
@@ -797,7 +796,7 @@ struct StreamState<'f, S> {
     out: Output,
     aut_state: S,
     done: bool,  // ('done' = true) means that there are no unexplored transitions in the current state. 
-                 // 'trans' value should be ignored when done is true.
+    // 'trans' value should be ignored when done is true.
 }
 
 impl<'f, A: Automaton> StreamWithState<'f, A> {
@@ -815,14 +814,13 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             fst,
             data,
             aut,
-            inp: Vec::with_capacity(STREAM_INPUT_CAPACITY),
+            inp: Buffer::new(),
             empty_output: None,
             stack: vec![],
             end_at,
             min: min_2,
             max: max_2,
             reversed: backward,
-            inp_return: Vec::new(), 
         };
         stream.seek(&min, &max);
         stream
@@ -901,29 +899,30 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 }
             }
         }
-        if !self.stack.is_empty() {
-            let last = self.stack.len() - 1;
-            let state = &self.stack[last];
-            let transition = if !state.done { 
-                self.previous_transition(&state.node, state.trans)
-            } else {
-                self.last_transition(&state.node)
-            };
-            if inclusive {
-                self.stack[last].trans = transition.unwrap_or_default();
-                self.stack[last].done = transition.is_none();
-                self.inp.pop();
-            } else {
-                let next_node = self.fst.node(state.node.transition(transition.unwrap_or_default()).addr, self.data);
-                let starting_transition = self.starting_transition(&next_node);
-                self.stack.push(StreamState {
-                    node: next_node,
-                    trans: starting_transition.unwrap_or_default(),
-                    out,
-                    aut_state,
-                    done: starting_transition.is_none(),
-                });
-            }
+        if self.stack.is_empty() {
+            return;
+        }
+        let last = self.stack.len() - 1;
+        let state = &self.stack[last];
+        let transition = if !state.done {
+            self.previous_transition(&state.node, state.trans)
+        } else {
+            self.last_transition(&state.node)
+        };
+        if inclusive {
+            self.stack[last].trans = transition.unwrap_or_default();
+            self.stack[last].done = transition.is_none();
+            self.inp.pop();
+        } else {
+            let next_node = self.fst.node(state.node.transition(transition.unwrap_or_default()).addr, self.data);
+            let starting_transition = self.starting_transition(&next_node);
+            self.stack.push(StreamState {
+                node: next_node,
+                trans: starting_transition.unwrap_or_default(),
+                out,
+                aut_state,
+                done: starting_transition.is_none(),
+            });
         }
     }
 
@@ -941,21 +940,15 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     // Reversed return next logic.
                     // If the stack is empty the value should not be returned. 
                     if self.reversed {
-                        self.inp_return.clear();
-                        self.inp_return.extend_from_slice(&self.inp);
-                        self.inp.pop().unwrap();
                         if !self.stack.is_empty() && state.node.is_final() {
                             let out_of_bounds =
-                                self.min.subceeded_by(&self.inp_return) ||
-                                    self.max.exceeded_by(&self.inp_return);
+                                self.min.subceeded_by(&self.inp) || self.max.exceeded_by(&self.inp);
                             if !out_of_bounds && self.aut.is_match(&state.aut_state) {
-                                return Some((&self.inp_return, state.out, transform(&state.aut_state)))
+                                return Some((&self.inp.pop(), state.out, transform(&state.aut_state)))
                             }
                         }
-                    } else {
-                        self.inp.pop().unwrap();
                     }
-
+                    self.inp.pop();
                 }
                 continue;
             }
@@ -1000,11 +993,11 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     fn transition_within_bound(&self, node: &Node<'f>, bound: u8) -> Option<usize> {
         let mut trans;
         if let Some(t) = self.starting_transition(&node) {
-           trans = t;
-       } else {
-           return None
-       }
-       loop {
+            trans = t;
+        } else {
+            return None
+        }
+        loop {
             let transition = node.transition(trans);
             if (!self.reversed && transition.inp > bound) || (self.reversed && transition.inp < bound) {
                 return Some(trans);
@@ -1124,6 +1117,58 @@ impl<'f, 'a, A: 'a + Automaton> Streamer<'a> for StreamWithState<'f, A>
 #[derive(Copy, Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Output(u64);
 
+#[derive(Clone)]
+struct Buffer {
+    buf: Box<[u8]>,
+    len: usize
+}
+
+impl Buffer {
+    fn new() -> Self {
+        Buffer {
+            buf: vec![0u8; KEY_BUFFER_CAPACITY].into_boxed_slice(),
+            len: 0,
+        }
+    }
+
+    fn capacity(&self) -> usize {
+        self.buf.len()
+    }
+
+    fn double_cap(&mut self) {
+        let old_cap = self.capacity();
+        let new_cap = old_cap * 2;
+        let mut new_buf = vec![0u8; new_cap].into_boxed_slice();
+        new_buf[..old_cap].copy_from_slice(&self.buf[..old_cap]);
+        mem::replace(&mut self.buf, new_buf);
+    }
+
+    fn push(&mut self, b: u8) {
+        if self.capacity() <= self.len {
+            self.double_cap();
+        }
+        self.buf[self.len] = b;
+        self.len += 1;
+    }
+
+    // Pops one byte and returns the entire chain before the byte was popped.
+    fn pop(&mut self) -> &[u8] {
+        let len = self.len;
+        self.len = len - 1;
+        &self.buf[..len]
+    }
+}
+
+
+
+impl Deref for Buffer {
+    type Target = [u8];
+
+    fn deref(&self) -> &[u8] {
+        &self.buf[..self.len]
+    }
+}
+
 impl Output {
     /// Create a new output from a `u64`.
     #[inline]
@@ -1167,7 +1212,7 @@ impl Output {
     #[inline]
     pub fn sub(self, o: Output) -> Output {
         Output(self.0.checked_sub(o.0)
-                     .expect("BUG: underflow subtraction not allowed"))
+            .expect("BUG: underflow subtraction not allowed"))
     }
 }
 

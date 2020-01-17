@@ -1,12 +1,24 @@
 use inner_automaton::Automaton;
 use automaton::AlwaysMatch;
 use error::Error;
-use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
+use raw::{self, VERSION, Buffer, Builder, Bound, Fst, Stream, Output};
 use stream::Streamer;
 use std::ops::Deref;
 use ::{IntoStreamer, Regex};
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
+
+#[test]
+fn test_buffer() {
+    let mut buffer = Buffer::new();
+    let v: Vec<u8> = (0..10_000).map(|val| (val % 256) as u8).collect();
+    for b in v.iter().cloned() {
+        buffer.push(b);
+    }
+    for len in (1..10_001).rev() {
+        assert_eq!(&v[..len], buffer.pop());
+    }
+}
 
 pub fn fst_set<I, S>(ss: I) -> Fst
         where I: IntoIterator<Item=S>, S: AsRef<[u8]> {

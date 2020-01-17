@@ -783,6 +783,7 @@ pub struct StreamWithState<'f, A=AlwaysMatch> where A: Automaton {
     inp: Vec<u8>,
     empty_output: Option<Output>,
     stack: Vec<StreamState<'f, A::State>>,
+    end_at: Bound,
     min: Bound,
     max: Bound,
     reversed: bool,
@@ -802,6 +803,14 @@ struct StreamState<'f, S> {
 impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     fn new(fst: &'f FstMeta, data: &'f [u8], aut: A, min: Bound, max: Bound, backward: bool) -> Self {
+        let min_2 = min.clone();
+        let max_2 = max.clone();
+        let end_at: Bound =
+            if !backward {
+                max.clone()
+            } else {
+                min.clone()
+            };
         let mut stream = StreamWithState {
             fst,
             data,
@@ -809,12 +818,13 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             inp: Vec::with_capacity(STREAM_INPUT_CAPACITY),
             empty_output: None,
             stack: vec![],
-            min,
-            max,
+            end_at,
+            min: min_2,
+            max: max_2,
             reversed: backward,
             inp_return: Vec::new(), 
         };
-        stream.seek();
+        stream.seek(&min, &max);
         stream
     }
 
@@ -825,13 +835,12 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     /// This theoretically should be straight-forward, but we need to make
     /// sure our stack is correct, which includes accounting for automaton
     /// states.
-    fn seek(&mut self) {
-        // TODO Bug here
-        let bound: &Bound = if !self.reversed { &self.min } else { &self.max };
-        if self.min.is_empty() && self.min.is_inclusive() {
-            self.empty_output = self.fst.empty_final_output(self.data);
+    fn seek(&mut self, min: &Bound, max: &Bound) {
+        let start_bound = if self.reversed { &max } else { &min };
+        if min.is_empty() && min.is_inclusive() {
+            self.empty_output = self.resolve_empty_output(min, max);
         }
-        if bound.is_empty() {
+        if start_bound.is_empty() {
             self.stack.clear();
             let node = self.fst.root(self.data);
             let transition = self.starting_transition(&node);
@@ -844,12 +853,12 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             }];
             return;
         }
-        let (key, inclusive) = match bound {
-            Bound::Excluded(ref bound) => {
-                (bound, false)
+        let (key, inclusive) = match start_bound {
+            Bound::Excluded(ref start_bound) => {
+                (start_bound, false)
             }
-            Bound::Included(ref bound) => {
-                (bound, true)
+            Bound::Included(ref start_bound) => {
+                (start_bound, true)
             }
             Bound::Unbounded => unreachable!(),
         };
@@ -923,10 +932,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         if !self.reversed {
             // Inorder empty output (will be first).
             if let Some(out) = self.empty_output.take() {
-                let empty_item = self.resolve_empty_output(out, &transform);
-                if empty_item.is_some() {
-                    return empty_item;
-                }
+                return Some((&[], out, transform(&self.aut.start())));
             }
         }
         while let Some(state) = self.stack.pop() {
@@ -937,9 +943,13 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                     self.inp.pop().unwrap();
                     // Reversed return next logic.
                     // If the stack is empty the value should not be returned. 
-                    if self.reversed && self.stack.len() > 0 && state.node.is_final() && 
-                      !self.out_of_bounds(&self.inp_return) && self.aut.is_match(&state.aut_state) {
-                        return Some((&self.inp_return, state.out, transform(&state.aut_state)))
+                    if self.reversed && !self.stack.is_empty() && state.node.is_final() {
+                        let out_of_bounds =
+                            self.min.subceeded_by(&self.inp_return) ||
+                            self.max.exceeded_by(&self.inp_return);
+                        if !out_of_bounds && self.aut.is_match(&state.aut_state) {
+                            return Some((&self.inp_return, state.out, transform(&state.aut_state)))
+                        }
                     }
                 }
                 continue;
@@ -965,7 +975,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             });
             // Inorder return next logic.
             if !self.reversed {
-                if self.out_of_bounds(&self.inp) {
+                if self.end_at.exceeded_by(&self.inp) {
                     // We are done, forever.
                     self.stack.clear();
                     return None;
@@ -974,16 +984,10 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 }
             }
         }
-        if self.reversed {
-            // Reverse order empty output (will be last).
-            if let Some(out) = self.empty_output.take() {
-                let empty_item = self.resolve_empty_output(out, &transform);
-                if empty_item.is_some() {
-                    return empty_item;
-                }
-            }
-        }
-        None
+        // If we are streaming backward, we still need to return the empty output, if empty is
+        // part of our fst, matches the range and the automaton
+        self.empty_output.take()
+            .map(|out| (&[][..], out, transform(&self.aut.start())))
     }
 
     // The first transition that is in a bound for a given node.
@@ -1009,13 +1013,15 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     /// Resolves value of the empty output. Will be none if the empty output should not be returned.
     #[inline]
-    fn resolve_empty_output<F, T>(&mut self, out: Output, transform: &F) -> Option<(&'static [u8], Output, T)> where F: Fn(&A::State) -> T {
+    fn resolve_empty_output(&mut self, min: &Bound, max: &Bound) -> Option<Output> {
+        if min.subceeded_by(&[]) || max.exceeded_by(&[]) {
+            return None;
+        }
         let start = self.aut.start();
-        if !self.out_of_bounds(&[]) && self.aut.is_match(&start) {
-            Some((b"", out, (*transform)(&start)))
-        } else {
-            None
-        } 
+        if !self.aut.is_match(&start) {
+            return None;
+        }
+        self.fst.empty_final_output(self.data)
     }
 
 
@@ -1084,11 +1090,6 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         } else {
             None
         }
-    }
-
-    /// Checks if an input is out of the current bounds.
-    fn out_of_bounds(&self, inp: &[u8]) -> bool {
-        self.min.subceeded_by(inp) || self.max.exceeded_by(inp)
     }
 }
 

@@ -2,9 +2,9 @@ use crate::automaton::AlwaysMatch;
 use crate::error::Error;
 use crate::inner_automaton::Automaton;
 use crate::raw::{self, Bound, Buffer, Builder, Fst, Output, Stream, VERSION};
-use std::ops::Deref;
 use crate::stream::Streamer;
 use crate::{IntoStreamer, Regex};
+use std::ops::Deref;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 

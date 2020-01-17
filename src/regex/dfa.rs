@@ -27,7 +27,7 @@ impl DfaBuilder {
     pub fn new(insts: Vec<Inst>) -> Self {
         DfaBuilder {
             dfa: Dfa {
-                insts: insts,
+                insts,
                 states: Vec::with_capacity(16),
             },
             cache: HashMap::with_capacity(1024),
@@ -51,7 +51,7 @@ impl DfaBuilder {
                     }
                 }
                 if self.dfa.states.len() > STATE_LIMIT {
-                    return Err(Error::TooManyStates(STATE_LIMIT).into());
+                    return Err(Error::TooManyStates(STATE_LIMIT));
                 }
             }
         }
@@ -94,16 +94,16 @@ impl DfaBuilder {
                 }
             }
         }
-        if insts.len() == 0 {
+        if insts.is_empty() {
             return None;
         }
         Some(match self.cache.entry(insts.clone()) {
             Entry::Occupied(v) => *v.get(),
             Entry::Vacant(v) => {
                 self.dfa.states.push(State {
-                    insts: insts,
+                    insts,
                     next: [None; 256],
-                    is_match: is_match,
+                    is_match,
                 });
                 *v.insert(self.dfa.states.len() - 1)
             }

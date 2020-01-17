@@ -82,7 +82,7 @@ to read data that isn't actually an encoded FST."
             DuplicateKey { ref got } => write!(
                 f,
                 "\
-Error inserting duplicate key: {}.",
+                 Error inserting duplicate key: {}.",
                 format_bytes(&*got)
             ),
             OutOfOrder {
@@ -99,7 +99,7 @@ inserted in lexicographic order.",
             WrongType { expected, got } => write!(
                 f,
                 "\
-Error opening FST: expected type {}, got type {}.",
+                 Error opening FST: expected type {}, got type {}.",
                 expected, got
             ),
         }

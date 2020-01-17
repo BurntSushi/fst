@@ -51,7 +51,6 @@ impl<'f> Default for OpBuilder<'f> {
 }
 
 impl<'f> OpBuilder<'f> {
-
     /// Add a stream to this set operation.
     ///
     /// This is useful for a chaining style pattern, e.g.,

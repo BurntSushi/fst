@@ -207,9 +207,7 @@ impl Automaton for AlwaysMatch {
     type State = ();
 
     #[inline]
-    fn start(&self) -> () {
-        ()
-    }
+    fn start(&self) {}
     #[inline]
     fn is_match(&self, _: &()) -> bool {
         true
@@ -223,9 +221,7 @@ impl Automaton for AlwaysMatch {
         true
     }
     #[inline]
-    fn accept(&self, _: &(), _: u8) -> () {
-        ()
-    }
+    fn accept(&self, _: &(), _: u8) {}
 }
 
 /// An automaton that matches a string that begins with something that the

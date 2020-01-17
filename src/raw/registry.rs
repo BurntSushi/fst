@@ -32,12 +32,12 @@ impl Registry {
         let ncells = table_size.checked_mul(mru_size).unwrap();
         Registry {
             table: vec![empty_cell; ncells],
-            table_size: table_size,
-            mru_size: mru_size,
+            table_size,
+            mru_size,
         }
     }
 
-    pub fn entry<'a>(&'a mut self, node: &BuilderNode) -> RegistryEntry<'a> {
+    pub fn entry(&mut self, node: &BuilderNode) -> RegistryEntry {
         if self.table.is_empty() {
             return RegistryEntry::Rejected;
         }
@@ -56,8 +56,8 @@ impl Registry {
         //
         // In unscientific experiments, this provides the same compression
         // as `std::hash::SipHasher` but is much much faster.
-        const FNV_PRIME: u64 = 1099511628211;
-        let mut h = 14695981039346656037;
+        const FNV_PRIME: u64 = 1_099_511_628_211;
+        let mut h = 14_695_981_039_346_656_037;
         h = (h ^ (node.is_final as u64)).wrapping_mul(FNV_PRIME);
         h = (h ^ node.final_output.value()).wrapping_mul(FNV_PRIME);
         for t in &node.trans {

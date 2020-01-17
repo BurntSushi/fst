@@ -5,9 +5,9 @@ use std::iter::FromIterator;
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::raw;
 pub use crate::raw::IndexedValue;
-use std::ops::Deref;
 use crate::stream::{IntoStreamer, Streamer};
 use crate::Result;
+use std::ops::Deref;
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///
@@ -256,7 +256,6 @@ impl<Data: Deref<Target = [u8]>> Map<Data> {
     /// in the `fst-regex` crate, which can be used to search maps.
     ///
     /// ```rust
-    /// extern crate tantivy_fst;
     ///
     /// use std::error::Error;
     ///

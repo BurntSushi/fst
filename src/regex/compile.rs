@@ -11,7 +11,7 @@ pub struct Compiler {
 impl Compiler {
     pub fn new(size_limit: usize) -> Compiler {
         Compiler {
-            size_limit: size_limit,
+            size_limit,
             insts: vec![],
         }
     }
@@ -25,19 +25,19 @@ impl Compiler {
     fn c(&mut self, ast: &Expr) -> Result<(), Error> {
         match *ast {
             Expr::StartLine | Expr::EndLine | Expr::StartText | Expr::EndText => {
-                return Err(From::from(Error::NoEmpty))
+                return Err(Error::NoEmpty)
             }
             Expr::WordBoundary
             | Expr::NotWordBoundary
             | Expr::WordBoundaryAscii
             | Expr::NotWordBoundaryAscii => {
-                return Err(From::from(Error::NoWordBoundary));
+                return Err(Error::NoWordBoundary);
             }
             Expr::LiteralBytes { .. }
             | Expr::AnyByte
             | Expr::AnyByteNoNL
             | Expr::ClassBytes(..) => {
-                return Err(From::from(Error::NoBytes));
+                return Err(Error::NoBytes);
             }
             Expr::Empty => {}
             Expr::Literal { ref chars, casei } => {
@@ -79,7 +79,7 @@ impl Compiler {
                 }
             }
             Expr::Alternate(ref es) => {
-                if es.len() == 0 {
+                if es.is_empty() {
                     return Ok(());
                 }
                 let mut jmps_to_end = vec![];
@@ -98,7 +98,7 @@ impl Compiler {
                 }
             }
             Expr::Repeat { greedy: false, .. } => {
-                return Err(Error::NoLazy.into());
+                return Err(Error::NoLazy);
             }
             Expr::Repeat {
                 ref e,
@@ -183,7 +183,7 @@ impl Compiler {
             return Ok(());
         }
         let mut jmps = vec![];
-        for r in &class[0..class.len() - 1] {
+        for &r in &class[0..class.len() - 1] {
             let split = self.empty_split();
             let j1 = self.insts.len();
             self.compile_class_range(r)?;
@@ -191,7 +191,7 @@ impl Compiler {
             let j2 = self.insts.len();
             self.set_split(split, j1, j2);
         }
-        self.compile_class_range(&class[class.len() - 1])?;
+        self.compile_class_range(class[class.len() - 1])?;
         let end = self.insts.len();
         for jmp in jmps {
             self.set_jump(jmp, end);
@@ -199,7 +199,7 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_class_range(&mut self, char_range: &ClassRange) -> Result<(), Error> {
+    fn compile_class_range(&mut self, char_range: ClassRange) -> Result<(), Error> {
         let mut it = Utf8Sequences::new(char_range.start, char_range.end).peekable();
         let mut jmps = vec![];
         let mut utf8_ranges = it.next().expect("non-empty char class");
@@ -230,7 +230,7 @@ impl Compiler {
         use std::mem::size_of;
 
         if self.insts.len() * size_of::<Inst>() > self.size_limit {
-            Err(Error::CompiledTooBig(self.size_limit).into())
+            Err(Error::CompiledTooBig(self.size_limit))
         } else {
             Ok(())
         }

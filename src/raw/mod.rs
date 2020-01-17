@@ -986,11 +986,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                         let out_of_bounds =
                             self.min.subceeded_by(&self.inp) || self.max.exceeded_by(&self.inp);
                         if !out_of_bounds && self.aut.is_match(&state.aut_state) {
-                            return Some((
-                                &self.inp.pop(),
-                                state.out,
-                                transform(&state.aut_state),
-                            ));
+                            return Some((&self.inp.pop(), state.out, transform(&state.aut_state)));
                         }
                     }
                     self.inp.pop();

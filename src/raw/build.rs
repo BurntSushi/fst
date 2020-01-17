@@ -222,7 +222,7 @@ impl<W: io::Write> Builder<W> {
         if bs.is_empty() {
             self.len = 1; // must be first key, so length is always 1
             self.unfinished
-                .set_root_output(out.unwrap_or(Output::zero()));
+                .set_root_output(out.unwrap_or_else(Output::zero));
             return Ok(());
         }
         let (prefix_len, out) = if let Some(out) = out {
@@ -368,10 +368,7 @@ impl UnfinishedNodes {
         }
         let last = self.stack.len().checked_sub(1).unwrap();
         assert!(self.stack[last].last.is_none());
-        self.stack[last].last = Some(LastTransition {
-            inp: bs[0],
-            out,
-        });
+        self.stack[last].last = Some(LastTransition { inp: bs[0], out });
         for &b in &bs[1..] {
             self.stack.push(BuilderNodeUnfinished {
                 node: BuilderNode::default(),

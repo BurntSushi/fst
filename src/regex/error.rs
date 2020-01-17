@@ -64,17 +64,17 @@ impl fmt::Display for Error {
             NoLazy => write!(
                 f,
                 "Lazy reptition operators such as '+?' are \
-                                 not allowed."
+                 not allowed."
             ),
             NoWordBoundary => write!(
                 f,
                 "Word boundary operators are not \
-                                           allowed."
+                 allowed."
             ),
             NoEmpty => write!(
                 f,
                 "Empty match operators are not allowed \
-                                  (hopefully temporary)."
+                 (hopefully temporary)."
             ),
             NoBytes => write!(f, "Byte literals are not allowed."),
         }

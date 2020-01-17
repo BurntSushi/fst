@@ -5,13 +5,8 @@
 //! Parts of this crate were retrofitted from a PR by Clément Renault
 //! https://github.com/BurntSushi/fst/pull/61
 #![warn(missing_docs)]
-
-#[cfg(test)]
-extern crate proptest;
-#[cfg(test)]
-extern crate quickcheck;
-#[cfg(test)]
-extern crate rand;
+#![allow(clippy::new_without_default)]
+#![allow(clippy::should_implement_trait)]
 
 pub use crate::automaton::Automaton;
 pub use crate::error::{Error, Result};

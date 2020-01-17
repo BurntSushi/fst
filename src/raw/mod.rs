@@ -938,19 +938,24 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         while let Some(state) = self.stack.pop() {
             if state.done || !self.aut.can_match(&state.aut_state) {
                 if state.node.addr() != self.fst.root_addr {
-                    self.inp_return.clear();
-                    self.inp_return.extend_from_slice(&self.inp);
-                    self.inp.pop().unwrap();
                     // Reversed return next logic.
                     // If the stack is empty the value should not be returned. 
-                    if self.reversed && !self.stack.is_empty() && state.node.is_final() {
-                        let out_of_bounds =
-                            self.min.subceeded_by(&self.inp_return) ||
-                            self.max.exceeded_by(&self.inp_return);
-                        if !out_of_bounds && self.aut.is_match(&state.aut_state) {
-                            return Some((&self.inp_return, state.out, transform(&state.aut_state)))
+                    if self.reversed {
+                        self.inp_return.clear();
+                        self.inp_return.extend_from_slice(&self.inp);
+                        self.inp.pop().unwrap();
+                        if !self.stack.is_empty() && state.node.is_final() {
+                            let out_of_bounds =
+                                self.min.subceeded_by(&self.inp_return) ||
+                                    self.max.exceeded_by(&self.inp_return);
+                            if !out_of_bounds && self.aut.is_match(&state.aut_state) {
+                                return Some((&self.inp_return, state.out, transform(&state.aut_state)))
+                            }
                         }
+                    } else {
+                        self.inp.pop().unwrap();
                     }
+
                 }
                 continue;
             }

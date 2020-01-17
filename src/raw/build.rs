@@ -2,13 +2,13 @@ use std::io::{self, Write};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 
-use error::Result;
-use raw::counting_writer::CountingWriter;
-use raw::error::Error;
-use raw::registry::{Registry, RegistryEntry};
-use raw::{CompiledAddr, FstType, Output, Transition, EMPTY_ADDRESS, NONE_ADDRESS, VERSION};
+use crate::error::Result;
+use crate::raw::counting_writer::CountingWriter;
+use crate::raw::error::Error;
+use crate::raw::registry::{Registry, RegistryEntry};
+use crate::raw::{CompiledAddr, FstType, Output, Transition, EMPTY_ADDRESS, NONE_ADDRESS, VERSION};
 // use raw::registry_minimal::{Registry, RegistryEntry};
-use stream::{IntoStreamer, Streamer};
+use crate::stream::{IntoStreamer, Streamer};
 
 /// A builder for creating a finite state transducer.
 ///
@@ -120,7 +120,7 @@ impl<W: io::Write> Builder<W> {
         // Similarly for 8-15 for the fst type.
         wtr.write_u64::<LittleEndian>(ty)?;
         Ok(Builder {
-            wtr: wtr,
+            wtr,
             unfinished: UnfinishedNodes::new(),
             registry: Registry::new(10_000, 2),
             last: None,
@@ -255,7 +255,7 @@ impl<W: io::Write> Builder<W> {
                 self.unfinished.pop_freeze(addr)
             };
             addr = self.compile(&node)?;
-            assert!(addr != NONE_ADDRESS);
+            assert_ne!(addr, NONE_ADDRESS);
         }
         self.unfinished.top_last_freeze(addr);
         Ok(())
@@ -327,7 +327,7 @@ impl UnfinishedNodes {
     fn push_empty(&mut self, is_final: bool) {
         self.stack.push(BuilderNodeUnfinished {
             node: BuilderNode {
-                is_final: is_final,
+                is_final,
                 ..BuilderNode::default()
             },
             last: None,
@@ -335,7 +335,7 @@ impl UnfinishedNodes {
     }
 
     fn pop_root(&mut self) -> BuilderNode {
-        assert!(self.stack.len() == 1);
+        assert_eq!(self.stack.len(), 1);
         assert!(self.stack[0].last.is_none());
         self.stack.pop().unwrap().node
     }
@@ -370,7 +370,7 @@ impl UnfinishedNodes {
         assert!(self.stack[last].last.is_none());
         self.stack[last].last = Some(LastTransition {
             inp: bs[0],
-            out: out,
+            out,
         });
         for &b in &bs[1..] {
             self.stack.push(BuilderNodeUnfinished {
@@ -419,7 +419,7 @@ impl BuilderNodeUnfinished {
             self.node.trans.push(Transition {
                 inp: trans.inp,
                 out: trans.out,
-                addr: addr,
+                addr,
             });
         }
     }

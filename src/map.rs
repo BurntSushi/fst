@@ -2,12 +2,12 @@ use std::fmt;
 use std::io;
 use std::iter::FromIterator;
 
-use automaton::{AlwaysMatch, Automaton};
-use raw;
-pub use raw::IndexedValue;
+use crate::automaton::{AlwaysMatch, Automaton};
+use crate::raw;
+pub use crate::raw::IndexedValue;
 use std::ops::Deref;
-use stream::{IntoStreamer, Streamer};
-use Result;
+use crate::stream::{IntoStreamer, Streamer};
+use crate::Result;
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///
@@ -733,7 +733,7 @@ impl<'m> OpBuilder<'m> {
     /// Create a new set operation builder.
     #[inline]
     pub fn new() -> Self {
-        OpBuilder(raw::OpBuilder::new())
+        OpBuilder(raw::OpBuilder::default())
     }
 
     /// Add a stream to this set operation.

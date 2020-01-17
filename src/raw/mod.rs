@@ -24,9 +24,9 @@ use std::{cmp, mem};
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use automaton::{AlwaysMatch, Automaton};
-use error::Result;
-use stream::{IntoStreamer, Streamer};
+use crate::automaton::{AlwaysMatch, Automaton};
+use crate::error::Result;
+use crate::stream::{IntoStreamer, Streamer};
 
 pub use self::build::Builder;
 pub use self::error::Error;
@@ -454,7 +454,7 @@ impl<Data: Deref<Target = [u8]>> Fst<Data> {
     /// allow one to specify how conflicting values are merged in the stream.
     #[inline]
     pub fn op(&self) -> OpBuilder {
-        OpBuilder::new().add(self)
+        OpBuilder::default().add(self)
     }
 
     /// Returns true if and only if the `self` fst is disjoint with the fst
@@ -982,17 +982,15 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
                 if state.node.addr() != self.fst.root_addr {
                     // Reversed return next logic.
                     // If the stack is empty the value should not be returned.
-                    if self.reversed {
-                        if !self.stack.is_empty() && state.node.is_final() {
-                            let out_of_bounds =
-                                self.min.subceeded_by(&self.inp) || self.max.exceeded_by(&self.inp);
-                            if !out_of_bounds && self.aut.is_match(&state.aut_state) {
-                                return Some((
-                                    &self.inp.pop(),
-                                    state.out,
-                                    transform(&state.aut_state),
-                                ));
-                            }
+                    if self.reversed && !self.stack.is_empty() && state.node.is_final() {
+                        let out_of_bounds =
+                            self.min.subceeded_by(&self.inp) || self.max.exceeded_by(&self.inp);
+                        if !out_of_bounds && self.aut.is_match(&state.aut_state) {
+                            return Some((
+                                &self.inp.pop(),
+                                state.out,
+                                transform(&state.aut_state),
+                            ));
                         }
                     }
                     self.inp.pop();
@@ -1076,7 +1074,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     #[inline]
     fn starting_transition(&self, node: &Node<'f>) -> Option<usize> {
-        if node.len() == 0 {
+        if node.is_empty() {
             None
         } else if !self.reversed {
             Some(0)
@@ -1087,7 +1085,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
 
     #[inline]
     fn last_transition(&self, node: &Node<'f>) -> Option<usize> {
-        if node.len() == 0 {
+        if node.is_empty() {
             None
         } else if self.reversed {
             Some(0)
@@ -1134,7 +1132,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     /// See [Stream::forward_transition].
     #[inline]
     fn backward_transition(node: &Node<'f>, current_transition: usize) -> Option<usize> {
-        if current_transition > 0 && node.len() > 0 {
+        if current_transition > 0 && !node.is_empty() {
             Some(current_transition - 1)
         } else {
             None

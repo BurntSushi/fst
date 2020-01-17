@@ -3,7 +3,7 @@ extern crate utf8_ranges;
 
 use std::fmt;
 
-use Automaton;
+use crate::Automaton;
 
 mod compile;
 mod dfa;

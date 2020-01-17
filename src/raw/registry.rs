@@ -1,5 +1,5 @@
-use raw::build::BuilderNode;
-use raw::{CompiledAddr, NONE_ADDRESS};
+use crate::raw::build::BuilderNode;
+use crate::raw::{CompiledAddr, NONE_ADDRESS};
 
 #[derive(Debug)]
 pub struct Registry {
@@ -123,8 +123,8 @@ impl RegistryCell {
 #[cfg(test)]
 mod tests {
     use super::{Registry, RegistryCache, RegistryCell, RegistryEntry};
-    use raw::build::BuilderNode;
-    use raw::{Output, Transition};
+    use crate::raw::build::BuilderNode;
+    use crate::raw::{Output, Transition};
 
     fn assert_rejected(entry: RegistryEntry) {
         match entry {

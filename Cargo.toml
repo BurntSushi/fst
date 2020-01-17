@@ -10,6 +10,7 @@ repository = "https://github.com/tantivy-search/fst"
 readme = "README.md"
 keywords = ["donotuseme"]
 license = "Unlicense/MIT"
+edition = "2018"
 
 [[bench]]
 name = "build"

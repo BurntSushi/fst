@@ -2,7 +2,7 @@ use std::error;
 use std::fmt;
 use std::io;
 
-use raw;
+use crate::raw;
 
 /// A `Result` type alias for this crate's `Error` type.
 pub type Result<T> = ::std::result::Result<T, Error>;

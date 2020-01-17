@@ -112,5 +112,5 @@ macro_rules! search {
     };
 }
 
-search!(words, ::WORDS);
-search!(wiki_urls, ::WIKI_URLS);
+search!(words, crate::WORDS);
+search!(wiki_urls, crate::WIKI_URLS);

@@ -3,7 +3,7 @@ use std::fmt;
 use std::str;
 use std::string::FromUtf8Error;
 
-use raw::FstType;
+use crate::raw::FstType;
 
 /// An error that occurred while using a finite state transducer.
 pub enum Error {

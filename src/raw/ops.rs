@@ -2,8 +2,8 @@ use std::cmp;
 use std::collections::BinaryHeap;
 use std::iter::FromIterator;
 
-use raw::Output;
-use stream::{IntoStreamer, Streamer};
+use crate::raw::Output;
+use crate::stream::{IntoStreamer, Streamer};
 
 /// Permits stream operations to be hetergeneous with respect to streams.
 type BoxedStream<'f> = Box<dyn for<'a> Streamer<'a, Item = (&'a [u8], Output)> + 'f>;
@@ -44,12 +44,13 @@ pub struct OpBuilder<'f> {
     streams: Vec<BoxedStream<'f>>,
 }
 
-impl<'f> OpBuilder<'f> {
-    /// Create a new set operation builder.
-    #[inline]
-    pub fn new() -> Self {
+impl<'f> Default for OpBuilder<'f> {
+    fn default() -> Self {
         OpBuilder { streams: vec![] }
     }
+}
+
+impl<'f> OpBuilder<'f> {
 
     /// Add a stream to this set operation.
     ///
@@ -187,7 +188,7 @@ where
     where
         T: IntoIterator<Item = I>,
     {
-        let mut op = OpBuilder::new();
+        let mut op = OpBuilder::default();
         op.extend(it);
         op
     }
@@ -463,9 +464,9 @@ impl Ord for Slot {
 
 #[cfg(test)]
 mod tests {
-    use raw::tests::{fst_map, fst_set};
-    use raw::Fst;
-    use stream::{IntoStreamer, Streamer};
+    use crate::raw::tests::{fst_map, fst_set};
+    use crate::raw::Fst;
+    use crate::stream::{IntoStreamer, Streamer};
 
     use super::OpBuilder;
 

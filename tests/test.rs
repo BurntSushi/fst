@@ -5,10 +5,10 @@ extern crate fst_regex;
 use fst_levenshtein::Levenshtein;
 use fst_regex::Regex;
 
-use fst::{Automaton, IntoStreamer, Streamer};
 use fst::automaton::{Str, Subsequence};
 use fst::raw::{Builder, Fst, Output};
-use fst::set::{Set, OpBuilder};
+use fst::set::{OpBuilder, Set};
+use fst::{Automaton, IntoStreamer, Streamer};
 
 static WORDS: &'static str = include_str!("../data/words-10000");
 
@@ -17,7 +17,10 @@ fn get_set() -> Set {
 }
 
 fn fst_set<I, S>(ss: I) -> Fst
-        where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<[u8]>,
+{
     let mut bfst = Builder::memory();
     let mut ss: Vec<Vec<u8>> =
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
@@ -78,9 +81,12 @@ fn startswith_small() {
     let stream = set.search(lev.starts_with()).into_stream();
 
     let keys = stream.into_strs().unwrap();
-    assert_eq!(keys, vec![
-        "cooing", "fo", "fob", "focus", "foo", "food", "foul", "frothing",
-    ]);
+    assert_eq!(
+        keys,
+        vec![
+            "cooing", "fo", "fob", "focus", "foo", "food", "foul", "frothing",
+        ]
+    );
 }
 
 #[test]
@@ -129,10 +135,8 @@ fn union_large() {
     let lev = Levenshtein::new("foo", 3).unwrap();
     let reg = Regex::new("(..)*").unwrap();
     let mut stream1 = set.search((&lev).union(&reg)).into_stream();
-    let mut stream2 = OpBuilder::new()
-        .add(set.search(&lev))
-        .add(set.search(&reg))
-        .union();
+    let mut stream2 =
+        OpBuilder::new().add(set.search(&lev)).add(set.search(&reg)).union();
     while let Some(key1) = stream1.next() {
         assert_eq!(stream2.next(), Some(key1));
     }

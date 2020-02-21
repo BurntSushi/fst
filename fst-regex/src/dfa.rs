@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 
-use {Error, Inst};
 use sparse::SparseSet;
+use {Error, Inst};
 
 const STATE_LIMIT: usize = 1_000; // currently at least 2MB >_<
 
@@ -25,10 +25,7 @@ struct State {
 impl DfaBuilder {
     pub fn new(insts: Vec<Inst>) -> Self {
         DfaBuilder {
-            dfa: Dfa {
-                insts: insts,
-                states: Vec::with_capacity(16),
-            },
+            dfa: Dfa { insts: insts, states: Vec::with_capacity(16) },
             cache: HashMap::with_capacity(1024),
         }
     }
@@ -57,8 +54,13 @@ impl DfaBuilder {
         Ok(self.dfa)
     }
 
-    fn run_state(&mut self, cur: &mut SparseSet, next: &mut SparseSet,
-                 state: usize, byte: u8) -> Option<usize> {
+    fn run_state(
+        &mut self,
+        cur: &mut SparseSet,
+        next: &mut SparseSet,
+        state: usize,
+        byte: u8,
+    ) -> Option<usize> {
         cur.clear();
         for &ip in &self.dfa.states[state].insts {
             cur.add(ip);
@@ -142,7 +144,7 @@ impl Dfa {
                 Match => is_match = true,
                 Range(s, e) => {
                     if s <= byte && byte <= e {
-                        self.add(to, ip+1);
+                        self.add(to, ip + 1);
                     }
                 }
             }

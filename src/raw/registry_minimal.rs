@@ -13,8 +13,8 @@
 
 use std::collections::hash_map::{Entry, HashMap};
 
-use raw::CompiledAddr;
 use raw::build::BuilderNode;
+use raw::CompiledAddr;
 
 #[derive(Debug)]
 pub struct Registry {

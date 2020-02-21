@@ -6,7 +6,8 @@ use raw::Output;
 use stream::{IntoStreamer, Streamer};
 
 /// Permits stream operations to be hetergeneous with respect to streams.
-type BoxedStream<'f> = Box<for<'a> Streamer<'a, Item=(&'a [u8], Output)> + 'f>;
+type BoxedStream<'f> =
+    Box<for<'a> Streamer<'a, Item = (&'a [u8], Output)> + 'f>;
 
 /// A value indexed by a stream.
 ///
@@ -59,8 +60,10 @@ impl<'f> OpBuilder<'f> {
     /// The stream must emit a lexicographically ordered sequence of key-value
     /// pairs.
     pub fn add<I, S>(mut self, stream: I) -> Self
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+        S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+    {
         self.push(stream);
         self
     }
@@ -70,8 +73,10 @@ impl<'f> OpBuilder<'f> {
     /// The stream must emit a lexicographically ordered sequence of key-value
     /// pairs.
     pub fn push<I, S>(&mut self, stream: I)
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+        S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+    {
         self.streams.push(Box::new(stream.into_stream()));
     }
 
@@ -164,9 +169,14 @@ impl<'f> OpBuilder<'f> {
 }
 
 impl<'f, I, S> Extend<I> for OpBuilder<'f>
-    where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-          S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
-    fn extend<T>(&mut self, it: T) where T: IntoIterator<Item=I> {
+where
+    I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+    S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+{
+    fn extend<T>(&mut self, it: T)
+    where
+        T: IntoIterator<Item = I>,
+    {
         for stream in it {
             self.push(stream);
         }
@@ -174,9 +184,14 @@ impl<'f, I, S> Extend<I> for OpBuilder<'f>
 }
 
 impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
-    where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-          S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
-    fn from_iter<T>(it: T) -> Self where T: IntoIterator<Item=I> {
+where
+    I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+    S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+{
+    fn from_iter<T>(it: T) -> Self
+    where
+        T: IntoIterator<Item = I>,
+    {
         let mut op = OpBuilder::new();
         op.extend(it);
         op
@@ -251,7 +266,7 @@ impl<'a, 'f> Streamer<'a> for Intersection<'f> {
             } else {
                 self.cur_slot = Some(slot);
                 let key = self.cur_slot.as_ref().unwrap().input();
-                return Some((key, &self.outs))
+                return Some((key, &self.outs));
             }
         }
     }
@@ -283,10 +298,8 @@ impl<'a, 'f> Streamer<'a> for Difference<'f> {
                     self.key.clear();
                     self.key.extend(key);
                     self.outs.clear();
-                    self.outs.push(IndexedValue {
-                        index: 0,
-                        value: out.value(),
-                    });
+                    self.outs
+                        .push(IndexedValue { index: 0, value: out.value() });
                 }
             };
             let mut unique = true;
@@ -297,7 +310,7 @@ impl<'a, 'f> Streamer<'a> for Difference<'f> {
                 self.heap.refill(slot);
             }
             if unique {
-                return Some((&self.key, &self.outs))
+                return Some((&self.key, &self.outs));
             }
         }
     }
@@ -340,7 +353,7 @@ impl<'a, 'f> Streamer<'a> for SymmetricDifference<'f> {
             } else {
                 self.cur_slot = Some(slot);
                 let key = self.cur_slot.as_ref().unwrap().input();
-                return Some((key, &self.outs))
+                return Some((key, &self.outs));
             }
         }
     }
@@ -353,10 +366,7 @@ struct StreamHeap<'f> {
 
 impl<'f> StreamHeap<'f> {
     fn new(streams: Vec<BoxedStream<'f>>) -> StreamHeap<'f> {
-        let mut u = StreamHeap {
-            rdrs: streams,
-            heap: BinaryHeap::new(),
-        };
+        let mut u = StreamHeap { rdrs: streams, heap: BinaryHeap::new() };
         for i in 0..u.rdrs.len() {
             u.refill(Slot::new(i));
         }
@@ -437,8 +447,8 @@ impl Slot {
 impl PartialOrd for Slot {
     fn partial_cmp(&self, other: &Slot) -> Option<cmp::Ordering> {
         (&self.input, self.output)
-        .partial_cmp(&(&other.input, other.output))
-        .map(|ord| ord.reverse())
+            .partial_cmp(&(&other.input, other.output))
+            .map(|ord| ord.reverse())
     }
 }
 
@@ -456,7 +466,9 @@ mod tests {
 
     use super::OpBuilder;
 
-    fn s(string: &str) -> String { string.to_owned() }
+    fn s(string: &str) -> String {
+        string.to_owned()
+    }
 
     macro_rules! create_set_op {
         ($name:ident, $op:ident) => {
@@ -470,7 +482,7 @@ mod tests {
                 }
                 keys
             }
-        }
+        };
     }
 
     macro_rules! create_map_op {
@@ -487,7 +499,7 @@ mod tests {
                 }
                 keys
             }
-        }
+        };
     }
 
     create_set_op!(fst_union, union);
@@ -501,19 +513,13 @@ mod tests {
 
     #[test]
     fn union_set() {
-        let v = fst_union(vec![
-            vec!["a", "b", "c"],
-            vec!["x", "y", "z"],
-        ]);
+        let v = fst_union(vec![vec!["a", "b", "c"], vec!["x", "y", "z"]]);
         assert_eq!(v, vec!["a", "b", "c", "x", "y", "z"]);
     }
 
     #[test]
     fn union_set_dupes() {
-        let v = fst_union(vec![
-            vec!["aa", "b", "cc"],
-            vec!["b", "cc", "z"],
-        ]);
+        let v = fst_union(vec![vec!["aa", "b", "cc"], vec!["b", "cc", "z"]]);
         assert_eq!(v, vec!["aa", "b", "cc", "z"]);
     }
 
@@ -523,10 +529,17 @@ mod tests {
             vec![("a", 1), ("b", 2), ("c", 3)],
             vec![("x", 1), ("y", 2), ("z", 3)],
         ]);
-        assert_eq!(v, vec![
-            (s("a"), 1), (s("b"), 2), (s("c"), 3),
-            (s("x"), 1), (s("y"), 2), (s("z"), 3),
-        ]);
+        assert_eq!(
+            v,
+            vec![
+                (s("a"), 1),
+                (s("b"), 2),
+                (s("c"), 3),
+                (s("x"), 1),
+                (s("y"), 2),
+                (s("z"), 3),
+            ]
+        );
     }
 
     #[test]
@@ -536,17 +549,16 @@ mod tests {
             vec![("b", 1), ("cc", 2), ("z", 3)],
             vec![("b", 1)],
         ]);
-        assert_eq!(v, vec![
-            (s("aa"), 1), (s("b"), 4), (s("cc"), 5), (s("z"), 3),
-        ]);
+        assert_eq!(
+            v,
+            vec![(s("aa"), 1), (s("b"), 4), (s("cc"), 5), (s("z"), 3),]
+        );
     }
 
     #[test]
     fn intersect_set() {
-        let v = fst_intersection(vec![
-            vec!["a", "b", "c"],
-            vec!["x", "y", "z"],
-        ]);
+        let v =
+            fst_intersection(vec![vec!["a", "b", "c"], vec!["x", "y", "z"]]);
         assert_eq!(v, Vec::<String>::new());
     }
 
@@ -611,15 +623,9 @@ mod tests {
     #[test]
     fn difference2() {
         // Regression test: https://github.com/BurntSushi/fst/issues/19
-        let v = fst_difference(vec![
-            vec!["a", "c"],
-            vec!["b", "c"],
-        ]);
+        let v = fst_difference(vec![vec!["a", "c"], vec!["b", "c"]]);
         assert_eq!(v, vec!["a"]);
-        let v = fst_difference(vec![
-            vec!["bar", "foo"],
-            vec!["baz", "foo"],
-        ]);
+        let v = fst_difference(vec![vec!["bar", "foo"], vec!["baz", "foo"]]);
         assert_eq!(v, vec!["bar"]);
     }
 

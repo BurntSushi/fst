@@ -9,10 +9,7 @@ pub struct CountingWriter<W> {
 impl<W: io::Write> CountingWriter<W> {
     /// Wrap the given writer with a counter.
     pub fn new(wtr: W) -> CountingWriter<W> {
-        CountingWriter {
-            wtr: wtr,
-            cnt: 0,
-        }
+        CountingWriter { wtr: wtr, cnt: 0 }
     }
 
     /// Return the total number of bytes written to the underlying writer.
@@ -32,7 +29,6 @@ impl<W: io::Write> CountingWriter<W> {
     pub fn get_ref(&self) -> &W {
         &self.wtr
     }
-
 }
 
 impl<W: io::Write> io::Write for CountingWriter<W> {
@@ -49,8 +45,8 @@ impl<W: io::Write> io::Write for CountingWriter<W> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
     use super::CountingWriter;
+    use std::io::Write;
 
     #[test]
     fn counts_bytes() {

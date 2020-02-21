@@ -15,10 +15,12 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Error::*;
         match *self {
-            TooManyStates(size_limit) => {
-                write!(f, "Levenshtein automaton exceeds size limit of \
-                           {} states", size_limit)
-            }
+            TooManyStates(size_limit) => write!(
+                f,
+                "Levenshtein automaton exceeds size limit of \
+                           {} states",
+                size_limit
+            ),
         }
     }
 }

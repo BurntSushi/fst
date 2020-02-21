@@ -23,22 +23,7 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 fst = "0.2"
 ```
 
-And add this to your crate root:
-
-```ignore
-extern crate fst;
-```
-
 The examples in this documentation will show the rest.
-
-# Other crates
-
-The
-[`fst-regex`](https://docs.rs/fst-regex)
-and
-[`fst-levenshtein`](https://docs.rs/fst-levenshtein)
-crates provide regular expression matching and fuzzy searching on FSTs,
-respectively.
 
 # Overview of types and modules
 
@@ -51,7 +36,10 @@ as range queries and streams.
 The `raw` module permits direct interaction with finite state transducers.
 Namely, the states and transitions of a transducer can be directly accessed
 with the `raw` module.
-
+*/
+#![cfg_attr(
+    feature = "levenshtein",
+    doc = r##"
 # Example: fuzzy query
 
 This example shows how to create a set of strings in memory, and then execute
@@ -60,17 +48,17 @@ of `1` of `foo`. (Edit distance is the number of character insertions,
 deletions or substitutions required to get from one string to another. In this
 case, a character is a Unicode codepoint.)
 
-```rust
-extern crate fst;
-extern crate fst_levenshtein; // the fst-levenshtein crate
+This requires the `levenshtein` feature in this crate to be enabled. It is not
+enabled by default.
 
+```rust
 use std::error::Error;
 
 use fst::{IntoStreamer, Streamer, Set};
-use fst_levenshtein::Levenshtein;
+use fst::automaton::Levenshtein;
 
 # fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<Error>> {
+fn example() -> Result<(), Box<dyn Error>> {
     // A convenient way to create sets in memory.
     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
     let set = Set::from_iter(keys)?;
@@ -87,6 +75,18 @@ fn example() -> Result<(), Box<Error>> {
 }
 ```
 
+**Warning**: Levenshtein automatons use a lot of memory
+
+The construction of Levenshtein automatons should be consider "proof of
+concept" quality. Namely, they do just enough to be *correct*. But they haven't
+had any effort put into them to be memory conscious.
+
+Note that an error will be returned if a Levenshtein automaton gets too big
+(tens of MB in heap usage).
+
+"##
+)]
+/*!
 # Example: stream a map to a file
 
 This shows how to create a `MapBuilder` that will stream construction of the
@@ -132,30 +132,36 @@ assert_eq!(kvs, vec![
 
 # Example: case insensitive search
 
-We can perform case insensitive search on a set using a regular expression.
-Note that while sets can store arbitrary byte strings, a regular expression
-will only match valid UTF-8 encoded byte strings.
+We can perform case insensitive search on a set using a regular expression. We
+can use the [`regex-automata`](https://docs.rs/regex-automata) crate to compile
+a regular expression into an automaton:
 
-```rust
-extern crate fst;
-extern crate fst_regex; // the fst-regex crate
+```ignore
+use fst::{IntoStreamer, Set};
+use regex_automata::dense; // regex-automata crate with 'transducer' feature
 
-use std::error::Error;
-
-use fst::{IntoStreamer, Streamer, Set};
-use fst_regex::Regex;
-
-# fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let set = Set::from_iter(&["FoO", "Foo", "fOO", "foo"])?;
+    let pattern = r"(?i)foo";
+    // Setting 'anchored' is important, otherwise the regex can match anywhere
+    // in the key. This would cause the regex to iterate over every key in the
+    // FST set.
+    let dfa = dense::Builder::new().anchored(true).build(pattern).unwrap();
 
-    let re = Regex::new("(?i)foo")?;
-    let mut stream = set.search(&re).into_stream();
-
-    let keys = stream.into_strs()?;
+    let keys = set.search(&dfa).into_stream().into_strs()?;
     assert_eq!(keys, vec!["FoO", "Foo", "fOO", "foo"]);
+    println!("{:?}", keys);
     Ok(())
 }
+```
+
+Note that for this to work, the `regex-automata` crate must be compiled with
+the `transducer` feature enabled:
+
+```toml
+[dependencies]
+fst = "0.3"
+regex-automata = { version = "0.1.9", features = ["transducer"] }
 ```
 
 # Example: searching multiple sets efficiently
@@ -167,55 +173,52 @@ This crate provides efficient set/map operations that allow one to combine
 multiple streams of search results. Each operation only uses memory
 proportional to the number of streams.
 
-The example below shows how to find all keys that have at least one capital
-letter that doesn't appear at the beginning of the key. The example below uses
-sets, but the same operations are available on maps too.
+The example below shows how to find all keys that start with `B` or `G`. The
+example below uses sets, but the same operations are available on maps too.
 
 ```rust
-extern crate fst;
-extern crate fst_regex; // the fst-regex crate
-
 use std::error::Error;
 
-use fst::{Streamer, Set};
+use fst::automaton::{Automaton, Str};
 use fst::set;
-use fst_regex::Regex;
+use fst::{IntoStreamer, Set, Streamer};
 
 # fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<Error>> {
+fn example() -> Result<(), Box<dyn Error>> {
     let set1 = Set::from_iter(&["AC/DC", "Aerosmith"])?;
     let set2 = Set::from_iter(&["Bob Seger", "Bruce Springsteen"])?;
     let set3 = Set::from_iter(&["George Thorogood", "Golden Earring"])?;
     let set4 = Set::from_iter(&["Kansas"])?;
     let set5 = Set::from_iter(&["Metallica"])?;
 
-    // Create the regular expression. We can reuse it to search all of the sets.
-    let re = Regex::new(r".+\p{Lu}.*")?;
+    // Create the matcher. We can reuse it to search all of the sets.
+    let matcher = Str::new("B")
+        .starts_with()
+        .union(Str::new("G").starts_with());
 
-    // Build a set operation. All we need to do is add a search result stream for
-    // each set and ask for the union. (Other operations, like intersection and
-    // difference are also available.)
+    // Build a set operation. All we need to do is add a search result stream
+    // for each set and ask for the union. (Other operations, like intersection
+    // and difference are also available.)
     let mut stream =
         set::OpBuilder::new()
-        .add(set1.search(&re))
-        .add(set2.search(&re))
-        .add(set3.search(&re))
-        .add(set4.search(&re))
-        .add(set5.search(&re))
+        .add(set1.search(&matcher))
+        .add(set2.search(&matcher))
+        .add(set3.search(&matcher))
+        .add(set4.search(&matcher))
+        .add(set5.search(&matcher))
         .union();
 
-    // Now collect all of the keys. Alternatively, you could build another set here
-    // using `SetBuilder::extend_stream`.
+    // Now collect all of the keys. Alternatively, you could build another set
+    // here using `SetBuilder::extend_stream`.
     let mut keys = vec![];
     while let Some(key) = stream.next() {
-        keys.push(key.to_vec());
+        keys.push(String::from_utf8(key.to_vec())?);
     }
     assert_eq!(keys, vec![
-        "AC/DC".as_bytes(),
-        "Bob Seger".as_bytes(),
-        "Bruce Springsteen".as_bytes(),
-        "George Thorogood".as_bytes(),
-        "Golden Earring".as_bytes(),
+        "Bob Seger",
+        "Bruce Springsteen",
+        "George Thorogood",
+        "Golden Earring",
     ]);
     Ok(())
 }
@@ -290,31 +293,9 @@ data structures found in the standard library, such as `BTreeSet` and
    done, they can be merged together into one big set/map if desired.
    A somewhat simplistic example of this procedure can be seen in
    `fst-bin/src/merge.rs` from the root of this crate's repository.
-
-# Warning: regexes and Levenshtein automatons use a lot of memory
-
-The construction of automatons for both regular expressions and Levenshtein
-automatons should be consider "proof of concept" quality. Namely, they do just
-enough to be *correct*. But they haven't had any effort put into them to be
-memory conscious. These are important parts of this library, so they will be
-improved.
-
-Note that whether you're using regexes or Levenshtein automatons, an error
-will be returned if the automaton gets too big (tens of MB in heap usage).
 */
 
 #![deny(missing_docs)]
-
-
-#[cfg(test)]
-extern crate fst_levenshtein;
-#[cfg(test)]
-extern crate fst_regex;
-
-#[cfg(test)]
-extern crate quickcheck;
-#[cfg(test)]
-extern crate rand;
 
 pub use crate::automaton::Automaton;
 pub use crate::error::{Error, Result};

@@ -1,4 +1,9 @@
+#[cfg(feature = "levenshtein")]
+pub use self::levenshtein::{Levenshtein, LevenshteinError};
 use self::StartsWithStateInternal::*;
+
+#[cfg(feature = "levenshtein")]
+mod levenshtein;
 
 /// Automaton describes types that behave as a finite automaton.
 ///

@@ -1,8 +1,8 @@
 use std::io;
 
 use docopt::Docopt;
+use fst::automaton::Levenshtein;
 use fst::raw::Fst;
-use fst_levenshtein::Levenshtein;
 use serde::Deserialize;
 
 use crate::util;

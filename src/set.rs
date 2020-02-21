@@ -189,33 +189,28 @@ impl Set {
     ///
     /// # Example
     ///
-    /// An implementation of regular expressions for `Automaton` is available
-    /// in the `fst-regex` crate, which can be used to search sets.
+    /// An implementation of subsequence search for `Automaton` can be used
+    /// to search sets:
     ///
     /// ```rust
-    /// extern crate fst;
-    /// extern crate fst_regex;
-    ///
-    /// use std::error::Error;
-    ///
+    /// use fst::automaton::Subsequence;
     /// use fst::{IntoStreamer, Streamer, Set};
-    /// use fst_regex::Regex;
     ///
     /// # fn main() { example().unwrap(); }
-    /// fn example() -> Result<(), Box<Error>> {
+    /// fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     let set = Set::from_iter(&[
-    ///         "foo", "foo1", "foo2", "foo3", "foobar",
+    ///         "a foo bar", "foo", "foo1", "foo2", "foo3", "foobar",
     ///     ]).unwrap();
     ///
-    ///     let re = Regex::new("f[a-z]+3?").unwrap();
-    ///     let mut stream = set.search(&re).into_stream();
+    ///     let matcher = Subsequence::new("for");
+    ///     let mut stream = set.search(&matcher).into_stream();
     ///
     ///     let mut keys = vec![];
     ///     while let Some(key) = stream.next() {
-    ///         keys.push(key.to_vec());
+    ///         keys.push(String::from_utf8(key.to_vec())?);
     ///     }
     ///     assert_eq!(keys, vec![
-    ///         "foo".as_bytes(), "foo3".as_bytes(), "foobar".as_bytes(),
+    ///         "a foo bar", "foobar",
     ///     ]);
     ///
     ///     Ok(())

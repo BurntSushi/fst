@@ -24,11 +24,10 @@ bit-set = "0.4"
 chan = "0.1"
 csv = "1.1.3"
 docopt = "1.1"
-fst = { path = "..", version = "0.3" }
-fst-regex = { path = "../fst-regex", version = "0.2" }
-fst-levenshtein = { path = "../fst-levenshtein", version = "0.2" }
+fst = { path = "..", version = "0.3", features = ["levenshtein"] }
 lines = "0.0"
 num_cpus = "1.5"
+regex-automata = { version = "*", path = "/home/andrew/rust/regex-automata", features = ["transducer"] }
 serde = { version = "1.0.104", features = ["derive"] }
 tempdir = "0.3"
 

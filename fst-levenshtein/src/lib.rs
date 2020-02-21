@@ -1,5 +1,5 @@
-extern crate fst;
-extern crate utf8_ranges;
+
+
 
 use std::cmp;
 use std::collections::hash_map::Entry;
@@ -101,7 +101,7 @@ impl Levenshtein {
 }
 
 impl fmt::Debug for Levenshtein {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Levenshtein(query: {:?}, distance: {:?})",
@@ -178,7 +178,7 @@ struct State {
 }
 
 impl fmt::Debug for State {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "State {{")?;
         writeln!(f, "  is_match: {:?}", self.is_match)?;
         for i in 0..256 {

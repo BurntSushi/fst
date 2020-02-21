@@ -3,7 +3,7 @@ use std::fmt;
 use std::str;
 use std::string::FromUtf8Error;
 
-use raw::FstType;
+use crate::raw::FstType;
 
 /// An error that occurred while using a finite state transducer.
 pub enum Error {
@@ -59,7 +59,7 @@ pub enum Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Error::*;
         match *self {
             FromUtf8(ref err) => err.fmt(f),
@@ -104,7 +104,7 @@ Error opening FST: expected type {}, got type {}.",
 }
 
 impl fmt::Debug for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }
@@ -122,7 +122,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         match *self {
             Error::FromUtf8(ref err) => Some(err),
             _ => None,

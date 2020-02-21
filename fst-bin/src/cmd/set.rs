@@ -5,9 +5,9 @@ use docopt::Docopt;
 use fst::SetBuilder;
 use lines::linereader::LineReader;
 
-use merge::Merger;
-use util;
-use Error;
+use crate::merge::Merger;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Creates an ordered set backed by a finite state transducer.

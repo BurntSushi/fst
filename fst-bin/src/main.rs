@@ -36,7 +36,7 @@ mod cmd;
 mod merge;
 mod util;
 
-pub type Error = Box<error::Error + Send + Sync>;
+pub type Error = Box<dyn error::Error + Send + Sync>;
 
 const USAGE: &'static str = "
 Usage:

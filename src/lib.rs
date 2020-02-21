@@ -305,23 +305,22 @@ will be returned if the automaton gets too big (tens of MB in heap usage).
 
 #![deny(missing_docs)]
 
-extern crate byteorder;
+
 #[cfg(test)]
 extern crate fst_levenshtein;
 #[cfg(test)]
 extern crate fst_regex;
-#[cfg(feature = "mmap")]
-extern crate memmap;
+
 #[cfg(test)]
 extern crate quickcheck;
 #[cfg(test)]
 extern crate rand;
 
-pub use automaton::Automaton;
-pub use error::{Error, Result};
-pub use map::{Map, MapBuilder};
-pub use set::{Set, SetBuilder};
-pub use stream::{IntoStreamer, Streamer};
+pub use crate::automaton::Automaton;
+pub use crate::error::{Error, Result};
+pub use crate::map::{Map, MapBuilder};
+pub use crate::set::{Set, SetBuilder};
+pub use crate::stream::{IntoStreamer, Streamer};
 
 mod error;
 #[path = "automaton/mod.rs"]
@@ -338,7 +337,7 @@ mod stream;
 /// This module defines a trait, `Automaton`, with several implementations
 /// including, but not limited to, union, intersection and complement.
 pub mod automaton {
-    pub use inner_automaton::*;
+    pub use crate::inner_automaton::*;
 }
 
 /// Map operations implemented by finite state transducers.
@@ -357,7 +356,7 @@ pub mod automaton {
 /// option of specifying a merge strategy for a map's values. The rest of the
 /// types are streams for set operations.
 pub mod map {
-    pub use inner_map::*;
+    pub use crate::inner_map::*;
 }
 
 /// Set operations implemented by finite state transducers.
@@ -380,5 +379,5 @@ pub mod map {
 /// of streams and executes set operations like `union` or `intersection` on
 /// them. The rest of the types are streams for set operations.
 pub mod set {
-    pub use inner_set::*;
+    pub use crate::inner_set::*;
 }

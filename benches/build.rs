@@ -1,6 +1,6 @@
 #![feature(test)]
 
-extern crate fst;
+
 extern crate test;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};

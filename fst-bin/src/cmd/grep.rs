@@ -4,8 +4,8 @@ use docopt::Docopt;
 use fst::raw::Fst;
 use fst_regex::Regex;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Searches a transducer with a regular expression.

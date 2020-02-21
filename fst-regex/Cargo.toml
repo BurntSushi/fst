@@ -10,6 +10,7 @@ homepage = "https://github.com/BurntSushi/fst"
 repository = "https://github.com/BurntSushi/fst"
 keywords = ["search", "information", "retrieval", "dictionary", "map"]
 license = "Unlicense/MIT"
+edition = "2018"
 
 [features]
 mmap = ["fst/mmap"]

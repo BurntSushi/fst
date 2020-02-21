@@ -1,8 +1,8 @@
 use docopt::Docopt;
 use fst::raw::Fst;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Shows a single node from the transducer.

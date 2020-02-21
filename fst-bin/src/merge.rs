@@ -13,12 +13,12 @@ use fst::{self, Streamer, raw};
 use num_cpus;
 use tempdir::TempDir;
 
-use Error;
+use crate::Error;
 
 pub struct Merger<I> {
     it: I,
     output: PathBuf,
-    value_merger: Option<Arc<Fn(u64, u64) -> u64 + Send + Sync + 'static>>,
+    value_merger: Option<Arc<dyn Fn(u64, u64) -> u64 + Send + Sync + 'static>>,
     fd_limit: u32,
     batch_size: u32,
     threads: u32,
@@ -237,7 +237,7 @@ struct UnionBatch {
     gen: usize,
     index: usize,
     fsts: Vec<PathBuf>,
-    value_merger: Option<Arc<Fn(u64, u64) -> u64 + Send + Sync + 'static>>,
+    value_merger: Option<Arc<dyn Fn(u64, u64) -> u64 + Send + Sync + 'static>>,
 }
 
 impl Batchable for UnionBatch {

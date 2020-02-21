@@ -487,6 +487,11 @@ impl SetBuilder<Vec<u8>> {
     pub fn memory() -> Self {
         SetBuilder(raw::Builder::memory())
     }
+
+    /// Finishes the construction of the set and returning it.
+    pub fn into_set(self) -> Set {
+        self.into_inner().and_then(Set::from_bytes).unwrap()
+    }
 }
 
 impl<W: io::Write> SetBuilder<W> {

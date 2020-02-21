@@ -1,9 +1,9 @@
 [package]
 name = "fst-regex"
-version = "0.2.2"  #:version
+version = "0.3.0"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = """
-Search finite state transducers with regular expression.
+DEPRECATED. Use 'regex-automata' crate with 'transducer' feature instead.
 """
 documentation = "https://docs.rs/fst-regex"
 homepage = "https://github.com/BurntSushi/fst"

@@ -292,32 +292,35 @@ impl Map {
     /// An implementation of regular expressions for `Automaton` is available
     /// in the `fst-regex` crate, which can be used to search maps.
     ///
+    /// # Example
+    ///
+    /// An implementation of subsequence search for `Automaton` can be used
+    /// to search sets:
+    ///
     /// ```rust
-    /// extern crate fst;
-    /// extern crate fst_regex;
-    ///
-    /// use std::error::Error;
-    ///
+    /// use fst::automaton::Subsequence;
     /// use fst::{IntoStreamer, Streamer, Map};
-    /// use fst_regex::Regex;
     ///
     /// # fn main() { example().unwrap(); }
-    /// fn example() -> Result<(), Box<Error>> {
+    /// fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///     let map = Map::from_iter(vec![
-    ///         ("foo", 1), ("foo1", 2), ("foo2", 3), ("foo3", 4), ("foobar", 5),
+    ///         ("a foo bar", 1),
+    ///         ("foo", 2),
+    ///         ("foo1", 3),
+    ///         ("foo2", 4),
+    ///         ("foo3", 5),
+    ///         ("foobar", 6),
     ///     ]).unwrap();
     ///
-    ///     let re = Regex::new("f[a-z]+3?").unwrap();
-    ///     let mut stream = map.search(&re).into_stream();
+    ///     let matcher = Subsequence::new("for");
+    ///     let mut stream = map.search(&matcher).into_stream();
     ///
     ///     let mut kvs = vec![];
     ///     while let Some((k, v)) = stream.next() {
-    ///         kvs.push((k.to_vec(), v));
+    ///         kvs.push((String::from_utf8(k.to_vec())?, v));
     ///     }
     ///     assert_eq!(kvs, vec![
-    ///         (b"foo".to_vec(), 1),
-    ///         (b"foo3".to_vec(), 4),
-    ///         (b"foobar".to_vec(), 5),
+    ///         ("a foo bar".to_string(), 1), ("foobar".to_string(), 6),
     ///     ]);
     ///
     ///     Ok(())

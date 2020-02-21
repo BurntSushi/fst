@@ -2,7 +2,8 @@ use std::io;
 
 use docopt::Docopt;
 use fst::raw::Fst;
-use fst_regex::Regex;
+use regex_automata::dense;
+// use regex_automata::sparse::SparseDFA;
 use serde::Deserialize;
 
 use crate::util;
@@ -40,8 +41,20 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         .and_then(|d| d.argv(&argv).deserialize())
         .unwrap_or_else(|e| e.exit());
     let fst = unsafe { Fst::from_path(&args.arg_fst) }?;
-    let lev = Regex::new(&args.arg_regex)?;
-    let mut q = fst.search(&lev);
+    let dense_dfa = dense::Builder::new()
+        .anchored(true)
+        .byte_classes(false)
+        .premultiply(false)
+        .build(&args.arg_regex)?;
+    let dfa = match dense_dfa {
+        dense::DenseDFA::Standard(dfa) => dfa,
+        _ => unreachable!(),
+    };
+    // let dfa = match dense_dfa.to_sparse()? {
+    // SparseDFA::Standard(dfa) => dfa,
+    // _ => unreachable!(),
+    // };
+    let mut q = fst.search(&dfa);
     if let Some(ref start) = args.flag_start {
         q = q.ge(start);
     }

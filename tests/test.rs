@@ -1,14 +1,10 @@
-use fst;
-
-
-
-use fst_levenshtein::Levenshtein;
-use fst_regex::Regex;
-
+#[cfg(feature = "levenshtein")]
+use fst::automaton::Levenshtein;
 use fst::automaton::{Str, Subsequence};
-use fst::raw::{Builder, Fst, Output};
-use fst::set::{OpBuilder, Set};
-use fst::{Automaton, IntoStreamer, Streamer};
+#[cfg(feature = "levenshtein")]
+use fst::raw::{Builder, Fst};
+use fst::set::Set;
+use fst::{self, Automaton, IntoStreamer, Streamer};
 
 static WORDS: &'static str = include_str!("../data/words-10000");
 
@@ -16,6 +12,7 @@ fn get_set() -> Set {
     Set::from_iter(WORDS.lines()).unwrap()
 }
 
+#[cfg(feature = "levenshtein")]
 fn fst_set<I, S>(ss: I) -> Fst
 where
     I: IntoIterator<Item = S>,
@@ -34,15 +31,7 @@ where
     fst
 }
 
-#[test]
-fn regex_simple() {
-    let set = fst_set(vec!["abc", "abd", "ayz", "za"]);
-    let re = Regex::new("a[a-z]*").unwrap();
-    let mut rdr = set.search(&re).ge("abd").lt("ax").into_stream();
-    assert_eq!(rdr.next(), Some(("abd".as_bytes(), Output::zero())));
-    assert!(rdr.next().is_none());
-}
-
+#[cfg(feature = "levenshtein")]
 #[test]
 fn levenshtein_simple() {
     let set = fst_set(vec!["woof", "wood", "banana"]);
@@ -51,6 +40,7 @@ fn levenshtein_simple() {
     assert_eq!(vs, vec!["wood".as_bytes(), "woof".as_bytes()]);
 }
 
+#[cfg(feature = "levenshtein")]
 #[test]
 fn levenshtein_unicode() {
     let set = fst_set(vec!["woof", "wood", "banana", "☃snowman☃"]);
@@ -59,6 +49,7 @@ fn levenshtein_unicode() {
     assert_eq!(vs, vec!["☃snowman☃".as_bytes()]);
 }
 
+#[cfg(feature = "levenshtein")]
 #[test]
 fn complement_small() {
     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
@@ -70,6 +61,7 @@ fn complement_small() {
     assert_eq!(keys, vec!["fa", "focus", "foul"]);
 }
 
+#[cfg(feature = "levenshtein")]
 #[test]
 fn startswith_small() {
     let keys = vec![
@@ -89,39 +81,44 @@ fn startswith_small() {
     );
 }
 
+#[cfg(feature = "levenshtein")]
 #[test]
 fn intersection_small() {
-    let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+    let keys = vec!["fab", "fo", "fob", "focus", "foo", "food", "foul", "goo"];
     let set = Set::from_iter(keys).unwrap();
     let lev = Levenshtein::new("foo", 1).unwrap();
-    let reg = Regex::new("(..)*").unwrap();
-    let stream = set.search(lev.intersection(reg)).into_stream();
+    let prefix = Str::new("fo").starts_with();
+    let stream = set.search(lev.intersection(prefix)).into_stream();
 
     let keys = stream.into_strs().unwrap();
-    assert_eq!(keys, vec!["fo", "food"]);
+    assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
 }
 
+#[cfg(feature = "levenshtein")]
 #[test]
 fn union_small() {
-    let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+    let keys = vec!["fab", "fob", "focus", "foo", "food", "goo"];
     let set = Set::from_iter(keys).unwrap();
     let lev = Levenshtein::new("foo", 1).unwrap();
-    let reg = Regex::new("(..)*").unwrap();
-    let stream = set.search(lev.union(reg)).into_stream();
+    let prefix = Str::new("fo").starts_with();
+    let stream = set.search(lev.union(prefix)).into_stream();
 
     let keys = stream.into_strs().unwrap();
-    assert_eq!(keys, vec!["fa", "fo", "fob", "foo", "food", "foul"]);
+    assert_eq!(keys, vec!["fob", "focus", "foo", "food", "goo"]);
 }
 
+#[cfg(feature = "levenshtein")]
 #[test]
 fn intersection_large() {
+    use fst::set::OpBuilder;
+
     let set = get_set();
     let lev = Levenshtein::new("foo", 3).unwrap();
-    let reg = Regex::new("(..)*").unwrap();
-    let mut stream1 = set.search((&lev).intersection(&reg)).into_stream();
+    let prefix = Str::new("fa").starts_with();
+    let mut stream1 = set.search((&lev).intersection(&prefix)).into_stream();
     let mut stream2 = OpBuilder::new()
         .add(set.search(&lev))
-        .add(set.search(&reg))
+        .add(set.search(&prefix))
         .intersection();
     while let Some(key1) = stream1.next() {
         assert_eq!(stream2.next(), Some(key1));
@@ -129,14 +126,19 @@ fn intersection_large() {
     assert_eq!(stream2.next(), None);
 }
 
+#[cfg(feature = "levenshtein")]
 #[test]
 fn union_large() {
+    use fst::set::OpBuilder;
+
     let set = get_set();
     let lev = Levenshtein::new("foo", 3).unwrap();
-    let reg = Regex::new("(..)*").unwrap();
-    let mut stream1 = set.search((&lev).union(&reg)).into_stream();
-    let mut stream2 =
-        OpBuilder::new().add(set.search(&lev)).add(set.search(&reg)).union();
+    let prefix = Str::new("fa").starts_with();
+    let mut stream1 = set.search((&lev).union(&prefix)).into_stream();
+    let mut stream2 = OpBuilder::new()
+        .add(set.search(&lev))
+        .add(set.search(&prefix))
+        .union();
     while let Some(key1) = stream1.next() {
         assert_eq!(stream2.next(), Some(key1));
     }
@@ -166,14 +168,11 @@ fn str() {
 #[test]
 fn subsequence() {
     let set = get_set();
-    let subseq = Subsequence::new("aab");
-    let regex = Regex::new(".*a.*a.*b.*").unwrap();
-    let mut stream1 = set.search(&subseq).into_stream();
-    let mut stream2 = set.search(&regex).into_stream();
-    while let Some(key1) = stream1.next() {
-        assert_eq!(stream2.next(), Some(key1));
-    }
-    assert_eq!(stream2.next(), None);
+    let subseq = Subsequence::new("nockbunsurrundd");
+
+    let mut stream = set.search(&subseq).into_stream();
+    assert_eq!(stream.next().unwrap(), b"bannockburnsurrounded");
+    assert_eq!(stream.next(), None);
 }
 
 #[test]

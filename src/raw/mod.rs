@@ -26,33 +26,36 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::Arc;
 
-use byteorder::{ReadBytesExt, LittleEndian};
+use byteorder::{LittleEndian, ReadBytesExt};
 
-use automaton::{Automaton, AlwaysMatch};
+use automaton::{AlwaysMatch, Automaton};
 use error::Result;
 use stream::{IntoStreamer, Streamer};
 
 pub use self::build::Builder;
 pub use self::error::Error;
-pub use self::node::{Node, Transitions};
-#[cfg(feature = "mmap")] pub use self::mmap::MmapReadOnly;
+#[cfg(feature = "mmap")]
+pub use self::mmap::MmapReadOnly;
 use self::node::node_new;
+pub use self::node::{Node, Transitions};
 pub use self::ops::{
-    IndexedValue, OpBuilder,
-    Intersection, Union, Difference, SymmetricDifference,
+    Difference, IndexedValue, Intersection, OpBuilder, SymmetricDifference,
+    Union,
 };
 
 mod build;
 mod common_inputs;
 mod counting_writer;
 mod error;
-#[cfg(feature = "mmap")] mod mmap;
+#[cfg(feature = "mmap")]
+mod mmap;
 mod node;
 mod ops;
 mod pack;
 mod registry;
 mod registry_minimal;
-#[cfg(test)] mod tests;
+#[cfg(test)]
+mod tests;
 
 /// The API version of this crate.
 ///
@@ -357,10 +360,9 @@ impl Fst {
         // N bytes (no unexpected EOF).
         let version = (&*data).read_u64::<LittleEndian>().unwrap();
         if version == 0 || version > VERSION {
-            return Err(Error::Version {
-                expected: VERSION,
-                got: version,
-            }.into());
+            return Err(
+                Error::Version { expected: VERSION, got: version }.into()
+            );
         }
         let ty = (&data[8..]).read_u64::<LittleEndian>().unwrap();
         let root_addr = {
@@ -392,7 +394,8 @@ impl Fst {
         //
         // This is essentially our own little checksum.
         if (root_addr == EMPTY_ADDRESS && data.len() != 32)
-            && root_addr + 17 != data.len() {
+            && root_addr + 17 != data.len()
+        {
             return Err(Error::Format.into());
         }
         Ok(Fst {
@@ -496,8 +499,10 @@ impl Fst {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+        S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+    {
         self.op().add(stream).intersection().next().is_none()
     }
 
@@ -507,8 +512,10 @@ impl Fst {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+        S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+    {
         let mut op = self.op().add(stream).intersection();
         let mut count = 0;
         while let Some(_) = op.next() {
@@ -523,8 +530,10 @@ impl Fst {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+        S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+    {
         let mut op = self.op().add(stream).union();
         let mut count = 0;
         while let Some(_) = op.next() {
@@ -603,7 +612,7 @@ impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
-pub struct StreamBuilder<'f, A=AlwaysMatch> {
+pub struct StreamBuilder<'f, A = AlwaysMatch> {
     fst: &'f Fst,
     aut: A,
     min: Bound,
@@ -692,7 +701,10 @@ impl Bound {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
-pub struct Stream<'f, A=AlwaysMatch> where A: Automaton {
+pub struct Stream<'f, A = AlwaysMatch>
+where
+    A: Automaton,
+{
     fst: &'f Fst,
     aut: A,
     inp: Vec<u8>,
@@ -744,12 +756,8 @@ impl<'f, A: Automaton> Stream<'f, A> {
             return;
         }
         let (key, inclusive) = match min {
-            Bound::Excluded(ref min) => {
-                (min, false)
-            }
-            Bound::Included(ref min) => {
-                (min, true)
-            }
+            Bound::Excluded(ref min) => (min, false),
+            Bound::Included(ref min) => (min, true),
             Bound::Unbounded => unreachable!(),
         };
         // At this point, we need to find the starting location of `min` in
@@ -770,7 +778,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
                     self.inp.push(b);
                     self.stack.push(StreamState {
                         node: node,
-                        trans: i+1,
+                        trans: i + 1,
                         out: out,
                         aut_state: prev_state,
                     });
@@ -785,9 +793,10 @@ impl<'f, A: Automaton> Stream<'f, A> {
                     // input byte.
                     self.stack.push(StreamState {
                         node: node,
-                        trans: node.transitions()
-                                   .position(|t| t.inp > b)
-                                   .unwrap_or(node.len()),
+                        trans: node
+                            .transitions()
+                            .position(|t| t.inp > b)
+                            .unwrap_or(node.len()),
                         out: out,
                         aut_state: aut_state,
                     });
@@ -890,7 +899,8 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
         }
         while let Some(state) = self.stack.pop() {
             if state.trans >= state.node.len()
-                    || !self.aut.can_match(&state.aut_state) {
+                || !self.aut.can_match(&state.aut_state)
+            {
                 if state.node.addr() != self.fst.root_addr {
                     self.inp.pop().unwrap();
                 }
@@ -902,9 +912,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             let is_match = self.aut.is_match(&next_state);
             let next_node = self.fst.node(trans.addr);
             self.inp.push(trans.inp);
-            self.stack.push(StreamState {
-                trans: state.trans + 1, .. state
-            });
+            self.stack.push(StreamState { trans: state.trans + 1, ..state });
             self.stack.push(StreamState {
                 node: next_node,
                 trans: 0,
@@ -982,8 +990,11 @@ impl Output {
     /// This function panics if `self > o`.
     #[inline]
     pub fn sub(self, o: Output) -> Output {
-        Output(self.0.checked_sub(o.0)
-                     .expect("BUG: underflow subtraction not allowed"))
+        Output(
+            self.0
+                .checked_sub(o.0)
+                .expect("BUG: underflow subtraction not allowed"),
+        )
     }
 }
 
@@ -1027,11 +1038,7 @@ pub struct Transition {
 impl Default for Transition {
     #[inline]
     fn default() -> Self {
-        Transition {
-            inp: 0,
-            out: Output::zero(),
-            addr: NONE_ADDRESS,
-        }
+        Transition { inp: 0, out: Output::zero(), addr: NONE_ADDRESS }
     }
 }
 
@@ -1040,8 +1047,13 @@ impl fmt::Debug for Transition {
         if self.out.is_zero() {
             write!(f, "{} -> {}", self.inp as char, self.addr)
         } else {
-            write!(f, "({}, {}) -> {}",
-                   self.inp as char, self.out.value(), self.addr)
+            write!(
+                f,
+                "({}, {}) -> {}",
+                self.inp as char,
+                self.out.value(),
+                self.addr
+            )
         }
     }
 }
@@ -1056,11 +1068,14 @@ fn u64_to_usize(n: u64) -> usize {
 #[cfg(not(target_pointer_width = "64"))]
 fn u64_to_usize(n: u64) -> usize {
     if n > ::std::usize::MAX as u64 {
-        panic!("\
+        panic!(
+            "\
 Cannot convert node address {} to a pointer sized variable. If this FST
 is very large and was generated on a system with a larger pointer size
 than this system, then it is not possible to read this FST on this
-system.", n);
+system.",
+            n
+        );
     }
     n as usize
 }

@@ -1,15 +1,15 @@
 use std::io::{self, Write};
 
-use byteorder::{WriteBytesExt, LittleEndian};
+use byteorder::{LittleEndian, WriteBytesExt};
 
 use error::Result;
-use raw::{
-    VERSION, EMPTY_ADDRESS, NONE_ADDRESS,
-    CompiledAddr, FstType, Output, Transition,
-};
 use raw::counting_writer::CountingWriter;
 use raw::error::Error;
 use raw::registry::{Registry, RegistryEntry};
+use raw::{
+    CompiledAddr, FstType, Output, Transition, EMPTY_ADDRESS, NONE_ADDRESS,
+    VERSION,
+};
 // use raw::registry_minimal::{Registry, RegistryEntry};
 use stream::{IntoStreamer, Streamer};
 
@@ -134,7 +134,9 @@ impl<W: io::Write> Builder<W> {
 
     /// Adds a byte string to this FST with a zero output value.
     pub fn add<B>(&mut self, bs: B) -> Result<()>
-            where B: AsRef<[u8]> {
+    where
+        B: AsRef<[u8]>,
+    {
         self.check_last_key(bs.as_ref(), false)?;
         self.insert_output(bs, None)
     }
@@ -149,7 +151,9 @@ impl<W: io::Write> Builder<W> {
     /// added, then an error is returned. Similarly, if there was a problem
     /// writing to the underlying writer, an error is returned.
     pub fn insert<B>(&mut self, bs: B, val: u64) -> Result<()>
-            where B: AsRef<[u8]> {
+    where
+        B: AsRef<[u8]>,
+    {
         self.check_last_key(bs.as_ref(), true)?;
         self.insert_output(bs, Some(Output::new(val)))
     }
@@ -163,7 +167,10 @@ impl<W: io::Write> Builder<W> {
     /// added, then an error is returned. Similarly, if there was a problem
     /// writing to the underlying writer, an error is returned.
     pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
-            where T: AsRef<[u8]>, I: IntoIterator<Item=(T, Output)> {
+    where
+        T: AsRef<[u8]>,
+        I: IntoIterator<Item = (T, Output)>,
+    {
         for (key, out) in iter {
             self.insert(key, out.value())?;
         }
@@ -179,8 +186,10 @@ impl<W: io::Write> Builder<W> {
     /// added, then an error is returned. Similarly, if there was a problem
     /// writing to the underlying writer, an error is returned.
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-                  S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+        S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+    {
         let mut stream = stream.into_stream();
         while let Some((key, out)) = stream.next() {
             self.insert(key, out.value())?;
@@ -209,7 +218,9 @@ impl<W: io::Write> Builder<W> {
     }
 
     fn insert_output<B>(&mut self, bs: B, out: Option<Output>) -> Result<()>
-            where B: AsRef<[u8]> {
+    where
+        B: AsRef<[u8]>,
+    {
         let bs = bs.as_ref();
         if bs.is_empty() {
             self.len = 1; // must be first key, so length is always 1
@@ -240,12 +251,11 @@ impl<W: io::Write> Builder<W> {
     fn compile_from(&mut self, istate: usize) -> Result<()> {
         let mut addr = NONE_ADDRESS;
         while istate + 1 < self.unfinished.len() {
-            let node =
-                if addr == NONE_ADDRESS {
-                    self.unfinished.pop_empty()
-                } else {
-                    self.unfinished.pop_freeze(addr)
-                };
+            let node = if addr == NONE_ADDRESS {
+                self.unfinished.pop_empty()
+            } else {
+                self.unfinished.pop_freeze(addr)
+            };
             addr = self.compile(&node)?;
             assert!(addr != NONE_ADDRESS);
         }
@@ -256,7 +266,8 @@ impl<W: io::Write> Builder<W> {
     fn compile(&mut self, node: &BuilderNode) -> Result<CompiledAddr> {
         if node.is_final
             && node.trans.is_empty()
-            && node.final_output.is_zero() {
+            && node.final_output.is_zero()
+        {
             return Ok(EMPTY_ADDRESS);
         }
         let entry = self.registry.entry(&node);
@@ -281,7 +292,8 @@ impl<W: io::Write> Builder<W> {
                 return Err(Error::OutOfOrder {
                     previous: last.to_vec(),
                     got: bs.to_vec(),
-                }.into());
+                }
+                .into());
             }
             last.clear();
             for &b in bs {
@@ -367,13 +379,12 @@ impl UnfinishedNodes {
     }
 
     fn find_common_prefix(&mut self, bs: &[u8]) -> usize {
-        bs
-        .iter()
-        .zip(&self.stack)
-        .take_while(|&(&b, ref node)| {
-            node.last.as_ref().map(|t| t.inp == b).unwrap_or(false)
-        })
-        .count()
+        bs.iter()
+            .zip(&self.stack)
+            .take_while(|&(&b, ref node)| {
+                node.last.as_ref().map(|t| t.inp == b).unwrap_or(false)
+            })
+            .count()
     }
 
     fn find_common_prefix_and_set_output(

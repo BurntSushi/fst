@@ -63,25 +63,42 @@ impl fmt::Display for Error {
         use self::Error::*;
         match *self {
             FromUtf8(ref err) => err.fmt(f),
-            Version { expected, got } => {
-                write!(f, "\
+            Version { expected, got } => write!(
+                f,
+                "\
 Error opening FST: expected API version {}, got API version {}.
 It looks like the FST you're trying to open is either not an FST file or it
 was generated with a different version of the 'fst' crate. You'll either need
 to change the version of the 'fst' crate you're using, or re-generate the
-FST.", expected, got)
-            }
-            Format => write!(f, "\
+FST.",
+                expected, got
+            ),
+            Format => write!(
+                f,
+                "\
 Error opening FST: An unknown error occurred. This usually means you're trying
-to read data that isn't actually an encoded FST."),
-            DuplicateKey { ref got } => write!(f, "\
-Error inserting duplicate key: {}.", format_bytes(&*got)),
-            OutOfOrder { ref previous, ref got } => write!(f, "\
+to read data that isn't actually an encoded FST."
+            ),
+            DuplicateKey { ref got } => write!(
+                f,
+                "\
+Error inserting duplicate key: {}.",
+                format_bytes(&*got)
+            ),
+            OutOfOrder { ref previous, ref got } => write!(
+                f,
+                "\
 Error inserting out-of-order key: {}. (Previous key was {}.) Keys must be
 inserted in lexicographic order.",
-format_bytes(&*got), format_bytes(&*previous)),
-            WrongType { expected, got } => write!(f, "\
-Error opening FST: expected type {}, got type {}.", expected, got),
+                format_bytes(&*got),
+                format_bytes(&*previous)
+            ),
+            WrongType { expected, got } => write!(
+                f,
+                "\
+Error opening FST: expected type {}, got type {}.",
+                expected, got
+            ),
         }
     }
 }

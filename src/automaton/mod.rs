@@ -66,31 +66,37 @@ pub trait Automaton {
 
     /// Returns an automaton that matches the strings that start with something
     /// this automaton matches.
-    fn starts_with(self) -> StartsWith<Self> where Self: Sized {
+    fn starts_with(self) -> StartsWith<Self>
+    where
+        Self: Sized,
+    {
         StartsWith(self)
     }
 
     /// Returns an automaton that matches the strings matched by either this or
     /// the other automaton.
-    fn union<Rhs: Automaton>(
-        self,
-        rhs: Rhs,
-    ) -> Union<Self, Rhs> where Self: Sized {
+    fn union<Rhs: Automaton>(self, rhs: Rhs) -> Union<Self, Rhs>
+    where
+        Self: Sized,
+    {
         Union(self, rhs)
     }
 
     /// Returns an automaton that matches the strings matched by both this and
     /// the other automaton.
-    fn intersection<Rhs: Automaton>(
-        self,
-        rhs: Rhs,
-    ) -> Intersection<Self, Rhs> where Self: Sized {
+    fn intersection<Rhs: Automaton>(self, rhs: Rhs) -> Intersection<Self, Rhs>
+    where
+        Self: Sized,
+    {
         Intersection(self, rhs)
     }
 
     /// Returns an automaton that matches the strings not matched by this
     /// automaton.
-    fn complement(self) -> Complement<Self> where Self: Sized {
+    fn complement(self) -> Complement<Self>
+    where
+        Self: Sized,
+    {
         Complement(self)
     }
 }
@@ -150,7 +156,7 @@ impl<'a, T: Automaton> Automaton for &'a T {
 /// ```
 #[derive(Clone, Debug)]
 pub struct Str<'a> {
-    string: &'a [u8]
+    string: &'a [u8],
 }
 
 impl<'a> Str<'a> {
@@ -165,7 +171,9 @@ impl<'a> Automaton for Str<'a> {
     type State = Option<usize>;
 
     #[inline]
-    fn start(&self) -> Option<usize> { Some(0) }
+    fn start(&self) -> Option<usize> {
+        Some(0)
+    }
 
     #[inline]
     fn is_match(&self, pos: &Option<usize>) -> bool {
@@ -222,7 +230,7 @@ impl<'a> Automaton for Str<'a> {
 /// ```
 #[derive(Clone, Debug)]
 pub struct Subsequence<'a> {
-    subseq: &'a [u8]
+    subseq: &'a [u8],
 }
 
 impl<'a> Subsequence<'a> {
@@ -238,7 +246,9 @@ impl<'a> Automaton for Subsequence<'a> {
     type State = usize;
 
     #[inline]
-    fn start(&self) -> usize { 0 }
+    fn start(&self) -> usize {
+        0
+    }
 
     #[inline]
     fn is_match(&self, &state: &usize) -> bool {
@@ -246,7 +256,9 @@ impl<'a> Automaton for Subsequence<'a> {
     }
 
     #[inline]
-    fn can_match(&self, _: &usize) -> bool { true }
+    fn can_match(&self, _: &usize) -> bool {
+        true
+    }
 
     #[inline]
     fn will_always_match(&self, &state: &usize) -> bool {
@@ -255,7 +267,9 @@ impl<'a> Automaton for Subsequence<'a> {
 
     #[inline]
     fn accept(&self, &state: &usize, byte: u8) -> usize {
-        if state == self.subseq.len() { return state; }
+        if state == self.subseq.len() {
+            return state;
+        }
         state + (byte == self.subseq[state]) as usize
     }
 }
@@ -270,11 +284,26 @@ pub struct AlwaysMatch;
 impl Automaton for AlwaysMatch {
     type State = ();
 
-    #[inline] fn start(&self) -> () { () }
-    #[inline] fn is_match(&self, _: &()) -> bool { true }
-    #[inline] fn can_match(&self, _: &()) -> bool { true }
-    #[inline] fn will_always_match(&self, _: &()) -> bool { true }
-    #[inline] fn accept(&self, _: &(), _: u8) -> () { () }
+    #[inline]
+    fn start(&self) -> () {
+        ()
+    }
+    #[inline]
+    fn is_match(&self, _: &()) -> bool {
+        true
+    }
+    #[inline]
+    fn can_match(&self, _: &()) -> bool {
+        true
+    }
+    #[inline]
+    fn will_always_match(&self, _: &()) -> bool {
+        true
+    }
+    #[inline]
+    fn accept(&self, _: &(), _: u8) -> () {
+        ()
+    }
 }
 
 /// An automaton that matches a string that begins with something that the
@@ -287,7 +316,7 @@ pub struct StartsWithState<A: Automaton>(StartsWithStateInternal<A>);
 
 enum StartsWithStateInternal<A: Automaton> {
     Done,
-    Running(A::State)
+    Running(A::State),
 }
 
 impl<A: Automaton> Automaton for StartsWith<A> {
@@ -307,21 +336,21 @@ impl<A: Automaton> Automaton for StartsWith<A> {
     fn is_match(&self, state: &StartsWithState<A>) -> bool {
         match state.0 {
             Done => true,
-            Running(_) => false
+            Running(_) => false,
         }
     }
 
     fn can_match(&self, state: &StartsWithState<A>) -> bool {
         match state.0 {
             Done => true,
-            Running(ref inner) => self.0.can_match(inner)
+            Running(ref inner) => self.0.can_match(inner),
         }
     }
 
     fn will_always_match(&self, state: &StartsWithState<A>) -> bool {
         match state.0 {
             Done => true,
-            Running(_) => false
+            Running(_) => false,
         }
     }
 
@@ -330,19 +359,17 @@ impl<A: Automaton> Automaton for StartsWith<A> {
         state: &StartsWithState<A>,
         byte: u8,
     ) -> StartsWithState<A> {
-        StartsWithState(
-            match state.0 {
-                Done => Done,
-                Running(ref inner) => {
-                    let next_inner = self.0.accept(inner, byte);
-                    if self.0.is_match(&next_inner) {
-                        Done
-                    } else {
-                        Running(next_inner)
-                    }
+        StartsWithState(match state.0 {
+            Done => Done,
+            Running(ref inner) => {
+                let next_inner = self.0.accept(inner, byte);
+                if self.0.is_match(&next_inner) {
+                    Done
+                } else {
+                    Running(next_inner)
                 }
             }
-        )
+        })
     }
 }
 
@@ -357,10 +384,7 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
     type State = UnionState<A, B>;
 
     fn start(&self) -> UnionState<A, B> {
-        UnionState(
-            self.0.start(),
-            self.1.start()
-        )
+        UnionState(self.0.start(), self.1.start())
     }
 
     fn is_match(&self, state: &UnionState<A, B>) -> bool {
@@ -373,13 +397,13 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
 
     fn will_always_match(&self, state: &UnionState<A, B>) -> bool {
         self.0.will_always_match(&state.0)
-        || self.1.will_always_match(&state.1)
+            || self.1.will_always_match(&state.1)
     }
 
     fn accept(&self, state: &UnionState<A, B>, byte: u8) -> UnionState<A, B> {
         UnionState(
             self.0.accept(&state.0, byte),
-            self.1.accept(&state.1, byte)
+            self.1.accept(&state.1, byte),
         )
     }
 }
@@ -395,10 +419,7 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
     type State = IntersectionState<A, B>;
 
     fn start(&self) -> IntersectionState<A, B> {
-        IntersectionState(
-            self.0.start(),
-            self.1.start()
-        )
+        IntersectionState(self.0.start(), self.1.start())
     }
 
     fn is_match(&self, state: &IntersectionState<A, B>) -> bool {
@@ -410,7 +431,8 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
     }
 
     fn will_always_match(&self, state: &IntersectionState<A, B>) -> bool {
-        self.0.will_always_match(&state.0) && self.1.will_always_match(&state.1)
+        self.0.will_always_match(&state.0)
+            && self.1.will_always_match(&state.1)
     }
 
     fn accept(
@@ -420,7 +442,7 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
     ) -> IntersectionState<A, B> {
         IntersectionState(
             self.0.accept(&state.0, byte),
-            self.1.accept(&state.1, byte)
+            self.1.accept(&state.1, byte),
         )
     }
 }

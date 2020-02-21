@@ -31,11 +31,7 @@ impl MmapReadOnly {
     pub unsafe fn open(file: &fs::File) -> io::Result<MmapReadOnly> {
         let mmap = Mmap::map(file)?;
         let len = mmap.len();
-        Ok(MmapReadOnly {
-            map: Arc::new(mmap),
-            offset: 0,
-            len: len,
-        })
+        Ok(MmapReadOnly { map: Arc::new(mmap), offset: 0, len: len })
     }
 
     /// Open a new memory map from the path given.
@@ -82,7 +78,7 @@ impl MmapReadOnly {
 impl Clone for MmapReadOnly {
     #[inline]
     fn clone(&self) -> MmapReadOnly {
-        MmapReadOnly{
+        MmapReadOnly {
             map: self.map.clone(),
             offset: self.offset,
             len: self.len,

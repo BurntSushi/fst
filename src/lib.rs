@@ -306,11 +306,16 @@ will be returned if the automaton gets too big (tens of MB in heap usage).
 #![deny(missing_docs)]
 
 extern crate byteorder;
-#[cfg(test)] extern crate fst_levenshtein;
-#[cfg(test)] extern crate fst_regex;
-#[cfg(feature = "mmap")] extern crate memmap;
-#[cfg(test)] extern crate quickcheck;
-#[cfg(test)] extern crate rand;
+#[cfg(test)]
+extern crate fst_levenshtein;
+#[cfg(test)]
+extern crate fst_regex;
+#[cfg(feature = "mmap")]
+extern crate memmap;
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)]
+extern crate rand;
 
 pub use automaton::Automaton;
 pub use error::{Error, Result};
@@ -318,14 +323,14 @@ pub use map::{Map, MapBuilder};
 pub use set::{Set, SetBuilder};
 pub use stream::{IntoStreamer, Streamer};
 
+mod error;
 #[path = "automaton/mod.rs"]
 mod inner_automaton;
-mod error;
 #[path = "map.rs"]
 mod inner_map;
-pub mod raw;
 #[path = "set.rs"]
 mod inner_set;
+pub mod raw;
 mod stream;
 
 /// Automaton implementations for finite state transducers.

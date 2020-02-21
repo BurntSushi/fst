@@ -1,11 +1,11 @@
-use raw::{NONE_ADDRESS, CompiledAddr};
 use raw::build::BuilderNode;
+use raw::{CompiledAddr, NONE_ADDRESS};
 
 #[derive(Debug)]
 pub struct Registry {
     table: Vec<RegistryCell>,
     table_size: usize, // number of rows
-    mru_size: usize, // number of columns
+    mru_size: usize,   // number of columns
 }
 
 #[derive(Debug)]
@@ -94,7 +94,7 @@ impl<'a> RegistryCache<'a> {
     fn promote(&mut self, mut i: usize) {
         assert!(i < self.cells.len());
         while i > 0 {
-            self.cells.swap(i-1, i);
+            self.cells.swap(i - 1, i);
             i -= 1;
         }
     }
@@ -102,10 +102,7 @@ impl<'a> RegistryCache<'a> {
 
 impl RegistryCell {
     fn none() -> RegistryCell {
-        RegistryCell {
-            addr: NONE_ADDRESS,
-            node: BuilderNode::default(),
-        }
+        RegistryCell { addr: NONE_ADDRESS, node: BuilderNode::default() }
     }
 
     fn is_none(&self) -> bool {
@@ -119,11 +116,9 @@ impl RegistryCell {
 
 #[cfg(test)]
 mod tests {
-    use raw::{Output, Transition};
+    use super::{Registry, RegistryCache, RegistryCell, RegistryEntry};
     use raw::build::BuilderNode;
-    use super::{
-        Registry, RegistryCell, RegistryEntry, RegistryCache,
-    };
+    use raw::{Output, Transition};
 
     fn assert_rejected(entry: RegistryEntry) {
         match entry {
@@ -179,23 +174,30 @@ mod tests {
             is_final: false,
             final_output: Output::zero(),
             trans: vec![Transition {
-                addr: 0, inp: b'a', out: Output::zero(),
+                addr: 0,
+                inp: b'a',
+                out: Output::zero(),
             }],
         };
         assert_insert_and_found(&mut reg, &bnode);
         assert_not_found(
-            reg.entry(&BuilderNode { is_final: true, .. bnode.clone() }));
+            reg.entry(&BuilderNode { is_final: true, ..bnode.clone() }),
+        );
         assert_not_found(reg.entry(&BuilderNode {
             trans: vec![Transition {
-                addr: 0, inp: b'b', out: Output::zero(),
+                addr: 0,
+                inp: b'b',
+                out: Output::zero(),
             }],
-            .. bnode.clone()
+            ..bnode.clone()
         }));
         assert_not_found(reg.entry(&BuilderNode {
             trans: vec![Transition {
-                addr: 0, inp: b'a', out: Output::new(1),
+                addr: 0,
+                inp: b'a',
+                out: Output::new(1),
             }],
-            .. bnode.clone()
+            ..bnode.clone()
         }));
     }
 
@@ -206,9 +208,8 @@ mod tests {
         let bnode1 = BuilderNode { is_final: true, ..BuilderNode::default() };
         assert_insert_and_found(&mut reg, &bnode1);
 
-        let bnode2 = BuilderNode {
-            final_output: Output::new(1), ..bnode1.clone()
-        };
+        let bnode2 =
+            BuilderNode { final_output: Output::new(1), ..bnode1.clone() };
         assert_insert_and_found(&mut reg, &bnode2);
         assert_not_found(reg.entry(&bnode1));
     }

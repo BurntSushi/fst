@@ -2,13 +2,16 @@ use std::sync::Arc;
 
 use automaton::AlwaysMatch;
 use error::Error;
-use raw::{self, VERSION, Builder, Bound, Fst, Stream, Output};
+use raw::{self, Bound, Builder, Fst, Output, Stream, VERSION};
 use stream::Streamer;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
 pub fn fst_set<I, S>(ss: I) -> Fst
-        where I: IntoIterator<Item=S>, S: AsRef<[u8]> {
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<[u8]>,
+{
     let mut bfst = Builder::memory();
     let mut ss: Vec<Vec<u8>> =
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
@@ -23,7 +26,10 @@ pub fn fst_set<I, S>(ss: I) -> Fst
 }
 
 pub fn fst_map<I, S>(ss: I) -> Fst
-        where I: IntoIterator<Item=(S, u64)>, S: AsRef<[u8]> {
+where
+    I: IntoIterator<Item = (S, u64)>,
+    S: AsRef<[u8]>,
+{
     let mut bfst = Builder::memory();
     let mut ss: Vec<(Vec<u8>, u64)> =
         ss.into_iter().map(|(s, o)| (s.as_ref().to_vec(), o)).collect();
@@ -98,15 +104,16 @@ test_set_fail!(fst_set_order2, "a", "b", "c", "a");
 
 #[test]
 fn fst_set_100000() {
-    let words: Vec<Vec<u8>> = TEXT.lines()
-                                  .map(|s| s.as_bytes().to_vec())
-                                  .collect();
+    let words: Vec<Vec<u8>> =
+        TEXT.lines().map(|s| s.as_bytes().to_vec()).collect();
     let fst = fst_set(words.clone());
     assert_eq!(words, fst_inputs(&fst));
     for word in &words {
-        assert!(fst.get(word).is_some(),
-                "failed to find word: {}",
-                ::std::str::from_utf8(word).unwrap());
+        assert!(
+            fst.get(word).is_some(),
+            "failed to find word: {}",
+            ::std::str::from_utf8(word).unwrap()
+        );
     }
 }
 
@@ -149,8 +156,18 @@ test_map!(fst_map_two, "a", 1, "b", 2);
 test_map!(fst_map_many1, "a", 34786, "ab", 26);
 test_map!(
     fst_map_many2,
-    "a", 34786, "ab", 26, "abc", 58976, "abcd", 25,
-    "z", 58, "zabc", 6798
+    "a",
+    34786,
+    "ab",
+    26,
+    "abc",
+    58976,
+    "abcd",
+    25,
+    "z",
+    58,
+    "zabc",
+    6798
 );
 test_map!(fst_map_many3, "a", 1, "ab", 0, "abc", 0);
 
@@ -162,11 +179,11 @@ test_map_fail!(fst_map_order2, "a", 0, "b", 0, "c", 0, "a", 0);
 
 #[test]
 fn fst_map_100000_increments() {
-    let words: Vec<(Vec<u8>, u64)> =
-        TEXT.lines()
-            .enumerate()
-            .map(|(i, s)| (s.as_bytes().to_vec(), i as u64))
-            .collect();
+    let words: Vec<(Vec<u8>, u64)> = TEXT
+        .lines()
+        .enumerate()
+        .map(|(i, s)| (s.as_bytes().to_vec(), i as u64))
+        .collect();
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
     for &(ref word, out) in &words {
@@ -176,10 +193,10 @@ fn fst_map_100000_increments() {
 
 #[test]
 fn fst_map_100000_lengths() {
-    let words: Vec<(Vec<u8>, u64)> =
-        TEXT.lines()
-            .map(|s| (s.as_bytes().to_vec(), s.len() as u64))
-            .collect();
+    let words: Vec<(Vec<u8>, u64)> = TEXT
+        .lines()
+        .map(|s| (s.as_bytes().to_vec(), s.len() as u64))
+        .collect();
     let fst = fst_map(words.clone());
     assert_eq!(words, fst_inputs_outputs(&fst));
     for &(ref word, out) in &words {
@@ -477,7 +494,11 @@ fn one_vec_multiple_fsts() {
 
     let fst1 = Fst::from_shared_bytes(bytes.clone(), 0, fst1_len).unwrap();
     let fst2 = Fst::from_shared_bytes(
-        bytes.clone(), fst1_len, bytes.len() - fst1_len).unwrap();
+        bytes.clone(),
+        fst1_len,
+        bytes.len() - fst1_len,
+    )
+    .unwrap();
 
     assert_eq!(fst_inputs(&fst1), vec![b"bar".to_vec(), b"baz".to_vec()]);
     assert_eq!(fst_inputs(&fst2), vec![b"bar".to_vec(), b"foo".to_vec()]);

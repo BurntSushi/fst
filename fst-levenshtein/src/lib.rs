@@ -2,8 +2,8 @@ extern crate fst;
 extern crate utf8_ranges;
 
 use std::cmp;
-use std::collections::{HashMap, HashSet};
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use utf8_ranges::{Utf8Range, Utf8Sequences};
@@ -96,17 +96,17 @@ impl Levenshtein {
             dist: distance as usize,
         };
         let dfa = DfaBuilder::new(lev.clone()).build()?;
-        Ok(Levenshtein {
-            prog: lev,
-            dfa: dfa,
-        })
+        Ok(Levenshtein { prog: lev, dfa: dfa })
     }
 }
 
 impl fmt::Debug for Levenshtein {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Levenshtein(query: {:?}, distance: {:?})",
-               self.prog.query, self.prog.dist)
+        write!(
+            f,
+            "Levenshtein(query: {:?}, distance: {:?})",
+            self.prog.query, self.prog.dist
+        )
     }
 }
 
@@ -118,7 +118,7 @@ struct DynamicLevenshtein {
 
 impl DynamicLevenshtein {
     fn start(&self) -> Vec<usize> {
-        (0..self.query.chars().count()+1).collect()
+        (0..self.query.chars().count() + 1).collect()
     }
 
     fn is_match(&self, state: &[usize]) -> bool {
@@ -130,10 +130,13 @@ impl DynamicLevenshtein {
     }
 
     fn accept(&self, state: &[usize], chr: Option<char>) -> Vec<usize> {
-        let mut next = vec![state[0]+1];
+        let mut next = vec![state[0] + 1];
         for (i, c) in self.query.chars().enumerate() {
             let cost = if Some(c) == chr { 0 } else { 1 };
-            let v = cmp::min(cmp::min(next[i]+1, state[i+1]+1), state[i]+cost);
+            let v = cmp::min(
+                cmp::min(next[i] + 1, state[i + 1] + 1),
+                state[i] + cost,
+            );
             next.push(cmp::min(v, self.dist + 1));
         }
         next
@@ -144,7 +147,9 @@ impl Automaton for Levenshtein {
     type State = Option<usize>;
 
     #[inline]
-    fn start(&self) -> Option<usize> { Some(0) }
+    fn start(&self) -> Option<usize> {
+        Some(0)
+    }
 
     #[inline]
     fn is_match(&self, state: &Option<usize>) -> bool {
@@ -194,9 +199,7 @@ struct DfaBuilder {
 impl DfaBuilder {
     fn new(lev: DynamicLevenshtein) -> Self {
         DfaBuilder {
-            dfa: Dfa {
-                states: Vec::with_capacity(16),
-            },
+            dfa: Dfa { states: Vec::with_capacity(16) },
             lev: lev,
             cache: HashMap::with_capacity(1024),
         }
@@ -248,10 +251,9 @@ impl DfaBuilder {
             Entry::Occupied(v) => (*v.get(), true),
             Entry::Vacant(v) => {
                 let is_match = self.lev.is_match(lev_state);
-                self.dfa.states.push(State {
-                    next: [None; 256],
-                    is_match: is_match,
-                });
+                self.dfa
+                    .states
+                    .push(State { next: [None; 256], is_match: is_match });
                 (*v.insert(self.dfa.states.len() - 1), false)
             }
         })
@@ -283,13 +285,17 @@ impl DfaBuilder {
     ) {
         for seq in Utf8Sequences::new(from_chr, to_chr) {
             let mut fsi = from_si;
-            for range in &seq.as_slice()[0..seq.len()-1] {
+            for range in &seq.as_slice()[0..seq.len() - 1] {
                 let tsi = self.new_state(false);
                 self.add_utf8_range(overwrite, fsi, tsi, range);
                 fsi = tsi;
             }
             self.add_utf8_range(
-                overwrite, fsi, to_si, &seq.as_slice()[seq.len()-1]);
+                overwrite,
+                fsi,
+                to_si,
+                &seq.as_slice()[seq.len() - 1],
+            );
         }
     }
 
@@ -308,10 +314,7 @@ impl DfaBuilder {
     }
 
     fn new_state(&mut self, is_match: bool) -> usize {
-        self.dfa.states.push(State {
-            next: [None; 256],
-            is_match: is_match,
-        });
+        self.dfa.states.push(State { next: [None; 256], is_match: is_match });
         self.dfa.states.len() - 1
     }
 }

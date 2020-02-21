@@ -1,10 +1,10 @@
 use std::fmt;
-use std::iter::{self, FromIterator};
 use std::io;
+use std::iter::{self, FromIterator};
 #[cfg(feature = "mmap")]
 use std::path::Path;
 
-use automaton::{Automaton, AlwaysMatch};
+use automaton::{AlwaysMatch, Automaton};
 use raw;
 use stream::{IntoStreamer, Streamer};
 use Result;
@@ -93,7 +93,10 @@ impl Set {
     /// To build a set that streams to an arbitrary `io::Write`, use
     /// `SetBuilder`.
     pub fn from_iter<T, I>(iter: I) -> Result<Self>
-            where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
+    where
+        T: AsRef<[u8]>,
+        I: IntoIterator<Item = T>,
+    {
         let mut builder = SetBuilder::memory();
         builder.extend_iter(iter)?;
         Set::from_bytes(builder.into_inner()?)
@@ -281,8 +284,10 @@ impl Set {
     /// assert_eq!(set1.is_disjoint(&set3), false);
     /// ```
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+        S: 'f + for<'a> Streamer<'a, Item = &'a [u8]>,
+    {
         self.0.is_disjoint(StreamZeroOutput(stream.into_stream()))
     }
 
@@ -306,8 +311,10 @@ impl Set {
     /// assert_eq!(set3.is_subset(&set1), true);
     /// ```
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+        S: 'f + for<'a> Streamer<'a, Item = &'a [u8]>,
+    {
         self.0.is_subset(StreamZeroOutput(stream.into_stream()))
     }
 
@@ -331,8 +338,10 @@ impl Set {
     /// assert_eq!(set3.is_superset(&set1), false);
     /// ```
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+        S: 'f + for<'a> Streamer<'a, Item = &'a [u8]>,
+    {
         self.0.is_superset(StreamZeroOutput(stream.into_stream()))
     }
 
@@ -515,7 +524,10 @@ impl<W: io::Write> SetBuilder<W> {
     /// If an error occurred while adding an element, processing is stopped
     /// and the error is returned.
     pub fn extend_iter<T, I>(&mut self, iter: I) -> Result<()>
-            where T: AsRef<[u8]>, I: IntoIterator<Item=T> {
+    where
+        T: AsRef<[u8]>,
+        I: IntoIterator<Item = T>,
+    {
         for key in iter {
             self.0.add(key)?;
         }
@@ -527,8 +539,10 @@ impl<W: io::Write> SetBuilder<W> {
     /// Note that unlike `extend_iter`, this is not generic on the items in
     /// the stream.
     pub fn extend_stream<'f, I, S>(&mut self, stream: I) -> Result<()>
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+        S: 'f + for<'a> Streamer<'a, Item = &'a [u8]>,
+    {
         self.0.extend_stream(StreamZeroOutput(stream.into_stream()))
     }
 
@@ -554,7 +568,6 @@ impl<W: io::Write> SetBuilder<W> {
     pub fn bytes_written(&self) -> u64 {
         self.0.bytes_written()
     }
-
 }
 
 /// A lexicographically ordered stream of keys from a set.
@@ -563,7 +576,9 @@ impl<W: io::Write> SetBuilder<W> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
-pub struct Stream<'s, A=AlwaysMatch>(raw::Stream<'s, A>) where A: Automaton;
+pub struct Stream<'s, A = AlwaysMatch>(raw::Stream<'s, A>)
+where
+    A: Automaton;
 
 impl<'s, A: Automaton> Stream<'s, A> {
     /// Creates a new set stream from an fst stream.
@@ -612,7 +627,7 @@ impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
-pub struct StreamBuilder<'s, A=AlwaysMatch>(raw::StreamBuilder<'s, A>);
+pub struct StreamBuilder<'s, A = AlwaysMatch>(raw::StreamBuilder<'s, A>);
 
 impl<'s, A: Automaton> StreamBuilder<'s, A> {
     /// Specify a greater-than-or-equal-to bound.
@@ -676,8 +691,10 @@ impl<'s> OpBuilder<'s> {
     /// The stream must emit a lexicographically ordered sequence of byte
     /// strings.
     pub fn add<I, S>(mut self, streamable: I) -> Self
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 's + for<'a> Streamer<'a, Item=&'a [u8]> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+        S: 's + for<'a> Streamer<'a, Item = &'a [u8]>,
+    {
         self.push(streamable);
         self
     }
@@ -687,8 +704,10 @@ impl<'s> OpBuilder<'s> {
     /// The stream must emit a lexicographically ordered sequence of byte
     /// strings.
     pub fn push<I, S>(&mut self, streamable: I)
-            where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-                  S: 's + for<'a> Streamer<'a, Item=&'a [u8]> {
+    where
+        I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+        S: 's + for<'a> Streamer<'a, Item = &'a [u8]>,
+    {
         self.0.push(StreamZeroOutput(streamable.into_stream()));
     }
 
@@ -795,9 +814,14 @@ impl<'s> OpBuilder<'s> {
 }
 
 impl<'f, I, S> Extend<I> for OpBuilder<'f>
-    where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-          S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
-    fn extend<T>(&mut self, it: T) where T: IntoIterator<Item=I> {
+where
+    I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+    S: 'f + for<'a> Streamer<'a, Item = &'a [u8]>,
+{
+    fn extend<T>(&mut self, it: T)
+    where
+        T: IntoIterator<Item = I>,
+    {
         for stream in it {
             self.push(stream);
         }
@@ -805,9 +829,14 @@ impl<'f, I, S> Extend<I> for OpBuilder<'f>
 }
 
 impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
-    where I: for<'a> IntoStreamer<'a, Into=S, Item=&'a [u8]>,
-          S: 'f + for<'a> Streamer<'a, Item=&'a [u8]> {
-    fn from_iter<T>(it: T) -> Self where T: IntoIterator<Item=I> {
+where
+    I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
+    S: 'f + for<'a> Streamer<'a, Item = &'a [u8]>,
+{
+    fn from_iter<T>(it: T) -> Self
+    where
+        T: IntoIterator<Item = I>,
+    {
         let mut op = OpBuilder::new();
         op.extend(it);
         op
@@ -892,8 +921,8 @@ impl<'a, S: Streamer<'a>> Streamer<'a> for StreamZeroOutput<S> {
 
 #[cfg(test)]
 mod tests {
-    use Streamer;
     use super::OpBuilder;
+    use Streamer;
 
     #[test]
     fn no_fsts() {
@@ -929,11 +958,7 @@ mod tests {
                 &b"fubar"[..],
                 &b"quux"[..],
             ]))
-            .add(Iter::new(vec![
-                &b"bar"[..],
-                &b"foofoo"[..],
-                &b"fubar"[..],
-            ]))
+            .add(Iter::new(vec![&b"bar"[..], &b"foofoo"[..], &b"fubar"[..]]))
             .intersection();
 
         let mut got = vec![];

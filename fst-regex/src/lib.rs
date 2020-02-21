@@ -136,7 +136,9 @@ impl Automaton for Regex {
     type State = Option<usize>;
 
     #[inline]
-    fn start(&self) -> Option<usize> { Some(0) }
+    fn start(&self) -> Option<usize> {
+        Some(0)
+    }
 
     #[inline]
     fn is_match(&self, state: &Option<usize>) -> bool {

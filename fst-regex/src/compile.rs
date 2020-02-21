@@ -1,5 +1,5 @@
-use regex_syntax::{Expr, Repeater, CharClass, ClassRange};
-use utf8_ranges::{Utf8Sequences, Utf8Sequence};
+use regex_syntax::{CharClass, ClassRange, Expr, Repeater};
+use utf8_ranges::{Utf8Sequence, Utf8Sequences};
 
 use {Error, Inst};
 
@@ -10,10 +10,7 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(size_limit: usize) -> Compiler {
-        Compiler {
-            size_limit: size_limit,
-            insts: vec![],
-        }
+        Compiler { size_limit: size_limit, insts: vec![] }
     }
 
     pub fn compile(mut self, ast: &Expr) -> Result<Vec<Inst>, Error> {
@@ -40,13 +37,17 @@ impl Compiler {
             | Expr::ClassBytes(..) => {
                 return Err(From::from(Error::NoBytes));
             }
-            Expr::Empty => {},
+            Expr::Empty => {}
             Expr::Literal { ref chars, casei } => {
                 for &c in chars {
                     if casei {
-                        self.c(&Expr::Class(CharClass::new(vec![
-                            ClassRange { start: c, end: c },
-                        ]).case_fold()))?;
+                        self.c(&Expr::Class(
+                            CharClass::new(vec![ClassRange {
+                                start: c,
+                                end: c,
+                            }])
+                            .case_fold(),
+                        ))?;
                     } else {
                         // One scalar value, so we're guaranteed to get a
                         // single byte sequence.
@@ -56,13 +57,18 @@ impl Compiler {
                     }
                 }
             }
-            Expr::AnyChar => self.c(&Expr::Class(CharClass::new(vec![
-                ClassRange { start: '\u{0}', end: '\u{10FFFF}' },
-            ])))?,
-            Expr::AnyCharNoNL => self.c(&Expr::Class(CharClass::new(vec![
-                ClassRange { start: '\u{0}', end: '\u{09}' },
-                ClassRange { start: '\u{0B}', end: '\u{10FFFF}' },
-            ])))?,
+            Expr::AnyChar => {
+                self.c(&Expr::Class(CharClass::new(vec![ClassRange {
+                    start: '\u{0}',
+                    end: '\u{10FFFF}',
+                }])))?
+            }
+            Expr::AnyCharNoNL => {
+                self.c(&Expr::Class(CharClass::new(vec![
+                    ClassRange { start: '\u{0}', end: '\u{09}' },
+                    ClassRange { start: '\u{0B}', end: '\u{10FFFF}' },
+                ])))?
+            }
             Expr::Class(ref cls) => {
                 self.compile_class(cls)?;
             }
@@ -77,7 +83,7 @@ impl Compiler {
                     return Ok(());
                 }
                 let mut jmps_to_end = vec![];
-                for e in &es[0..es.len()-1] {
+                for e in &es[0..es.len() - 1] {
                     let split = self.empty_split();
                     let j1 = self.insts.len();
                     self.c(e)?;
@@ -85,7 +91,7 @@ impl Compiler {
                     let j2 = self.insts.len();
                     self.set_split(split, j1, j2);
                 }
-                self.c(&es[es.len()-1])?;
+                self.c(&es[es.len() - 1])?;
                 let end = self.insts.len();
                 for jmp_to_end in jmps_to_end {
                     self.set_jump(jmp_to_end, end);
@@ -161,7 +167,7 @@ impl Compiler {
             return Ok(());
         }
         let mut jmps = vec![];
-        for r in &class[0..class.len()-1] {
+        for r in &class[0..class.len() - 1] {
             let split = self.empty_split();
             let j1 = self.insts.len();
             self.compile_class_range(r)?;
@@ -169,7 +175,7 @@ impl Compiler {
             let j2 = self.insts.len();
             self.set_split(split, j1, j2);
         }
-        self.compile_class_range(&class[class.len()-1])?;
+        self.compile_class_range(&class[class.len() - 1])?;
         let end = self.insts.len();
         for jmp in jmps {
             self.set_jump(jmp, end);
@@ -181,8 +187,8 @@ impl Compiler {
         &mut self,
         char_range: &ClassRange,
     ) -> Result<(), Error> {
-        let mut it = Utf8Sequences::new(char_range.start, char_range.end)
-                                   .peekable();
+        let mut it =
+            Utf8Sequences::new(char_range.start, char_range.end).peekable();
         let mut jmps = vec![];
         let mut utf8_ranges = it.next().expect("non-empty char class");
         while it.peek().is_some() {

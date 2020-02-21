@@ -1,6 +1,6 @@
 use std::io;
 
-use byteorder::{ByteOrder, WriteBytesExt, LittleEndian};
+use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
 
 /// pack_uint packs the given integer in the smallest number of bytes possible,
 /// and writes it to the given writer. The number of bytes written is returned
@@ -55,9 +55,9 @@ pub fn pack_size(n: u64) -> u8 {
 
 #[cfg(test)]
 mod tests {
-    use std::io;
-    use quickcheck::{QuickCheck, StdGen};
     use super::*;
+    use quickcheck::{QuickCheck, StdGen};
+    use std::io;
 
     #[test]
     fn prop_pack_in_out() {

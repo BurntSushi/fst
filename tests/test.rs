@@ -1,6 +1,6 @@
-extern crate fst;
-extern crate fst_levenshtein;
-extern crate fst_regex;
+use fst;
+
+
 
 use fst_levenshtein::Levenshtein;
 use fst_regex::Regex;

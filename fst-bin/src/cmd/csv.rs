@@ -3,8 +3,8 @@ use csv;
 use docopt::Docopt;
 use fst::raw as fst;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Emit information in CSV format about the transducer.

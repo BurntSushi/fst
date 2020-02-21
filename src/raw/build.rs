@@ -2,16 +2,16 @@ use std::io::{self, Write};
 
 use byteorder::{LittleEndian, WriteBytesExt};
 
-use error::Result;
-use raw::counting_writer::CountingWriter;
-use raw::error::Error;
-use raw::registry::{Registry, RegistryEntry};
-use raw::{
+use crate::error::Result;
+use crate::raw::counting_writer::CountingWriter;
+use crate::raw::error::Error;
+use crate::raw::registry::{Registry, RegistryEntry};
+use crate::raw::{
     CompiledAddr, FstType, Output, Transition, EMPTY_ADDRESS, NONE_ADDRESS,
     VERSION,
 };
 // use raw::registry_minimal::{Registry, RegistryEntry};
-use stream::{IntoStreamer, Streamer};
+use crate::stream::{IntoStreamer, Streamer};
 
 /// A builder for creating a finite state transducer.
 ///

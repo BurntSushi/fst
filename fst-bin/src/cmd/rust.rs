@@ -2,8 +2,8 @@ use std::io::{Read, Write};
 
 use docopt::Docopt;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Emit Rust source code for the given FST.

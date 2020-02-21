@@ -2,7 +2,7 @@ use std::error;
 use std::fmt;
 use std::io;
 
-use raw;
+use crate::raw;
 
 /// A `Result` type alias for this crate's `Error` type.
 pub type Result<T> = ::std::result::Result<T, Error>;
@@ -32,7 +32,7 @@ impl From<raw::Error> for Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Error::*;
         match *self {
             Fst(ref err) => err.fmt(f),
@@ -50,7 +50,7 @@ impl error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         use self::Error::*;
         match *self {
             Fst(ref err) => Some(err),

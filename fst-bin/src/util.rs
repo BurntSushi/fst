@@ -7,7 +7,7 @@ use csv;
 use fst::{IntoStreamer, Streamer};
 use fst::raw::Output;
 
-use Error;
+use crate::Error;
 
 pub fn escape_input(b: u8) -> String {
     String::from_utf8(ascii::escape_default(b).collect::<Vec<_>>()).unwrap()
@@ -15,19 +15,19 @@ pub fn escape_input(b: u8) -> String {
 
 pub fn get_buf_reader<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<io::BufReader<Box<io::Read + Send + Sync + 'static>>> {
+) -> io::Result<io::BufReader<Box<dyn io::Read + Send + Sync + 'static>>> {
     Ok(io::BufReader::new(get_reader(path)?))
 }
 
 pub fn get_buf_writer<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<io::BufWriter<Box<io::Write + Send + Sync + 'static>>> {
+) -> io::Result<io::BufWriter<Box<dyn io::Write + Send + Sync + 'static>>> {
     Ok(io::BufWriter::new(get_writer(path)?))
 }
 
 pub fn get_reader<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<Box<io::Read + Send + Sync + 'static>> {
+) -> io::Result<Box<dyn io::Read + Send + Sync + 'static>> {
     Ok(match to_stdio(path) {
         None => Box::new(io::stdin()),
         Some(path) => Box::new(File::open(path)?),
@@ -36,7 +36,7 @@ pub fn get_reader<T: AsRef<Path>>(
 
 pub fn get_writer<T: AsRef<Path>>(
     path: Option<T>,
-) -> io::Result<Box<io::Write + Send + Sync + 'static>> {
+) -> io::Result<Box<dyn io::Write + Send + Sync + 'static>> {
     Ok(match to_stdio(path) {
         None => Box::new(io::stdout()),
         Some(path) => Box::new(File::create(path)?),
@@ -86,7 +86,7 @@ pub struct ConcatLines {
     cur: Option<Lines>,
 }
 
-type Lines = io::Lines<io::BufReader<Box<io::Read + Send + Sync + 'static>>>;
+type Lines = io::Lines<io::BufReader<Box<dyn io::Read + Send + Sync + 'static>>>;
 
 impl ConcatLines {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatLines {
@@ -125,7 +125,7 @@ pub struct ConcatCsv {
     cur: Option<Rows>,
 }
 
-type Reader = Box<io::Read + Send + Sync + 'static>;
+type Reader = Box<dyn io::Read + Send + Sync + 'static>;
 type Rows = csv::DeserializeRecordsIntoIter<Reader, (String, u64)>;
 
 impl ConcatCsv {

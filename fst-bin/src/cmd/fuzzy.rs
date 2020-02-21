@@ -4,8 +4,8 @@ use docopt::Docopt;
 use fst::raw::Fst;
 use fst_levenshtein::Levenshtein;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Issues a fuzzy query against the given transducer.

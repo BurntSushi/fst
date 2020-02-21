@@ -4,10 +4,10 @@ use std::iter::{self, FromIterator};
 #[cfg(feature = "mmap")]
 use std::path::Path;
 
-use automaton::{AlwaysMatch, Automaton};
-use raw;
-use stream::{IntoStreamer, Streamer};
-use Result;
+use crate::automaton::{AlwaysMatch, Automaton};
+use crate::raw;
+use crate::stream::{IntoStreamer, Streamer};
+use crate::Result;
 
 /// Set is a lexicographically ordered set of byte strings.
 ///
@@ -146,7 +146,7 @@ impl Set {
     /// assert_eq!(keys, vec![b"a", b"b", b"c"]);
     /// ```
     #[inline]
-    pub fn stream(&self) -> Stream {
+    pub fn stream(&self) -> Stream<'_> {
         Stream(self.0.stream())
     }
 
@@ -176,7 +176,7 @@ impl Set {
     /// assert_eq!(keys, vec![b"b", b"c", b"d"]);
     /// ```
     #[inline]
-    pub fn range(&self) -> StreamBuilder {
+    pub fn range(&self) -> StreamBuilder<'_> {
         StreamBuilder(self.0.range())
     }
 
@@ -221,7 +221,7 @@ impl Set {
     ///     Ok(())
     /// }
     /// ```
-    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
+    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
         StreamBuilder(self.0.search(aut))
     }
 
@@ -260,7 +260,7 @@ impl Set {
     /// assert_eq!(keys, vec![b"a", b"b", b"c", b"y", b"z"]);
     /// ```
     #[inline]
-    pub fn op(&self) -> OpBuilder {
+    pub fn op(&self) -> OpBuilder<'_> {
         OpBuilder::new().add(self)
     }
 
@@ -360,7 +360,7 @@ impl Default for Set {
 }
 
 impl fmt::Debug for Set {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Set([")?;
         let mut stream = self.stream();
         let mut first = true;
@@ -922,7 +922,7 @@ impl<'a, S: Streamer<'a>> Streamer<'a> for StreamZeroOutput<S> {
 #[cfg(test)]
 mod tests {
     use super::OpBuilder;
-    use Streamer;
+    use crate::Streamer;
 
     #[test]
     fn no_fsts() {

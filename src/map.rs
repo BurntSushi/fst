@@ -4,11 +4,11 @@ use std::iter::{self, FromIterator};
 #[cfg(feature = "mmap")]
 use std::path::Path;
 
-use automaton::{AlwaysMatch, Automaton};
-use raw;
-pub use raw::IndexedValue;
-use stream::{IntoStreamer, Streamer};
-use Result;
+use crate::automaton::{AlwaysMatch, Automaton};
+use crate::raw;
+pub use crate::raw::IndexedValue;
+use crate::stream::{IntoStreamer, Streamer};
+use crate::Result;
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///
@@ -193,7 +193,7 @@ impl Map {
     /// ]);
     /// ```
     #[inline]
-    pub fn stream(&self) -> Stream {
+    pub fn stream(&self) -> Stream<'_> {
         Stream(self.0.stream())
     }
 
@@ -216,7 +216,7 @@ impl Map {
     /// assert_eq!(keys, vec![b"a", b"b", b"c"]);
     /// ```
     #[inline]
-    pub fn keys(&self) -> Keys {
+    pub fn keys(&self) -> Keys<'_> {
         Keys(self.0.stream())
     }
 
@@ -240,7 +240,7 @@ impl Map {
     /// assert_eq!(values, vec![1, 2, 3]);
     /// ```
     #[inline]
-    pub fn values(&self) -> Values {
+    pub fn values(&self) -> Values<'_> {
         Values(self.0.stream())
     }
 
@@ -276,7 +276,7 @@ impl Map {
     /// ]);
     /// ```
     #[inline]
-    pub fn range(&self) -> StreamBuilder {
+    pub fn range(&self) -> StreamBuilder<'_> {
         StreamBuilder(self.0.range())
     }
 
@@ -323,7 +323,7 @@ impl Map {
     ///     Ok(())
     /// }
     /// ```
-    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
+    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
         StreamBuilder(self.0.search(aut))
     }
 
@@ -383,7 +383,7 @@ impl Map {
     /// ]);
     /// ```
     #[inline]
-    pub fn op(&self) -> OpBuilder {
+    pub fn op(&self) -> OpBuilder<'_> {
         OpBuilder::new().add(self)
     }
 
@@ -402,7 +402,7 @@ impl Default for Map {
 }
 
 impl fmt::Debug for Map {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Map([")?;
         let mut stream = self.stream();
         let mut first = true;

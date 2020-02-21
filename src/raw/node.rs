@@ -5,10 +5,10 @@ use std::ops::Range;
 
 use byteorder::WriteBytesExt;
 
-use raw::build::BuilderNode;
-use raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
-use raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
-use raw::{u64_to_usize, CompiledAddr, Output, Transition, EMPTY_ADDRESS};
+use crate::raw::build::BuilderNode;
+use crate::raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
+use crate::raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
+use crate::raw::{u64_to_usize, CompiledAddr, Output, Transition, EMPTY_ADDRESS};
 
 /// The threshold (in number of transitions) at which an index is created for
 /// a node's transitions. This speeds up lookup time at the expense of FST
@@ -32,7 +32,7 @@ pub struct Node<'f> {
 }
 
 impl<'f> fmt::Debug for Node<'f> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "NODE@{}", self.start)?;
         writeln!(f, "  end_addr: {}", self.end)?;
         writeln!(f, "  size: {} bytes", self.as_slice().len())?;
@@ -55,7 +55,7 @@ impl<'f> fmt::Debug for Node<'f> {
 /// This is a free function so that we can export it to parent modules, but
 /// not to consumers of this crate.
 #[inline(always)]
-pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node {
+pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node<'_> {
     use self::State::*;
     let state = State::new(data, addr);
     match state {
@@ -357,7 +357,7 @@ impl StateOneTransNext {
     }
 
     #[inline(always)]
-    fn input(&self, node: &Node) -> u8 {
+    fn input(&self, node: &Node<'_>) -> u8 {
         if let Some(inp) = self.common_input() {
             inp
         } else {
@@ -366,7 +366,7 @@ impl StateOneTransNext {
     }
 
     #[inline(always)]
-    fn trans_addr(&self, node: &Node) -> CompiledAddr {
+    fn trans_addr(&self, node: &Node<'_>) -> CompiledAddr {
         node.end as CompiledAddr - 1
     }
 }
@@ -433,7 +433,7 @@ impl StateOneTrans {
     }
 
     #[inline(always)]
-    fn input(&self, node: &Node) -> u8 {
+    fn input(&self, node: &Node<'_>) -> u8 {
         if let Some(inp) = self.common_input() {
             inp
         } else {
@@ -442,7 +442,7 @@ impl StateOneTrans {
     }
 
     #[inline(always)]
-    fn output(&self, node: &Node) -> Output {
+    fn output(&self, node: &Node<'_>) -> Output {
         let osize = node.sizes.output_pack_size();
         if osize == 0 {
             return Output::zero();
@@ -456,7 +456,7 @@ impl StateOneTrans {
     }
 
     #[inline(always)]
-    fn trans_addr(&self, node: &Node) -> CompiledAddr {
+    fn trans_addr(&self, node: &Node<'_>) -> CompiledAddr {
         let tsize = node.sizes.transition_pack_size();
         let i = node.start
                 - self.input_len()
@@ -658,7 +658,7 @@ impl StateAnyTrans {
     }
 
     #[inline(always)]
-    fn trans_addr(&self, node: &Node, i: usize) -> CompiledAddr {
+    fn trans_addr(&self, node: &Node<'_>, i: usize) -> CompiledAddr {
         assert!(i < node.ntrans);
         let tsize = node.sizes.transition_pack_size();
         let at = node.start
@@ -672,7 +672,7 @@ impl StateAnyTrans {
     }
 
     #[inline(always)]
-    fn input(&self, node: &Node, i: usize) -> u8 {
+    fn input(&self, node: &Node<'_>, i: usize) -> u8 {
         let at = node.start
                  - self.ntrans_len()
                  - 1 // pack size
@@ -683,7 +683,7 @@ impl StateAnyTrans {
     }
 
     #[inline(always)]
-    fn find_input(&self, node: &Node, b: u8) -> Option<usize> {
+    fn find_input(&self, node: &Node<'_>, b: u8) -> Option<usize> {
         if node.version >= 2 && node.ntrans > TRANS_INDEX_THRESHOLD {
             let start = node.start
                         - self.ntrans_len()
@@ -707,7 +707,7 @@ impl StateAnyTrans {
     }
 
     #[inline(always)]
-    fn output(&self, node: &Node, i: usize) -> Output {
+    fn output(&self, node: &Node<'_>, i: usize) -> Output {
         let osize = node.sizes.output_pack_size();
         if osize == 0 {
             return Output::zero();
@@ -772,7 +772,7 @@ impl PackSizes {
 ///
 /// `'f` is the lifetime of the underlying fst and `'n` is the lifetime of
 /// the underlying `Node`.
-pub struct Transitions<'f: 'n, 'n> {
+pub struct Transitions<'f, 'n> {
     node: &'n Node<'f>,
     range: Range<usize>,
 }
@@ -869,10 +869,10 @@ fn unpack_delta(
 mod tests {
     use quickcheck::{quickcheck, TestResult};
 
-    use raw::build::BuilderNode;
-    use raw::node::{node_new, Node};
-    use raw::{Builder, CompiledAddr, Fst, Output, Transition, VERSION};
-    use stream::Streamer;
+    use crate::raw::build::BuilderNode;
+    use crate::raw::node::{node_new, Node};
+    use crate::raw::{Builder, CompiledAddr, Fst, Output, Transition, VERSION};
+    use crate::stream::Streamer;
 
     const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
 

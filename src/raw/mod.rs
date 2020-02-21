@@ -28,9 +28,9 @@ use std::sync::Arc;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
-use automaton::{AlwaysMatch, Automaton};
-use error::Result;
-use stream::{IntoStreamer, Streamer};
+use crate::automaton::{AlwaysMatch, Automaton};
+use crate::error::Result;
+use crate::stream::{IntoStreamer, Streamer};
 
 pub use self::build::Builder;
 pub use self::error::Error;
@@ -446,7 +446,7 @@ impl Fst {
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
     #[inline]
-    pub fn stream(&self) -> Stream {
+    pub fn stream(&self) -> Stream<'_> {
         StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
 
@@ -455,12 +455,12 @@ impl Fst {
     /// A range query returns a subset of key-value pairs in this fst in a
     /// range given in lexicographic order.
     #[inline]
-    pub fn range(&self) -> StreamBuilder {
+    pub fn range(&self) -> StreamBuilder<'_> {
         StreamBuilder::new(self, AlwaysMatch)
     }
 
     /// Executes an automaton on the keys of this map.
-    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<A> {
+    pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
         StreamBuilder::new(self, aut)
     }
 
@@ -489,7 +489,7 @@ impl Fst {
     /// symmetric difference on the keys of the fst. These set operations also
     /// allow one to specify how conflicting values are merged in the stream.
     #[inline]
-    pub fn op(&self) -> OpBuilder {
+    pub fn op(&self) -> OpBuilder<'_> {
         OpBuilder::new().add(self)
     }
 
@@ -556,7 +556,7 @@ impl Fst {
 
     /// Returns the root node of this fst.
     #[inline(always)]
-    pub fn root(&self) -> Node {
+    pub fn root(&self) -> Node<'_> {
         self.node(self.root_addr)
     }
 
@@ -564,7 +564,7 @@ impl Fst {
     ///
     /// Node addresses can be obtained by reading transitions on `Node` values.
     #[inline]
-    pub fn node(&self, addr: CompiledAddr) -> Node {
+    pub fn node(&self, addr: CompiledAddr) -> Node<'_> {
         node_new(self.version, addr, &self.data)
     }
 
@@ -1043,7 +1043,7 @@ impl Default for Transition {
 }
 
 impl fmt::Debug for Transition {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.out.is_zero() {
             write!(f, "{} -> {}", self.inp as char, self.addr)
         } else {

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use automaton::AlwaysMatch;
-use error::Error;
-use raw::{self, Bound, Builder, Fst, Output, Stream, VERSION};
-use stream::Streamer;
+use crate::automaton::AlwaysMatch;
+use crate::error::Error;
+use crate::raw::{self, Bound, Builder, Fst, Output, Stream, VERSION};
+use crate::stream::Streamer;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 

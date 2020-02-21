@@ -2,12 +2,12 @@ use std::cmp;
 use std::collections::BinaryHeap;
 use std::iter::FromIterator;
 
-use raw::Output;
-use stream::{IntoStreamer, Streamer};
+use crate::raw::Output;
+use crate::stream::{IntoStreamer, Streamer};
 
 /// Permits stream operations to be hetergeneous with respect to streams.
 type BoxedStream<'f> =
-    Box<for<'a> Streamer<'a, Item = (&'a [u8], Output)> + 'f>;
+    Box<dyn for<'a> Streamer<'a, Item = (&'a [u8], Output)> + 'f>;
 
 /// A value indexed by a stream.
 ///
@@ -460,9 +460,9 @@ impl Ord for Slot {
 
 #[cfg(test)]
 mod tests {
-    use raw::tests::{fst_map, fst_set};
-    use raw::Fst;
-    use stream::{IntoStreamer, Streamer};
+    use crate::raw::tests::{fst_map, fst_set};
+    use crate::raw::Fst;
+    use crate::stream::{IntoStreamer, Streamer};
 
     use super::OpBuilder;
 

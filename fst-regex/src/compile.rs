@@ -1,7 +1,7 @@
 use regex_syntax::{CharClass, ClassRange, Expr, Repeater};
 use utf8_ranges::{Utf8Sequence, Utf8Sequences};
 
-use {Error, Inst};
+use crate::{Error, Inst};
 
 pub struct Compiler {
     size_limit: usize,

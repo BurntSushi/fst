@@ -6,9 +6,9 @@ use csv;
 use docopt::Docopt;
 use fst::MapBuilder;
 
-use merge::Merger;
-use util;
-use Error;
+use crate::merge::Merger;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Creates an ordered map backed by a finite state transducer.

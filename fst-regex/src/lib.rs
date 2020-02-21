@@ -1,12 +1,12 @@
-extern crate fst;
-extern crate regex_syntax;
-extern crate utf8_ranges;
+
+use regex_syntax;
+
 
 use std::fmt;
 
 use fst::Automaton;
 
-pub use error::Error;
+pub use crate::error::Error;
 
 mod compile;
 mod dfa;
@@ -157,14 +157,14 @@ impl Automaton for Regex {
 }
 
 impl fmt::Debug for Regex {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Regex({:?})", self.original)?;
         self.dfa.fmt(f)
     }
 }
 
 impl fmt::Debug for Inst {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use self::Inst::*;
         match *self {
             Match => write!(f, "Match"),

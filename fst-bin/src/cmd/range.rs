@@ -3,8 +3,8 @@ use std::io;
 use docopt::Docopt;
 use fst::raw::Fst;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Issues a range query against the given transducer.

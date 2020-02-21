@@ -1,7 +1,7 @@
 #![feature(test)]
 
-extern crate fnv;
-extern crate fst;
+
+
 #[macro_use]
 extern crate lazy_static;
 extern crate test;
@@ -90,5 +90,5 @@ macro_rules! search {
     };
 }
 
-search!(words, ::WORDS);
-search!(wiki_urls, ::WIKI_URLS);
+search!(words, crate::WORDS);
+search!(wiki_urls, crate::WIKI_URLS);

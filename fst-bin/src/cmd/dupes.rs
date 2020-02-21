@@ -5,8 +5,8 @@ use bit_set::BitSet;
 use docopt::Docopt;
 use fst::raw as fst;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 A simple way to show duplicate nodes.

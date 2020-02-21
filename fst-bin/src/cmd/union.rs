@@ -3,8 +3,8 @@ use std::fs;
 use docopt::Docopt;
 use fst;
 
-use util;
-use Error;
+use crate::util;
+use crate::Error;
 
 const USAGE: &'static str = "
 Unions all of the transducer inputs into a single transducer.

@@ -42,15 +42,7 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {
-    fn description(&self) -> &str {
-        use self::Error::*;
-        match *self {
-            Fst(ref err) => err.description(),
-            Io(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use self::Error::*;
         match *self {
             Fst(ref err) => Some(err),

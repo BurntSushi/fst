@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 
 use docopt::Docopt;
+use serde::Deserialize;
 
 use crate::util;
 use crate::Error;
@@ -38,8 +39,8 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
     let mut wtr = util::get_buf_writer::<&str>(None)?;
     let mut rdr = util::get_buf_reader(Some(&args.arg_fst))?;
 
@@ -48,8 +49,11 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     w!(wtr, "lazy_static! {{");
     w!(wtr, "    pub static ref {}: ::fst::raw::Fst = ", args.arg_name);
-    w!(wtr, "        ::fst::raw::Fst::from_static_slice({}_BYTES).unwrap();",
-       args.arg_name);
+    w!(
+        wtr,
+        "        ::fst::raw::Fst::from_static_slice({}_BYTES).unwrap();",
+        args.arg_name
+    );
     w!(wtr, "}}\n");
 
     w!(wtr, "const {}_BYTES: &'static [u8] = b\"\\", args.arg_name);

@@ -1,7 +1,7 @@
 use std::fs;
 
 use docopt::Docopt;
-use fst;
+use serde::Deserialize;
 
 use crate::util;
 use crate::Error;
@@ -30,8 +30,8 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
     if !args.flag_force && fs::metadata(&args.arg_output).is_ok() {
         fail!("Output file already exists: {}", args.arg_output);
     }

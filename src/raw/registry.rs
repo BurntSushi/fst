@@ -30,11 +30,7 @@ impl Registry {
     pub fn new(table_size: usize, mru_size: usize) -> Registry {
         let empty_cell = RegistryCell::none();
         let ncells = table_size.checked_mul(mru_size).unwrap();
-        Registry {
-            table: vec![empty_cell; ncells],
-            table_size: table_size,
-            mru_size: mru_size,
-        }
+        Registry { table: vec![empty_cell; ncells], table_size, mru_size }
     }
 
     pub fn entry<'a>(&'a mut self, node: &BuilderNode) -> RegistryEntry<'a> {

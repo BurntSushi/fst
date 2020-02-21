@@ -3,6 +3,7 @@ use std::io;
 use docopt::Docopt;
 use fst::raw::Fst;
 use fst_levenshtein::Levenshtein;
+use serde::Deserialize;
 
 use crate::util;
 use crate::Error;
@@ -45,8 +46,8 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
     let fst = unsafe { Fst::from_path(&args.arg_fst) }?;
     let lev = Levenshtein::new(&args.arg_query, args.flag_distance)?;
     let mut q = fst.search(&lev);

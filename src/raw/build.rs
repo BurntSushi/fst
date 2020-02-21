@@ -123,7 +123,7 @@ impl<W: io::Write> Builder<W> {
         // Similarly for 8-15 for the fst type.
         wtr.write_u64::<LittleEndian>(ty)?;
         Ok(Builder {
-            wtr: wtr,
+            wtr,
             unfinished: UnfinishedNodes::new(),
             registry: Registry::new(10_000, 2),
             last: None,
@@ -329,7 +329,7 @@ impl UnfinishedNodes {
 
     fn push_empty(&mut self, is_final: bool) {
         self.stack.push(BuilderNodeUnfinished {
-            node: BuilderNode { is_final: is_final, ..BuilderNode::default() },
+            node: BuilderNode { is_final, ..BuilderNode::default() },
             last: None,
         });
     }
@@ -368,7 +368,7 @@ impl UnfinishedNodes {
         }
         let last = self.stack.len().checked_sub(1).unwrap();
         assert!(self.stack[last].last.is_none());
-        self.stack[last].last = Some(LastTransition { inp: bs[0], out: out });
+        self.stack[last].last = Some(LastTransition { inp: bs[0], out });
         for &b in &bs[1..] {
             self.stack.push(BuilderNodeUnfinished {
                 node: BuilderNode::default(),
@@ -419,7 +419,7 @@ impl BuilderNodeUnfinished {
             self.node.trans.push(Transition {
                 inp: trans.inp,
                 out: trans.out,
-                addr: addr,
+                addr,
             });
         }
     }

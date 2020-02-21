@@ -3,7 +3,7 @@ use std::io::Write;
 
 use bit_set::BitSet;
 use docopt::Docopt;
-use fst::raw as fst;
+use serde::Deserialize;
 
 use crate::util;
 use crate::Error;
@@ -43,12 +43,12 @@ struct Args {
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct FullNode {
     is_final: bool,
-    final_output: fst::Output,
-    trans: Vec<fst::Transition>,
+    final_output: fst::raw::Output,
+    trans: Vec<fst::raw::Transition>,
 }
 
 impl FullNode {
-    fn from_node(node: &fst::Node) -> FullNode {
+    fn from_node(node: &fst::raw::Node) -> FullNode {
         FullNode {
             is_final: node.is_final(),
             final_output: node.final_output(),
@@ -59,11 +59,11 @@ impl FullNode {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
 
     let mut wtr = util::get_buf_writer(args.arg_output.as_ref())?;
-    let fst = unsafe { fst::Fst::from_path(args.arg_input) }?;
+    let fst = unsafe { fst::raw::Fst::from_path(args.arg_input) }?;
     let mut set = BitSet::with_capacity(fst.len());
     let mut node_counts = HashMap::with_capacity(10_000);
 

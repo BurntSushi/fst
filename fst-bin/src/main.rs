@@ -1,25 +1,12 @@
 #![allow(dead_code)]
 
-extern crate bit_set;
-extern crate chan;
-extern crate csv;
-extern crate docopt;
-extern crate fst;
-extern crate fst_levenshtein;
-extern crate fst_regex;
-extern crate lines;
-extern crate num_cpus;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate tempdir;
-
 use std::env;
 use std::error;
-use std::process;
 use std::io::{self, Write};
+use std::process;
 
 use docopt::Docopt;
+use serde::Deserialize;
 
 macro_rules! w {
     ($wtr:expr, $($tt:tt)*) => {{
@@ -105,10 +92,10 @@ impl Command {
 
 fn main() {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.options_first(true)
-                                           .version(Some(version()))
-                                           .deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| {
+            d.options_first(true).version(Some(version())).deserialize()
+        })
+        .unwrap_or_else(|e| e.exit());
     let cmd = args.arg_command.expect("BUG: expected a command");
     if let Err(err) = cmd.run() {
         writeln!(&mut io::stderr(), "{}", err).unwrap();
@@ -123,8 +110,9 @@ fn version() -> String {
         option_env!("CARGO_PKG_VERSION_PATCH"),
     );
     match (maj, min, pat) {
-        (Some(maj), Some(min), Some(pat)) =>
-            format!("{}.{}.{}", maj, min, pat),
+        (Some(maj), Some(min), Some(pat)) => {
+            format!("{}.{}.{}", maj, min, pat)
+        }
         _ => "N/A".to_owned(),
     }
 }

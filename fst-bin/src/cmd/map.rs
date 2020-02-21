@@ -5,6 +5,7 @@ use std::path::Path;
 use csv;
 use docopt::Docopt;
 use fst::MapBuilder;
+use serde::Deserialize;
 
 use crate::merge::Merger;
 use crate::util;
@@ -65,8 +66,8 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
     if !args.flag_force && fs::metadata(&args.arg_output).is_ok() {
         fail!("Output file already exists: {}", args.arg_output);
     }
@@ -82,9 +83,8 @@ fn run_sorted(args: &Args) -> Result<(), Error> {
     let mut map = MapBuilder::new(wtr)?;
     for input in &args.arg_input {
         let rdr = util::get_reader(Some(input))?;
-        let mut rdr = csv::ReaderBuilder::new()
-            .has_headers(false)
-            .from_reader(rdr);
+        let mut rdr =
+            csv::ReaderBuilder::new().has_headers(false).from_reader(rdr);
         for row in rdr.deserialize() {
             let (key, val): (String, u64) = row?;
             map.insert(key, val)?;
@@ -95,9 +95,11 @@ fn run_sorted(args: &Args) -> Result<(), Error> {
 }
 
 fn run_unsorted(args: &Args) -> Result<(), Error> {
-    let inputs =
-        args.arg_input
-        .iter().map(|inp| Path::new(inp).to_path_buf()).collect();
+    let inputs = args
+        .arg_input
+        .iter()
+        .map(|inp| Path::new(inp).to_path_buf())
+        .collect();
     let keys = util::ConcatCsv::new(inputs);
 
     let mut merger = Merger::new(keys, &args.arg_output);

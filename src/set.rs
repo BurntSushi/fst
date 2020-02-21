@@ -933,7 +933,7 @@ mod tests {
 
         impl<'a> Iter<'a> {
             fn new(xs: Vec<&'a [u8]>) -> Iter<'a> {
-                Iter { i: 0, xs: xs }
+                Iter { i: 0, xs }
             }
         }
 

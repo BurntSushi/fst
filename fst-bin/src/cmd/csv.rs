@@ -1,7 +1,7 @@
 use bit_set::BitSet;
 use csv;
 use docopt::Docopt;
-use fst::raw as fst;
+use serde::Deserialize;
 
 use crate::util;
 use crate::Error;
@@ -30,13 +30,13 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
 
     let wtr = util::get_writer(args.arg_output.as_ref())?;
     let mut wtr = csv::Writer::from_writer(wtr);
 
-    let fst = unsafe { fst::Fst::from_path(args.arg_input) }?;
+    let fst = unsafe { fst::raw::Fst::from_path(args.arg_input) }?;
     let mut set = BitSet::with_capacity(fst.len());
 
     if args.cmd_edges {
@@ -49,15 +49,17 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
                     stack.push(t.addr);
                     set.insert(t.addr);
                 }
-                wtr.serialize((
-                    addr, t.addr, t.inp as char, t.out.value(),
-                ))?;
+                wtr.serialize((addr, t.addr, t.inp as char, t.out.value()))?;
             }
         }
     } else {
         wtr.serialize((
-            "addr", "state", "size",
-            "transitions", "final", "final_output",
+            "addr",
+            "state",
+            "size",
+            "transitions",
+            "final",
+            "final_output",
         ))?;
         let mut stack = vec![fst.root().addr()];
         set.insert(fst.root().addr());

@@ -4,6 +4,7 @@ use std::path::Path;
 use docopt::Docopt;
 use fst::SetBuilder;
 use lines::linereader::LineReader;
+use serde::Deserialize;
 
 use crate::merge::Merger;
 use crate::util;
@@ -59,8 +60,8 @@ struct Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
     if !args.flag_force && fs::metadata(&args.arg_output).is_ok() {
         fail!("Output file already exists: {}", args.arg_output);
     }
@@ -82,26 +83,25 @@ fn run_sorted(args: &Args) -> Result<(), Error> {
             if line.is_empty() {
                 break;
             }
-            let off = if line.len() >= 2 && line[line.len()-2] == b'\r' {
+            let off = if line.len() >= 2 && line[line.len() - 2] == b'\r' {
                 2
             } else {
                 1
             };
-            set.insert(&line[0..line.len()-off])?;
+            set.insert(&line[0..line.len() - off])?;
         }
     }
     set.finish().map_err(From::from)
 }
 
 fn run_unsorted(args: &Args) -> Result<(), Error> {
-    let inputs =
-        args.arg_input
-        .iter().map(|inp| Path::new(inp).to_path_buf()).collect();
-    let keys =
-        util::ConcatLines::new(inputs)
-        .map(|result| {
-            result.map(|line| (line, 0)).map_err(From::from)
-        });
+    let inputs = args
+        .arg_input
+        .iter()
+        .map(|inp| Path::new(inp).to_path_buf())
+        .collect();
+    let keys = util::ConcatLines::new(inputs)
+        .map(|result| result.map(|line| (line, 0)).map_err(From::from));
 
     let mut merger = Merger::new(keys, &args.arg_output);
     merger = merger.fd_limit(args.flag_fd_limit);

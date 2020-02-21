@@ -82,20 +82,7 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {
-    fn description(&self) -> &str {
-        use self::Error::*;
-        match *self {
-            Syntax(ref err) => err.description(),
-            CompiledTooBig(_) => "compiled regex is too big",
-            TooManyStates(_) => "compiled regex has too many states",
-            NoLazy => "lazy repetition operators are not allowed",
-            NoWordBoundary => "word boundary operators are not allowed",
-            NoEmpty => "empty match operators are not allowed",
-            NoBytes => "byte literals are not allowed",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use self::Error::*;
         match *self {
             Syntax(ref err) => Some(err),

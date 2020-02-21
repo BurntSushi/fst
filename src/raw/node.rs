@@ -61,7 +61,7 @@ pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node<'_> {
     match state {
         EmptyFinal => Node {
             data: &[],
-            version: version,
+            version,
             state: State::EmptyFinal,
             start: EMPTY_ADDRESS,
             end: EMPTY_ADDRESS,
@@ -73,9 +73,9 @@ pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node<'_> {
         OneTransNext(s) => {
             let data = &data[..addr + 1];
             Node {
-                data: data,
-                version: version,
-                state: state,
+                data,
+                version,
+                state,
                 start: addr,
                 end: s.end_addr(data),
                 is_final: false,
@@ -88,14 +88,14 @@ pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node<'_> {
             let data = &data[..addr + 1];
             let sizes = s.sizes(data);
             Node {
-                data: data,
-                version: version,
-                state: state,
+                data,
+                version,
+                state,
                 start: addr,
                 end: s.end_addr(data, sizes),
                 is_final: false,
                 ntrans: 1,
-                sizes: sizes,
+                sizes,
                 final_output: Output::zero(),
             }
         }
@@ -104,14 +104,14 @@ pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node<'_> {
             let sizes = s.sizes(data);
             let ntrans = s.ntrans(data);
             Node {
-                data: data,
-                version: version,
-                state: state,
+                data,
+                version,
+                state,
                 start: addr,
                 end: s.end_addr(version, data, sizes, ntrans),
                 is_final: s.is_final_state(),
-                ntrans: ntrans,
-                sizes: sizes,
+                ntrans,
+                sizes,
                 final_output: s.final_output(version, data, sizes, ntrans),
             }
         }
@@ -925,7 +925,7 @@ mod tests {
     }
 
     fn trans(addr: CompiledAddr, inp: u8) -> Transition {
-        Transition { inp: inp, out: Output::zero(), addr: addr }
+        Transition { inp, out: Output::zero(), addr }
     }
 
     #[test]

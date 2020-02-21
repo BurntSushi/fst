@@ -2,7 +2,7 @@ use std::io::Write;
 
 use bit_set::BitSet;
 use docopt::Docopt;
-use fst::raw as fst;
+use serde::Deserialize;
 
 use crate::util;
 use crate::Error;
@@ -41,15 +41,12 @@ struct Args {
 impl Args {
     fn dot_state(
         &self,
-        node: &fst::Node,
+        node: &fst::raw::Node,
         i: usize,
-        addr: fst::CompiledAddr,
+        addr: fst::raw::CompiledAddr,
     ) -> String {
-        let label = if self.flag_state_names {
-            i.to_string()
-        } else {
-            "".to_owned()
-        };
+        let label =
+            if self.flag_state_names { i.to_string() } else { "".to_owned() };
         if node.is_final() {
             format!("    {} [label=\"{}\",peripheries=2];", addr, label)
         } else {
@@ -60,21 +57,25 @@ impl Args {
 
 pub fn run(argv: Vec<String>) -> Result<(), Error> {
     let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.argv(&argv).deserialize())
-                            .unwrap_or_else(|e| e.exit());
+        .and_then(|d| d.argv(&argv).deserialize())
+        .unwrap_or_else(|e| e.exit());
 
     let mut wtr = util::get_buf_writer(args.arg_output.as_ref())?;
-    let fst = unsafe { fst::Fst::from_path(&args.arg_input) }?;
+    let fst = unsafe { fst::raw::Fst::from_path(&args.arg_input) }?;
     let mut set = BitSet::with_capacity(fst.len());
 
     let mut stack = vec![fst.root().addr()];
 
-    writeln!(wtr, r#"
+    writeln!(
+        wtr,
+        r#"
 digraph automaton {{
     labelloc="l";
     labeljust="l";
     rankdir="LR";
-"#).unwrap();
+"#
+    )
+    .unwrap();
     let mut state_num = 0;
     while let Some(addr) = stack.pop() {
         if set.contains(addr) {
@@ -86,11 +87,20 @@ digraph automaton {{
         writeln!(wtr, "{}", args.dot_state(&node, state_num, addr)).unwrap();
         for t in node.transitions() {
             stack.push(t.addr);
-            let out = if t.out.value() == 0 { "".to_owned() } else {
+            let out = if t.out.value() == 0 {
+                "".to_owned()
+            } else {
                 format!("/{}", t.out.value().to_string())
             };
-            writeln!(wtr, "    {} -> {} [label=\"{}{}\"];",
-                     addr, t.addr, util::escape_input(t.inp), out).unwrap();
+            writeln!(
+                wtr,
+                "    {} -> {} [label=\"{}{}\"];",
+                addr,
+                t.addr,
+                util::escape_input(t.inp),
+                out
+            )
+            .unwrap();
         }
         state_num += 1;
     }

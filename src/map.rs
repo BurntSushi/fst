@@ -541,6 +541,11 @@ impl MapBuilder<Vec<u8>> {
     pub fn memory() -> Self {
         MapBuilder(raw::Builder::memory())
     }
+
+    /// Finishes the construction of the map and returning it.
+    pub fn into_map(self) -> Map {
+        self.into_inner().and_then(Map::from_bytes).unwrap()
+    }
 }
 
 impl<W: io::Write> MapBuilder<W> {

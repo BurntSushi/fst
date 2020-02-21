@@ -622,8 +622,8 @@ pub struct StreamBuilder<'f, A = AlwaysMatch> {
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
     fn new(fst: &'f Fst, aut: A) -> Self {
         StreamBuilder {
-            fst: fst,
-            aut: aut,
+            fst,
+            aut,
             min: Bound::Unbounded,
             max: Bound::Unbounded,
         }
@@ -724,8 +724,8 @@ struct StreamState<'f, S> {
 impl<'f, A: Automaton> Stream<'f, A> {
     fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
         let mut rdr = Stream {
-            fst: fst,
-            aut: aut,
+            fst,
+            aut,
             inp: Vec::with_capacity(16),
             empty_output: None,
             stack: vec![],
@@ -777,9 +777,9 @@ impl<'f, A: Automaton> Stream<'f, A> {
                     aut_state = self.aut.accept(&prev_state, b);
                     self.inp.push(b);
                     self.stack.push(StreamState {
-                        node: node,
+                        node,
                         trans: i + 1,
-                        out: out,
+                        out,
                         aut_state: prev_state,
                     });
                     out = out.cat(t.out);
@@ -792,13 +792,13 @@ impl<'f, A: Automaton> Stream<'f, A> {
                     // first transition in this node that proceeds the current
                     // input byte.
                     self.stack.push(StreamState {
-                        node: node,
+                        node,
                         trans: node
                             .transitions()
                             .position(|t| t.inp > b)
                             .unwrap_or(node.len()),
-                        out: out,
-                        aut_state: aut_state,
+                        out,
+                        aut_state,
                     });
                     return;
                 }
@@ -815,8 +815,8 @@ impl<'f, A: Automaton> Stream<'f, A> {
                 self.stack.push(StreamState {
                     node: self.fst.node(node.transition(trans - 1).addr),
                     trans: 0,
-                    out: out,
-                    aut_state: aut_state,
+                    out,
+                    aut_state,
                 });
             }
         }
@@ -916,7 +916,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             self.stack.push(StreamState {
                 node: next_node,
                 trans: 0,
-                out: out,
+                out,
                 aut_state: next_state,
             });
             if self.end_at.exceeded_by(&self.inp) {

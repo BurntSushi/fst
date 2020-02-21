@@ -110,19 +110,7 @@ impl fmt::Debug for Error {
 }
 
 impl error::Error for Error {
-    fn description(&self) -> &str {
-        use self::Error::*;
-        match *self {
-            FromUtf8(ref err) => err.description(),
-            Version { .. } => "incompatible version found when opening FST",
-            Format => "unknown invalid format found when opening FST",
-            DuplicateKey { .. } => "duplicate key insertion",
-            OutOfOrder { .. } => "out-of-order key insertion",
-            WrongType { .. } => "incompatible type found when opening FST",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn error::Error> {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             Error::FromUtf8(ref err) => Some(err),
             _ => None,

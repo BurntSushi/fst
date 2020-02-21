@@ -12,8 +12,7 @@ Check out my blog post
 Rust](http://blog.burntsushi.net/transducers/)
 for extensive background, examples and experiments.
 
-[![Linux build status](https://travis-ci.org/BurntSushi/fst.svg?branch=master)](https://travis-ci.org/BurntSushi/fst)
-[![Windows build status](https://ci.appveyor.com/api/projects/status/github/BurntSushi/fst?svg=true)](https://ci.appveyor.com/project/BurntSushi/fst)
+[![Build status](https://github.com/BurntSushi/fst/workflows/ci/badge.svg)](https://github.com/BurntSushi/fst/actions)
 [![](http://meritbadge.herokuapp.com/fst)](https://crates.io/crates/fst)
 
 Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
@@ -21,7 +20,7 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 
 ### Documentation
 
-[Full API documentation and examples.](http://burntsushi.net/rustdoc/fst/)
+https://docs.rs/fst
 
 The
 [`fst-regex`](https://docs.rs/fst-regex)
@@ -38,12 +37,6 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 ```toml,ignore
 [dependencies]
 fst = "0.3"
-```
-
-And add this to your crate root:
-
-```rust,ignore
-extern crate fst;
 ```
 
 

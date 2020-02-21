@@ -160,7 +160,9 @@ impl Iterator for ConcatCsv {
                             Err(err) => return Some(Err(From::from(err))),
                             Ok(rdr) => rdr,
                         };
-                        let csvrdr = csv::Reader::from_reader(rdr);
+                        let csvrdr = csv::ReaderBuilder::new()
+                            .has_headers(false)
+                            .from_reader(rdr);
                         self.cur = Some(csvrdr.into_deserialize());
                     }
                 }

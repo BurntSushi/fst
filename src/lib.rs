@@ -87,11 +87,16 @@ Note that an error will be returned if a Levenshtein automaton gets too big
 "##
 )]
 /*!
-# Example: stream a map to a file
+# Example: stream to a file and memory map it for searching
 
 This shows how to create a `MapBuilder` that will stream construction of the
 map to a file. Notably, this will never store the entire transducer in memory.
-Instead, only constant memory is required.
+Instead, only constant memory is required during construction.
+
+For the search phase, we use the
+[`memmap`](https://crates.io/memmap)
+crate to make the file available as a `&[u8]` without necessarily reading it
+all into memory (the operating system will automatically handle that for you).
 
 ```rust,no_run
 # fn example() -> Result<(), fst::Error> {
@@ -99,6 +104,7 @@ use std::fs::File;
 use std::io;
 
 use fst::{IntoStreamer, Streamer, Map, MapBuilder};
+use memmap::Mmap;
 
 // This is where we'll write our map to.
 let mut wtr = io::BufWriter::new(File::create("map.fst")?);
@@ -115,7 +121,8 @@ build.finish()?;
 // At this point, the map has been constructed. Now we'd like to search it.
 // This creates a memory map, which enables searching the map without loading
 // all of it into memory.
-let map = unsafe { Map::from_path("map.fst") }?;
+let mmap = unsafe { Mmap::map(&File::open("map.fst")?)? };
+let map = Map::new(mmap)?;
 
 // Query for keys that are greater than or equal to clarence.
 let mut stream = map.range().ge("clarence").into_stream();
@@ -239,8 +246,9 @@ actually reading the entire set/map into memory. This use case is served well
 by *memory maps*, which lets one assign the entire contents of a file to a
 contiguous region of virtual memory.
 
-Indeed, this crate encourages this mode of operation. Both sets and maps have
-methods for memory mapping a finite state transducer from disk.
+Indeed, this crate encourages this mode of operation. Both sets and maps can
+be constructed from anything that provides an `AsRef<[u8]>` implementation,
+which any memory map should.
 
 This is particularly important for long running processes that use this crate,
 since it enables the operating system to determine which regions of your
@@ -255,7 +263,7 @@ solid state drives where seek time is eliminated. Nevertheless, solid state
 drives are not ubiquitous and it is possible that the OS will not be smart
 enough to keep your memory mapped transducers in the page cache. In that case,
 it is advisable to load the entire transducer into your process's memory (e.g.,
-`Set::from_bytes`).
+calling `Set::new` with a `Vec<u8>`).
 
 # Streams
 

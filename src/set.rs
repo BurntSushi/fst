@@ -1,8 +1,6 @@
 use std::fmt;
 use std::io;
 use std::iter::{self, FromIterator};
-#[cfg(feature = "mmap")]
-use std::path::Path;
 
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::raw;
@@ -17,8 +15,7 @@ use crate::Result;
 ///
 /// A key feature of `Set` is that it can be serialized to disk compactly. Its
 /// underlying representation is built such that the `Set` can be memory mapped
-/// (`Set::from_path`) and searched without necessarily loading the entire
-/// set into memory.
+/// and searched without necessarily loading the entire set into memory.
 ///
 /// It supports most common operations associated with sets, such as
 /// membership, union, intersection, subset/superset, etc. It also supports
@@ -29,42 +26,36 @@ use crate::Result;
 ///
 /// 1. Once constructed, a `Set` can never be modified.
 /// 2. Sets must be constructed with lexicographically ordered byte sequences.
-pub struct Set(raw::Fst);
+pub struct Set<D: AsRef<[u8]>>(raw::Fst<D>);
 
-impl Set {
-    /// Opens a set stored at the given file path via a memory map.
+impl Set<Vec<u8>> {
+    /// Create a `Set` from an iterator of lexicographically ordered byte
+    /// strings.
     ///
-    /// The set must have been written with a compatible finite state
-    /// transducer builder (`SetBuilder` qualifies). If the format is invalid
-    /// or if there is a mismatch between the API version of this library
-    /// and the set, then an error is returned.
+    /// If the iterator does not yield values in lexicographic order, then an
+    /// error is returned.
     ///
-    /// This is unsafe because Rust programs cannot guarantee that memory
-    /// backed by a memory mapped file won't be mutably aliased. It is up to
-    /// the caller to enforce that the memory map is not modified while it is
-    /// opened.
-    #[cfg(feature = "mmap")]
-    pub unsafe fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        raw::Fst::from_path(path).map(Set)
+    /// Note that this is a convenience function to build a set in memory.
+    /// To build a set that streams to an arbitrary `io::Write`, use
+    /// `SetBuilder`.
+    pub fn from_iter<T, I>(iter: I) -> Result<Set<Vec<u8>>>
+    where
+        T: AsRef<[u8]>,
+        I: IntoIterator<Item = T>,
+    {
+        let mut builder = SetBuilder::memory();
+        builder.extend_iter(iter)?;
+        Set::new(builder.into_inner()?)
     }
+}
 
+impl<D: AsRef<[u8]>> Set<D> {
     /// Creates a set from its representation as a raw byte sequence.
     ///
-    /// Note that this operation is very cheap (no allocations and no copies).
-    ///
-    /// The set must have been written with a compatible finite state
-    /// transducer builder (`SetBuilder` qualifies). If the format is invalid
-    /// or if there is a mismatch between the API version of this library
-    /// and the set, then an error is returned.
-    #[inline]
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        raw::Fst::from_bytes(bytes).map(Set)
-    }
-
-    /// Creates a set from its representation as a raw byte sequence.
-    ///
-    /// This accepts a static byte slice, which may be useful if the FST data is
-    /// embedded into the program.
+    /// This accepts anything that can be cheaply converted to a `&[u8]`. The
+    /// caller is responsible for guaranteeing that the given bytes refer to
+    /// a valid FST. While memory safety will not be violated by invalid input,
+    /// a panic could occur while reading the FST at any point.
     ///
     /// # Example
     ///
@@ -77,29 +68,10 @@ impl Set {
     /// # };
     /// # static FST: &[u8] = &[];
     ///
-    /// let set = Set::from_static_slice(FST).unwrap();
+    /// let set = Set::new(FST).unwrap();
     /// ```
-    pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
-        raw::Fst::from_static_slice(bytes).map(Set)
-    }
-
-    /// Create a `Set` from an iterator of lexicographically ordered byte
-    /// strings.
-    ///
-    /// If the iterator does not yield values in lexicographic order, then an
-    /// error is returned.
-    ///
-    /// Note that this is a convenience function to build a set in memory.
-    /// To build a set that streams to an arbitrary `io::Write`, use
-    /// `SetBuilder`.
-    pub fn from_iter<T, I>(iter: I) -> Result<Self>
-    where
-        T: AsRef<[u8]>,
-        I: IntoIterator<Item = T>,
-    {
-        let mut builder = SetBuilder::memory();
-        builder.extend_iter(iter)?;
-        Set::from_bytes(builder.into_inner()?)
+    pub fn new(data: D) -> Result<Set<D>> {
+        raw::Fst::new(data).map(Set)
     }
 
     /// Tests the membership of a single key.
@@ -342,19 +314,19 @@ impl Set {
 
     /// Returns a reference to the underlying raw finite state transducer.
     #[inline]
-    pub fn as_fst(&self) -> &raw::Fst {
+    pub fn as_fst(&self) -> &raw::Fst<D> {
         &self.0
     }
 }
 
-impl Default for Set {
+impl Default for Set<Vec<u8>> {
     #[inline]
-    fn default() -> Set {
+    fn default() -> Set<Vec<u8>> {
         Set::from_iter(iter::empty::<&[u8]>()).unwrap()
     }
 }
 
-impl fmt::Debug for Set {
+impl<D: AsRef<[u8]>> fmt::Debug for Set<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Set([")?;
         let mut stream = self.stream();
@@ -371,14 +343,14 @@ impl fmt::Debug for Set {
 }
 
 /// Returns the underlying finite state transducer.
-impl AsRef<raw::Fst> for Set {
+impl<D: AsRef<[u8]>> AsRef<raw::Fst<D>> for Set<D> {
     #[inline]
-    fn as_ref(&self) -> &raw::Fst {
+    fn as_ref(&self) -> &raw::Fst<D> {
         &self.0
     }
 }
 
-impl<'s, 'a> IntoStreamer<'a> for &'s Set {
+impl<'s, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'s Set<D> {
     type Item = &'a [u8];
     type Into = Stream<'s>;
 
@@ -389,9 +361,9 @@ impl<'s, 'a> IntoStreamer<'a> for &'s Set {
 }
 
 // Construct a set from an Fst object.
-impl From<raw::Fst> for Set {
+impl<D: AsRef<[u8]>> From<raw::Fst<D>> for Set<D> {
     #[inline]
-    fn from(fst: raw::Fst) -> Set {
+    fn from(fst: raw::Fst<D>) -> Set<D> {
         Set(fst)
     }
 }
@@ -441,7 +413,7 @@ impl From<raw::Fst> for Set {
 /// let bytes = build.into_inner().unwrap();
 ///
 /// // At this point, the set has been constructed, but here's how to read it.
-/// let set = Set::from_bytes(bytes).unwrap();
+/// let set = Set::new(bytes).unwrap();
 /// let mut stream = set.into_stream();
 /// let mut keys = vec![];
 /// while let Some(key) = stream.next() {
@@ -473,7 +445,9 @@ impl From<raw::Fst> for Set {
 /// build.finish().unwrap();
 ///
 /// // At this point, the set has been constructed, but here's how to read it.
-/// let set = unsafe { Set::from_path("set.fst").unwrap() };
+/// // NOTE: Normally, one would memory map a file instead of reading its
+/// // entire contents on to the heap.
+/// let set = Set::new(std::fs::read("set.fst").unwrap()).unwrap();
 /// let mut stream = set.into_stream();
 /// let mut keys = vec![];
 /// while let Some(key) = stream.next() {
@@ -492,9 +466,10 @@ impl SetBuilder<Vec<u8>> {
         SetBuilder(raw::Builder::memory())
     }
 
-    /// Finishes the construction of the set and returning it.
-    pub fn into_set(self) -> Set {
-        self.into_inner().and_then(Set::from_bytes).unwrap()
+    /// Finishes the construction of the set and returns it.
+    #[inline]
+    pub fn into_set(self) -> Set<Vec<u8>> {
+        Set(self.0.into_fst())
     }
 }
 

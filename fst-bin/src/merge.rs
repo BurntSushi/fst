@@ -9,10 +9,11 @@ use std::sync::Arc;
 use std::thread;
 
 use chan;
-use fst::{self, Streamer, raw};
+use fst::{self, raw, Streamer};
 use num_cpus;
 use tempdir::TempDir;
 
+use crate::util;
 use crate::Error;
 
 pub struct Merger<I> {
@@ -29,10 +30,14 @@ pub struct Merger<I> {
 type KV = (String, u64);
 
 impl<I> Merger<I>
-where I: Iterator<Item=Result<(String, u64), Error>> + Send + 'static {
+where
+    I: Iterator<Item = Result<(String, u64), Error>> + Send + 'static,
+{
     pub fn new<T, P>(it: T, output: P) -> Self
-            where P: AsRef<Path>,
-                  T: IntoIterator<IntoIter=I, Item=I::Item> {
+    where
+        P: AsRef<Path>,
+        T: IntoIterator<IntoIter = I, Item = I::Item>,
+    {
         Merger {
             it: it.into_iter(),
             output: output.as_ref().to_path_buf(),
@@ -46,7 +51,9 @@ where I: Iterator<Item=Result<(String, u64), Error>> + Send + 'static {
     }
 
     pub fn value_merger<F>(mut self, f: F) -> Self
-            where F: Fn(u64, u64) -> u64 + Send + Sync + 'static {
+    where
+        F: Fn(u64, u64) -> u64 + Send + Sync + 'static,
+    {
         self.value_merger = Some(Arc::new(f));
         self
     }
@@ -132,9 +139,11 @@ fn batcher<I, T, IT>(
     batch_size: u32,
     threads: u32,
 ) -> chan::Receiver<Result<Vec<T>, Error>>
-where T: Send + 'static,
-      IT: Iterator<Item=Result<T, Error>> + Send + 'static,
-      I: IntoIterator<IntoIter=IT, Item=IT::Item> + Send + 'static {
+where
+    T: Send + 'static,
+    IT: Iterator<Item = Result<T, Error>> + Send + 'static,
+    I: IntoIterator<IntoIter = IT, Item = IT::Item> + Send + 'static,
+{
     let batch_size = batch_size as usize;
     let (send, recv) = chan::sync(cmp::min(1, threads as usize / 3));
     let it = it.into_iter();
@@ -182,10 +191,7 @@ impl<B: Batchable + Send + 'static> Sorters<B> {
                 rsend.send(results);
             });
         }
-        Sorters {
-            send: bsend,
-            results: rrecv,
-        }
+        Sorters { send: bsend, results: rrecv }
     }
 
     fn create_fst(&self, batch: B) {
@@ -223,7 +229,9 @@ impl Batchable for KvBatch {
         for &(ref k, v) in &self.kvs {
             match builder.insert(k, v) {
                 Ok(_) => {}
-                Err(fst::Error::Fst(fst::raw::Error::DuplicateKey { .. })) => {}
+                Err(fst::Error::Fst(fst::raw::Error::DuplicateKey {
+                    ..
+                })) => {}
                 Err(err) => return Err(From::from(err)),
             }
         }
@@ -249,15 +257,15 @@ impl Batchable for UnionBatch {
 
         let mut fsts = vec![];
         for path in &self.fsts {
-            fsts.push(unsafe { raw::Fst::from_path(path) }?);
+            fsts.push(unsafe { util::mmap_fst(path)? });
         }
         let mut union = fsts.iter().collect::<raw::OpBuilder>().union();
         while let Some((key, outputs)) = union.next() {
             let mut merged = 0;
             if let Some(ref value_merger) = self.value_merger {
-                merged = outputs.iter().fold(0, |merged, iv| {
-                    value_merger(merged, iv.value)
-                });
+                merged = outputs
+                    .iter()
+                    .fold(0, |merged, iv| value_merger(merged, iv.value));
             }
             builder.insert(key, merged)?;
         }

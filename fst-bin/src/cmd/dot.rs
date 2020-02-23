@@ -61,7 +61,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         .unwrap_or_else(|e| e.exit());
 
     let mut wtr = util::get_buf_writer(args.arg_output.as_ref())?;
-    let fst = unsafe { fst::raw::Fst::from_path(&args.arg_input) }?;
+    let fst = unsafe { util::mmap_fst(&args.arg_input)? };
     let mut set = BitSet::with_capacity(fst.len());
 
     let mut stack = vec![fst.root().addr()];

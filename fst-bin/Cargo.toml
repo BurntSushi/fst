@@ -30,7 +30,3 @@ num_cpus = "1.5"
 regex-automata = { version = "*", path = "/home/andrew/rust/regex-automata", features = ["transducer"] }
 serde = { version = "1.0.104", features = ["derive"] }
 tempdir = "0.3"
-
-[profile.release]
-debug = true
-opt-level = 3

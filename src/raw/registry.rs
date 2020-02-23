@@ -72,6 +72,22 @@ impl<'a> RegistryCache<'a> {
                 cell.node.clone_from(node);
                 RegistryEntry::NotFound(cell)
             }
+        } else if self.cells.len() == 2 {
+            let cell1 = &mut self.cells[0];
+            if !cell1.is_none() && &cell1.node == node {
+                return RegistryEntry::Found(cell1.addr);
+            }
+
+            let cell2 = &mut self.cells[1];
+            if !cell2.is_none() && &cell2.node == node {
+                let addr = cell2.addr;
+                self.cells.swap(0, 1);
+                return RegistryEntry::Found(addr);
+            }
+
+            self.cells[1].node.clone_from(node);
+            self.cells.swap(0, 1);
+            RegistryEntry::NotFound(&mut self.cells[0])
         } else {
             let find = |c: &RegistryCell| !c.is_none() && &c.node == node;
             if let Some(i) = self.cells.iter().position(find) {

@@ -1067,7 +1067,7 @@ fn u64_to_usize(n: u64) -> usize {
 #[inline]
 #[cfg(not(target_pointer_width = "64"))]
 fn u64_to_usize(n: u64) -> usize {
-    if n > ::std::usize::MAX as u64 {
+    if n > std::usize::MAX as u64 {
         panic!(
             "\
 Cannot convert node address {} to a pointer sized variable. If this FST

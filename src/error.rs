@@ -5,7 +5,7 @@ use std::io;
 use crate::raw;
 
 /// A `Result` type alias for this crate's `Error` type.
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// An error that encapsulates all possible errors in this crate.
 #[derive(Debug)]

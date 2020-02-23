@@ -112,7 +112,7 @@ fn fst_set_100000() {
         assert!(
             fst.get(word).is_some(),
             "failed to find word: {}",
-            ::std::str::from_utf8(word).unwrap()
+            std::str::from_utf8(word).unwrap()
         );
     }
 }

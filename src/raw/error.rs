@@ -1,4 +1,3 @@
-use std::error;
 use std::fmt;
 use std::str;
 use std::string::FromUtf8Error;
@@ -109,8 +108,8 @@ impl fmt::Debug for Error {
     }
 }
 
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             Error::FromUtf8(ref err) => Some(err),
             _ => None,

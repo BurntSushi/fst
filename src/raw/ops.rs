@@ -473,7 +473,8 @@ mod tests {
     macro_rules! create_set_op {
         ($name:ident, $op:ident) => {
             fn $name(sets: Vec<Vec<&str>>) -> Vec<String> {
-                let fsts: Vec<Fst> = sets.into_iter().map(fst_set).collect();
+                let fsts: Vec<Fst<_>> =
+                    sets.into_iter().map(fst_set).collect();
                 let op: OpBuilder = fsts.iter().collect();
                 let mut stream = op.$op().into_stream();
                 let mut keys = vec![];
@@ -488,7 +489,8 @@ mod tests {
     macro_rules! create_map_op {
         ($name:ident, $op:ident) => {
             fn $name(sets: Vec<Vec<(&str, u64)>>) -> Vec<(String, u64)> {
-                let fsts: Vec<Fst> = sets.into_iter().map(fst_map).collect();
+                let fsts: Vec<Fst<_>> =
+                    sets.into_iter().map(fst_map).collect();
                 let op: OpBuilder = fsts.iter().collect();
                 let mut stream = op.$op().into_stream();
                 let mut keys = vec![];

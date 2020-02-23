@@ -4,10 +4,17 @@ use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 
 use csv;
+use fst::raw::{Fst, Output};
 use fst::{IntoStreamer, Streamer};
-use fst::raw::Output;
+use memmap::Mmap;
 
 use crate::Error;
+
+pub unsafe fn mmap_fst<P: AsRef<Path>>(path: P) -> Result<Fst<Mmap>, Error> {
+    let mmap = Mmap::map(&File::open(path)?)?;
+    let fst = Fst::new(mmap)?;
+    Ok(fst)
+}
 
 pub fn escape_input(b: u8) -> String {
     String::from_utf8(ascii::escape_default(b).collect::<Vec<_>>()).unwrap()
@@ -61,9 +68,11 @@ pub fn print_stream<'f, W, I, S>(
     outputs: bool,
     stream: I,
 ) -> Result<(), Error>
-where W: io::Write,
-      I: for<'a> IntoStreamer<'a, Into=S, Item=(&'a [u8], Output)>,
-      S: 'f + for<'a> Streamer<'a, Item=(&'a [u8], Output)> {
+where
+    W: io::Write,
+    I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
+    S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
+{
     let mut stream = stream.into_stream();
     if outputs {
         let mut wtr = csv::Writer::from_writer(wtr);
@@ -86,7 +95,8 @@ pub struct ConcatLines {
     cur: Option<Lines>,
 }
 
-type Lines = io::Lines<io::BufReader<Box<dyn io::Read + Send + Sync + 'static>>>;
+type Lines =
+    io::Lines<io::BufReader<Box<dyn io::Read + Send + Sync + 'static>>>;
 
 impl ConcatLines {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatLines {

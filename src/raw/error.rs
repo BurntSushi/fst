@@ -26,7 +26,10 @@ pub enum Error {
     /// An unexpected error occurred while reading a finite state transducer.
     /// Usually this occurs because the data is corrupted or is not actually
     /// a finite state transducer serialized by this library.
-    Format,
+    Format {
+        /// The number of bytes given to the FST constructor.
+        size: usize,
+    },
     /// A duplicate key was inserted into a finite state transducer, which is
     /// not allowed.
     DuplicateKey {
@@ -72,11 +75,12 @@ to change the version of the 'fst' crate you're using, or re-generate the
 FST.",
                 expected, got
             ),
-            Format => write!(
+            Format { size } => write!(
                 f,
                 "\
-Error opening FST: An unknown error occurred. This usually means you're trying
-to read data that isn't actually an encoded FST."
+Error opening FST with size {} bytes: An unknown error occurred. This
+usually means you're trying to read data that isn't actually an encoded FST.",
+                size
             ),
             DuplicateKey { ref got } => write!(
                 f,

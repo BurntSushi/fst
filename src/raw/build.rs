@@ -7,8 +7,8 @@ use crate::raw::counting_writer::CountingWriter;
 use crate::raw::error::Error;
 use crate::raw::registry::{Registry, RegistryEntry};
 use crate::raw::{
-    CompiledAddr, FstType, Output, Transition, EMPTY_ADDRESS, NONE_ADDRESS,
-    VERSION,
+    CompiledAddr, Fst, FstType, Output, Transition, EMPTY_ADDRESS,
+    NONE_ADDRESS, VERSION,
 };
 // use raw::registry_minimal::{Registry, RegistryEntry};
 use crate::stream::{IntoStreamer, Streamer};
@@ -102,6 +102,12 @@ impl Builder<Vec<u8>> {
     #[inline]
     pub fn memory() -> Self {
         Builder::new(Vec::with_capacity(10 * (1 << 10))).unwrap()
+    }
+
+    /// Finishes construction of the FST and returns it.
+    #[inline]
+    pub fn into_fst(self) -> Fst<Vec<u8>> {
+        self.into_inner().and_then(Fst::new).unwrap()
     }
 }
 

@@ -49,11 +49,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     w!(wtr, "lazy_static! {{");
     w!(wtr, "    pub static ref {}: ::fst::raw::Fst = ", args.arg_name);
-    w!(
-        wtr,
-        "        ::fst::raw::Fst::from_static_slice({}_BYTES).unwrap();",
-        args.arg_name
-    );
+    w!(wtr, "        ::fst::raw::Fst::new({}_BYTES).unwrap();", args.arg_name);
     w!(wtr, "}}\n");
 
     w!(wtr, "const {}_BYTES: &'static [u8] = b\"\\", args.arg_name);

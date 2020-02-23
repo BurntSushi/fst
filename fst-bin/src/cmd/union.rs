@@ -41,7 +41,8 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
 
     let mut sets = vec![];
     for set_path in &args.arg_input {
-        sets.push(unsafe { fst::Set::from_path(set_path) }?);
+        let fst = unsafe { util::mmap_fst(set_path)? };
+        sets.push(fst::Set::from(fst));
     }
     let union = sets.iter().collect::<fst::set::OpBuilder>().union();
     merged.extend_stream(union)?;

@@ -8,12 +8,12 @@ use fst::{self, Automaton, IntoStreamer, Streamer};
 
 static WORDS: &'static str = include_str!("../data/words-10000");
 
-fn get_set() -> Set {
+fn get_set() -> Set<Vec<u8>> {
     Set::from_iter(WORDS.lines()).unwrap()
 }
 
 #[cfg(feature = "levenshtein")]
-fn fst_set<I, S>(ss: I) -> Fst
+fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<[u8]>,
@@ -25,7 +25,7 @@ where
     for s in ss.iter().into_iter() {
         bfst.add(s).unwrap();
     }
-    let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
+    let fst = bfst.into_fst();
     ss.dedup();
     assert_eq!(fst.len(), ss.len());
     fst
@@ -177,9 +177,9 @@ fn subsequence() {
 
 #[test]
 fn implements_default() {
-    let map: fst::Map = Default::default();
+    let map: fst::Map<Vec<u8>> = Default::default();
     assert!(map.is_empty());
 
-    let set: fst::Set = Default::default();
+    let set: fst::Set<Vec<u8>> = Default::default();
     assert!(set.is_empty());
 }

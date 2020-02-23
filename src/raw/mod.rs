@@ -18,13 +18,8 @@ option of specifying a merge strategy for output values.
 
 Most of the rest of the types are streams from set operations.
 */
-use std::borrow::Cow;
 use std::cmp;
 use std::fmt;
-use std::ops::Deref;
-#[cfg(feature = "mmap")]
-use std::path::Path;
-use std::sync::Arc;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 
@@ -34,8 +29,6 @@ use crate::stream::{IntoStreamer, Streamer};
 
 pub use self::build::Builder;
 pub use self::error::Error;
-#[cfg(feature = "mmap")]
-pub use self::mmap::MmapReadOnly;
 use self::node::node_new;
 pub use self::node::{Node, Transitions};
 pub use self::ops::{
@@ -47,8 +40,6 @@ mod build;
 mod common_inputs;
 mod counting_writer;
 mod error;
-#[cfg(feature = "mmap")]
-mod mmap;
 mod node;
 mod ops;
 mod pack;
@@ -277,42 +268,20 @@ pub type CompiledAddr = usize;
 ///   (excellent for in depth overview)
 /// * [Comparison of Construction Algorithms for Minimal, Acyclic, Deterministic, Finite-State Automata from Sets of Strings](http://www.cs.mun.ca/~harold/Courses/Old/CS4750/Diary/q3p2qx4lv71m5vew.pdf)
 ///   (excellent for surface level overview)
-pub struct Fst {
+pub struct Fst<D: AsRef<[u8]>> {
+    meta: Meta,
+    data: D,
+}
+
+#[derive(Debug)]
+struct Meta {
     version: u64,
-    data: FstData,
     root_addr: CompiledAddr,
     ty: FstType,
     len: usize,
 }
 
-impl Fst {
-    /// Opens a transducer stored at the given file path via a memory map.
-    ///
-    /// The fst must have been written with a compatible finite state
-    /// transducer builder (`Builder` qualifies). If the format is invalid or
-    /// if there is a mismatch between the API version of this library and the
-    /// fst, then an error is returned.
-    ///
-    /// This is unsafe because Rust programs cannot guarantee that memory
-    /// backed by a memory mapped file won't be mutably aliased. It is up to
-    /// the caller to enforce that the memory map is not modified while it is
-    /// opened.
-    #[cfg(feature = "mmap")]
-    pub unsafe fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Fst::from_mmap(MmapReadOnly::open_path(path)?)
-    }
-
-    /// Opens a transducer from a `MmapReadOnly`.
-    ///
-    /// This is useful if a transducer is serialized to only a part of a file.
-    /// A `MmapReadOnly` lets one control which region of the file is used for
-    /// the transducer.
-    #[cfg(feature = "mmap")]
-    #[inline]
-    pub fn from_mmap(mmap: MmapReadOnly) -> Result<Self> {
-        Fst::new(FstData::Mmap(mmap))
-    }
-
+impl<D: AsRef<[u8]>> Fst<D> {
     /// Creates a transducer from its representation as a raw byte sequence.
     ///
     /// Note that this operation is very cheap (no allocations and no copies).
@@ -322,55 +291,29 @@ impl Fst {
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     #[inline]
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Fst::new(FstData::Cow(Cow::Owned(bytes)))
-    }
-
-    /// Creates a transducer from its representation as a raw byte sequence.
-    ///
-    /// This accepts a static byte slice, which may be useful if the Fst
-    /// is embedded into source code.
-    #[inline]
-    pub fn from_static_slice(bytes: &'static [u8]) -> Result<Self> {
-        Fst::new(FstData::Cow(Cow::Borrowed(bytes)))
-    }
-
-    /// Creates a transducer from a shared vector at the given offset and
-    /// length.
-    ///
-    /// This permits creating multiple transducers from a single region of
-    /// owned memory.
-    #[inline]
-    pub fn from_shared_bytes(
-        bytes: Arc<Vec<u8>>,
-        offset: usize,
-        len: usize,
-    ) -> Result<Self> {
-        Fst::new(FstData::Shared { vec: bytes, offset: offset, len: len })
-    }
-
-    fn new(data: FstData) -> Result<Self> {
-        if data.len() < 32 {
-            return Err(Error::Format.into());
+    pub fn new(data: D) -> Result<Self> {
+        let bytes = data.as_ref();
+        if bytes.len() < 32 {
+            return Err(Error::Format { size: bytes.len() }.into());
         }
         // The read_u64 unwraps below are OK because they can never fail.
         // They can only fail when there is an IO error or if there is an
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
         // N bytes (no unexpected EOF).
-        let version = (&*data).read_u64::<LittleEndian>().unwrap();
+        let version = (&bytes[0..]).read_u64::<LittleEndian>().unwrap();
         if version == 0 || version > VERSION {
             return Err(
                 Error::Version { expected: VERSION, got: version }.into()
             );
         }
-        let ty = (&data[8..]).read_u64::<LittleEndian>().unwrap();
+        let ty = (&bytes[8..]).read_u64::<LittleEndian>().unwrap();
         let root_addr = {
-            let mut last = &data[data.len() - 8..];
+            let mut last = &bytes[bytes.len() - 8..];
             u64_to_usize(last.read_u64::<LittleEndian>().unwrap())
         };
         let len = {
-            let mut last2 = &data[data.len() - 16..];
+            let mut last2 = &bytes[bytes.len() - 16..];
             u64_to_usize(last2.read_u64::<LittleEndian>().unwrap())
         };
         // The root node is always the last node written, so its address should
@@ -391,63 +334,34 @@ impl Fst {
         // special address `0`. In that case, the FST is the smallest it can
         // be: the version, type, root address and number of nodes. That's
         // 32 bytes (8 byte u64 each).
-        //
-        // This is essentially our own little checksum.
-        if (root_addr == EMPTY_ADDRESS && data.len() != 32)
-            && root_addr + 17 != data.len()
+        if (root_addr == EMPTY_ADDRESS && bytes.len() != 32)
+            && root_addr + 17 != bytes.len()
         {
-            return Err(Error::Format.into());
+            return Err(Error::Format { size: bytes.len() }.into());
         }
-        Ok(Fst {
-            version: version,
-            data: data,
-            root_addr: root_addr,
-            ty: ty,
-            len: len,
-        })
+        let meta = Meta { version, root_addr, ty, len };
+        Ok(Fst { meta, data })
     }
 
     /// Retrieves the value associated with a key.
     ///
     /// If the key does not exist, then `None` is returned.
-    #[inline(never)]
+    #[inline]
     pub fn get<B: AsRef<[u8]>>(&self, key: B) -> Option<Output> {
-        let mut node = self.root();
-        let mut out = Output::zero();
-        for &b in key.as_ref() {
-            node = match node.find_input(b) {
-                None => return None,
-                Some(i) => {
-                    let t = node.transition(i);
-                    out = out.cat(t.out);
-                    self.node(t.addr)
-                }
-            }
-        }
-        if !node.is_final() {
-            None
-        } else {
-            Some(out.cat(node.final_output()))
-        }
+        self.as_ref().get(key.as_ref())
     }
 
     /// Returns true if and only if the given key is in this FST.
+    #[inline]
     pub fn contains_key<B: AsRef<[u8]>>(&self, key: B) -> bool {
-        let mut node = self.root();
-        for &b in key.as_ref() {
-            node = match node.find_input(b) {
-                None => return false,
-                Some(i) => self.node(node.transition_addr(i)),
-            }
-        }
-        node.is_final()
+        self.as_ref().contains_key(key.as_ref())
     }
 
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
     #[inline]
     pub fn stream(&self) -> Stream<'_> {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
+        StreamBuilder::new(self.as_ref(), AlwaysMatch).into_stream()
     }
 
     /// Return a builder for range queries.
@@ -456,30 +370,31 @@ impl Fst {
     /// range given in lexicographic order.
     #[inline]
     pub fn range(&self) -> StreamBuilder<'_> {
-        StreamBuilder::new(self, AlwaysMatch)
+        StreamBuilder::new(self.as_ref(), AlwaysMatch)
     }
 
     /// Executes an automaton on the keys of this map.
+    #[inline]
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
-        StreamBuilder::new(self, aut)
+        StreamBuilder::new(self.as_ref(), aut)
     }
 
     /// Returns the number of keys in this fst.
     #[inline]
     pub fn len(&self) -> usize {
-        self.len
+        self.as_ref().len()
     }
 
     /// Returns true if and only if this fst has no keys.
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.len == 0
+        self.as_ref().is_empty()
     }
 
     /// Returns the number of bytes used by this fst.
     #[inline]
     pub fn size(&self) -> usize {
-        self.data.len()
+        self.as_ref().size()
     }
 
     /// Creates a new fst operation with this fst added to it.
@@ -498,6 +413,7 @@ impl Fst {
     ///
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
+    #[inline]
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -511,6 +427,7 @@ impl Fst {
     ///
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
+    #[inline]
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -529,6 +446,7 @@ impl Fst {
     ///
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
+    #[inline]
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -551,13 +469,13 @@ impl Fst {
     /// the meaning of 0-255 unspecified.
     #[inline]
     pub fn fst_type(&self) -> FstType {
-        self.ty
+        self.as_ref().fst_type()
     }
 
     /// Returns the root node of this fst.
     #[inline(always)]
     pub fn root(&self) -> Node<'_> {
-        self.node(self.root_addr)
+        self.as_ref().root()
     }
 
     /// Returns the node at the given address.
@@ -565,19 +483,108 @@ impl Fst {
     /// Node addresses can be obtained by reading transitions on `Node` values.
     #[inline]
     pub fn node(&self, addr: CompiledAddr) -> Node<'_> {
-        node_new(self.version, addr, &self.data)
+        self.as_ref().node(addr)
     }
 
     /// Returns a copy of the binary contents of this FST.
     #[inline]
     pub fn to_vec(&self) -> Vec<u8> {
-        self.data.to_vec()
+        self.as_ref().to_vec()
     }
 
     /// Returns the binary contents of this FST.
     #[inline]
     pub fn as_bytes(&self) -> &[u8] {
-        &self.data
+        self.as_ref().as_bytes()
+    }
+
+    #[inline]
+    fn as_ref(&self) -> FstRef {
+        FstRef { meta: &self.meta, data: self.data.as_ref() }
+    }
+}
+
+impl<'a, 'f, D: AsRef<[u8]>> IntoStreamer<'a> for &'f Fst<D> {
+    type Item = (&'a [u8], Output);
+    type Into = Stream<'f>;
+
+    #[inline]
+    fn into_stream(self) -> Self::Into {
+        StreamBuilder::new(self.as_ref(), AlwaysMatch).into_stream()
+    }
+}
+
+struct FstRef<'f> {
+    meta: &'f Meta,
+    data: &'f [u8],
+}
+
+impl<'f> FstRef<'f> {
+    fn get(&self, key: &[u8]) -> Option<Output> {
+        let mut node = self.root();
+        let mut out = Output::zero();
+        for &b in key {
+            node = match node.find_input(b) {
+                None => return None,
+                Some(i) => {
+                    let t = node.transition(i);
+                    out = out.cat(t.out);
+                    self.node(t.addr)
+                }
+            }
+        }
+        if !node.is_final() {
+            None
+        } else {
+            Some(out.cat(node.final_output()))
+        }
+    }
+
+    fn contains_key(&self, key: &[u8]) -> bool {
+        let mut node = self.root();
+        for &b in key {
+            node = match node.find_input(b) {
+                None => return false,
+                Some(i) => self.node(node.transition_addr(i)),
+            }
+        }
+        node.is_final()
+    }
+
+    fn len(&self) -> usize {
+        self.meta.len
+    }
+
+    fn is_empty(&self) -> bool {
+        self.meta.len == 0
+    }
+
+    fn size(&self) -> usize {
+        self.as_bytes().len()
+    }
+
+    fn fst_type(&self) -> FstType {
+        self.meta.ty
+    }
+
+    fn root_addr(&self) -> CompiledAddr {
+        self.meta.root_addr
+    }
+
+    fn root(&self) -> Node<'f> {
+        self.node(self.root_addr())
+    }
+
+    fn node(&self, addr: CompiledAddr) -> Node<'f> {
+        node_new(self.meta.version, addr, self.as_bytes())
+    }
+
+    fn to_vec(&self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+
+    fn as_bytes(&self) -> &'f [u8] {
+        self.data
     }
 
     fn empty_final_output(&self) -> Option<Output> {
@@ -587,16 +594,6 @@ impl Fst {
         } else {
             None
         }
-    }
-}
-
-impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
-    type Item = (&'a [u8], Output);
-    type Into = Stream<'f>;
-
-    #[inline]
-    fn into_stream(self) -> Self::Into {
-        StreamBuilder::new(self, AlwaysMatch).into_stream()
     }
 }
 
@@ -613,14 +610,14 @@ impl<'a, 'f> IntoStreamer<'a> for &'f Fst {
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct StreamBuilder<'f, A = AlwaysMatch> {
-    fst: &'f Fst,
+    fst: FstRef<'f>,
     aut: A,
     min: Bound,
     max: Bound,
 }
 
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
-    fn new(fst: &'f Fst, aut: A) -> Self {
+    fn new(fst: FstRef<'f>, aut: A) -> Self {
         StreamBuilder {
             fst,
             aut,
@@ -705,7 +702,7 @@ pub struct Stream<'f, A = AlwaysMatch>
 where
     A: Automaton,
 {
-    fst: &'f Fst,
+    fst: FstRef<'f>,
     aut: A,
     inp: Vec<u8>,
     empty_output: Option<Output>,
@@ -722,7 +719,7 @@ struct StreamState<'f, S> {
 }
 
 impl<'f, A: Automaton> Stream<'f, A> {
-    fn new(fst: &'f Fst, aut: A, min: Bound, max: Bound) -> Self {
+    fn new(fst: FstRef<'f>, aut: A, min: Bound, max: Bound) -> Stream<'f, A> {
         let mut rdr = Stream {
             fst,
             aut,
@@ -901,7 +898,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
             if state.trans >= state.node.len()
                 || !self.aut.can_match(&state.aut_state)
             {
-                if state.node.addr() != self.fst.root_addr {
+                if state.node.addr() != self.fst.root_addr() {
                     self.inp.pop().unwrap();
                 }
                 continue;
@@ -995,32 +992,6 @@ impl Output {
                 .checked_sub(o.0)
                 .expect("BUG: underflow subtraction not allowed"),
         )
-    }
-}
-
-enum FstData {
-    Cow(Cow<'static, [u8]>),
-    Shared {
-        vec: Arc<Vec<u8>>,
-        offset: usize,
-        len: usize,
-    },
-    #[cfg(feature = "mmap")]
-    Mmap(MmapReadOnly),
-}
-
-impl Deref for FstData {
-    type Target = [u8];
-
-    fn deref(&self) -> &[u8] {
-        match *self {
-            FstData::Cow(ref v) => &**v,
-            FstData::Shared { ref vec, offset, len } => {
-                &vec[offset..offset + len]
-            }
-            #[cfg(feature = "mmap")]
-            FstData::Mmap(ref v) => v.as_slice(),
-        }
     }
 }
 

@@ -1,5 +1,4 @@
 use docopt::Docopt;
-use fst::raw::Fst;
 use serde::Deserialize;
 
 use crate::util;
@@ -34,7 +33,7 @@ pub fn run(argv: Vec<String>) -> Result<(), Error> {
         .and_then(|d| d.argv(&argv).deserialize())
         .unwrap_or_else(|e| e.exit());
     let mut wtr = util::get_buf_writer::<&str>(None)?;
-    let fst = unsafe { Fst::from_path(&args.arg_fst) }?;
+    let fst = unsafe { util::mmap_fst(&args.arg_fst)? };
     let node = fst.node(args.arg_node_address);
     w!(wtr, "{:?}", node);
     Ok(())

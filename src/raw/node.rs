@@ -873,9 +873,7 @@ mod tests {
 
     use crate::raw::build::BuilderNode;
     use crate::raw::node::{node_new, Node};
-    use crate::raw::{
-        Builder, CompiledAddr, Fst, Output, Transition, VERSION,
-    };
+    use crate::raw::{Builder, CompiledAddr, Output, Transition, VERSION};
     use crate::stream::Streamer;
 
     const NEVER_LAST: CompiledAddr = std::u64::MAX as CompiledAddr;
@@ -890,7 +888,7 @@ mod tests {
             for word in &bs {
                 bfst.add(word).unwrap();
             }
-            let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
+            let fst = bfst.into_fst();
             let mut rdr = fst.stream();
             let mut words = vec![];
             while let Some(w) = rdr.next() {

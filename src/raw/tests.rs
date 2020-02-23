@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::automaton::AlwaysMatch;
 use crate::error::Error;
 use crate::raw::{self, Bound, Builder, Fst, Output, Stream, VERSION};
@@ -7,7 +5,7 @@ use crate::stream::Streamer;
 
 const TEXT: &'static str = include_str!("./../../data/words-100000");
 
-pub fn fst_set<I, S>(ss: I) -> Fst
+pub fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
 where
     I: IntoIterator<Item = S>,
     S: AsRef<[u8]>,
@@ -16,16 +14,16 @@ where
     let mut ss: Vec<Vec<u8>> =
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
     ss.sort();
+    ss.dedup();
     for s in ss.iter().into_iter() {
         bfst.add(s).unwrap();
     }
-    let fst = Fst::from_bytes(bfst.into_inner().unwrap()).unwrap();
-    ss.dedup();
+    let fst = bfst.into_fst();
     assert_eq!(fst.len(), ss.len());
     fst
 }
 
-pub fn fst_map<I, S>(ss: I) -> Fst
+pub fn fst_map<I, S>(ss: I) -> Fst<Vec<u8>>
 where
     I: IntoIterator<Item = (S, u64)>,
     S: AsRef<[u8]>,
@@ -38,10 +36,10 @@ where
     for (s, o) in ss.into_iter() {
         bfst.insert(s, o).unwrap();
     }
-    Fst::from_bytes(bfst.into_inner().unwrap()).unwrap()
+    bfst.into_fst()
 }
 
-pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
+pub fn fst_inputs<D: AsRef<[u8]>>(fst: &Fst<D>) -> Vec<Vec<u8>> {
     let mut words = vec![];
     let mut rdr = fst.stream();
     while let Some((word, _)) = rdr.next() {
@@ -50,7 +48,9 @@ pub fn fst_inputs(fst: &Fst) -> Vec<Vec<u8>> {
     words
 }
 
-pub fn fst_inputs_outputs(fst: &Fst) -> Vec<(Vec<u8>, u64)> {
+pub fn fst_inputs_outputs<D: AsRef<[u8]>>(
+    fst: &Fst<D>,
+) -> Vec<(Vec<u8>, u64)> {
     let mut words = vec![];
     let mut rdr = fst.stream();
     while let Some((word, out)) = rdr.next() {
@@ -206,7 +206,7 @@ fn fst_map_100000_lengths() {
 
 #[test]
 fn invalid_version() {
-    match Fst::from_bytes(vec![0; 32]) {
+    match Fst::new(vec![0; 32]) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
@@ -219,7 +219,7 @@ fn invalid_version_crate_too_old() {
 
     let mut buf = vec![0; 32];
     LittleEndian::write_u64(&mut buf, VERSION + 1);
-    match Fst::from_bytes(buf) {
+    match Fst::new(buf) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => {
             assert_eq!(got, VERSION + 1);
         }
@@ -230,8 +230,8 @@ fn invalid_version_crate_too_old() {
 
 #[test]
 fn invalid_format() {
-    match Fst::from_bytes(vec![0; 0]) {
-        Err(Error::Fst(raw::Error::Format)) => {}
+    match Fst::new(vec![0; 0]) {
+        Err(Error::Fst(raw::Error::Format { .. })) => {}
         Err(err) => panic!("expected format error, got {:?}", err),
         Ok(_) => panic!("expected format error, got FST"),
     }
@@ -256,14 +256,18 @@ macro_rules! test_range {
         #[test]
         fn $name() {
             let items: Vec<&'static str> = vec![$($s),*];
-            let items: Vec<_> =
-                items.into_iter().enumerate()
-                     .map(|(i, k)| (k, i as u64)).collect();
+            let items: Vec<_> = items
+                .into_iter()
+                .enumerate()
+                .map(|(i, k)| (k, i as u64))
+                .collect();
             let fst = fst_map(items.clone());
-            let mut rdr = Stream::new(&fst, AlwaysMatch, $min, $max);
+            let mut rdr = Stream::new(fst.as_ref(), AlwaysMatch, $min, $max);
             for i in $imin..$imax {
-                assert_eq!(rdr.next().unwrap(),
-                           (items[i].0.as_bytes(), Output::new(items[i].1)));
+                assert_eq!(
+                    rdr.next().unwrap(),
+                    (items[i].0.as_bytes(), Output::new(items[i].1)),
+                );
             }
             assert_eq!(rdr.next(), None);
         }
@@ -490,15 +494,13 @@ fn one_vec_multiple_fsts() {
     let mut bfst2 = Builder::new(bytes).unwrap();
     bfst2.add(b"bar").unwrap();
     bfst2.add(b"foo").unwrap();
-    let bytes = Arc::new(bfst2.into_inner().unwrap());
 
-    let fst1 = Fst::from_shared_bytes(bytes.clone(), 0, fst1_len).unwrap();
-    let fst2 = Fst::from_shared_bytes(
-        bytes.clone(),
-        fst1_len,
-        bytes.len() - fst1_len,
-    )
-    .unwrap();
+    let bytes = bfst2.into_inner().unwrap();
+    let slice1 = &bytes[0..fst1_len];
+    let slice2 = &bytes[fst1_len..bytes.len()];
+
+    let fst1 = Fst::new(slice1).unwrap();
+    let fst2 = Fst::new(slice2).unwrap();
 
     assert_eq!(fst_inputs(&fst1), vec![b"bar".to_vec(), b"baz".to_vec()]);
     assert_eq!(fst_inputs(&fst2), vec![b"bar".to_vec(), b"foo".to_vec()]);

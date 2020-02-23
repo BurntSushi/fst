@@ -8,7 +8,9 @@ use byteorder::WriteBytesExt;
 use crate::raw::build::BuilderNode;
 use crate::raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
 use crate::raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
-use crate::raw::{u64_to_usize, CompiledAddr, Output, Transition, EMPTY_ADDRESS};
+use crate::raw::{
+    u64_to_usize, CompiledAddr, Output, Transition, EMPTY_ADDRESS,
+};
 
 /// The threshold (in number of transitions) at which an index is created for
 /// a node's transitions. This speeds up lookup time at the expense of FST
@@ -871,10 +873,12 @@ mod tests {
 
     use crate::raw::build::BuilderNode;
     use crate::raw::node::{node_new, Node};
-    use crate::raw::{Builder, CompiledAddr, Fst, Output, Transition, VERSION};
+    use crate::raw::{
+        Builder, CompiledAddr, Fst, Output, Transition, VERSION,
+    };
     use crate::stream::Streamer;
 
-    const NEVER_LAST: CompiledAddr = ::std::u64::MAX as CompiledAddr;
+    const NEVER_LAST: CompiledAddr = std::u64::MAX as CompiledAddr;
 
     #[test]
     fn prop_emits_inputs() {

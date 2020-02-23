@@ -1,0 +1,23 @@
+[package]
+publish = false
+name = "fst-bench"
+version = "0.0.1"
+authors = ["Andrew Gallant <jamslam@gmail.com>"]
+description = "Criterion benchmark suite for fst."
+homepage = "https://github.com/BurntSushi/fst"
+repository = "https://github.com/BurntSushi/fst"
+license = "BSD-3-Clause"
+edition = "2018"
+
+[lib]
+bench = false
+
+[[bench]]
+name = "fst"
+harness = false
+path = "src/bench.rs"
+
+[dependencies]
+criterion = "0.3.1"
+fnv = "1.0.6"
+fst = { version = "*", path = "..", features = ["levenshtein"] }

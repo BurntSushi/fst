@@ -14,22 +14,13 @@ keywords = ["search", "information", "retrieval", "dictionary", "map"]
 license = "Unlicense/MIT"
 edition = "2018"
 
+[workspace]
+members = ["bench", "fst-bin"]
+
 [features]
 default = ["mmap"]
 mmap = ["memmap"]
 levenshtein = ["utf8-ranges"]
-
-[[bench]]
-name = "build"
-path = "./benches/build.rs"
-test = false
-bench = true
-
-[[bench]]
-name = "search"
-path = "./benches/search.rs"
-test = false
-bench = true
 
 [dependencies]
 byteorder = "1"
@@ -46,7 +37,6 @@ rand = "0.5"
 debug = true
 
 [profile.bench]
-opt-level = 3
 debug = true
 
 [package.metadata.docs.rs]

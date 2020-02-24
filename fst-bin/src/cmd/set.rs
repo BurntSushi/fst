@@ -1,9 +1,10 @@
 use std::fs;
+use std::io;
 use std::path::Path;
 
+use bstr::io::BufReadExt;
 use docopt::Docopt;
 use fst::SetBuilder;
-use lines::linereader::LineReader;
 use serde::Deserialize;
 
 use crate::merge::Merger;
@@ -77,19 +78,14 @@ fn run_sorted(args: &Args) -> Result<(), Error> {
     let mut set = SetBuilder::new(wtr)?;
     for input in &args.arg_input {
         let rdr = util::get_buf_reader(Some(input))?;
-        let mut lines = LineReader::new(rdr);
-        loop {
-            let line = lines.read_line()?;
+        rdr.for_byte_line(|line| {
             if line.is_empty() {
-                break;
+                return Ok(false);
             }
-            let off = if line.len() >= 2 && line[line.len() - 2] == b'\r' {
-                2
-            } else {
-                1
-            };
-            set.insert(&line[0..line.len() - off])?;
-        }
+            set.insert(line)
+                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            Ok(true)
+        })?;
     }
     set.finish().map_err(From::from)
 }

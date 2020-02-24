@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::cmp;
 use std::env;
 use std::fs::{self, File};
@@ -8,10 +6,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
 
-use chan;
+use bstr::BString;
+use crossbeam_channel as chan;
 use fst::{self, raw, Streamer};
 use num_cpus;
-use tempdir::TempDir;
+use tempfile;
 
 use crate::util;
 use crate::Error;
@@ -27,11 +26,11 @@ pub struct Merger<I> {
     keep_tmp_dir: bool,
 }
 
-type KV = (String, u64);
+type KV = (BString, u64);
 
 impl<I> Merger<I>
 where
-    I: Iterator<Item = Result<(String, u64), Error>> + Send + 'static,
+    I: Iterator<Item = Result<(BString, u64), Error>> + Send + 'static,
 {
     pub fn new<T, P>(it: T, output: P) -> Self
     where
@@ -84,7 +83,9 @@ where
     }
 
     pub fn merge(self) -> Result<(), Error> {
-        let tmp_dir = TempDir::new_in(&self.tmp_dir, "rust-fst")?;
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("rust-fst")
+            .tempdir_in(&self.tmp_dir)?;
         let tmp_dir_path = Arc::new(tmp_dir.path().to_path_buf());
 
         // Do the initial round of creating FSTs for every batch in the input.
@@ -145,27 +146,27 @@ where
     I: IntoIterator<IntoIter = IT, Item = IT::Item> + Send + 'static,
 {
     let batch_size = batch_size as usize;
-    let (send, recv) = chan::sync(cmp::min(1, threads as usize / 3));
+    let (send, recv) = chan::bounded(cmp::min(1, threads as usize / 3));
     let it = it.into_iter();
     thread::spawn(move || {
         let mut batch = Vec::with_capacity(batch_size);
         for item in it {
             match item {
                 Err(err) => {
-                    send.send(Err(From::from(err)));
+                    send.send(Err(From::from(err))).unwrap();
                     return;
                 }
                 Ok(item) => {
                     batch.push(item);
                     if batch.len() >= batch_size {
-                        send.send(Ok(batch));
+                        send.send(Ok(batch)).unwrap();
                         batch = Vec::with_capacity(batch_size);
                     }
                 }
             }
         }
         if !batch.is_empty() {
-            send.send(Ok(batch));
+            send.send(Ok(batch)).unwrap();
         }
     });
     recv
@@ -178,8 +179,8 @@ struct Sorters<B> {
 
 impl<B: Batchable + Send + 'static> Sorters<B> {
     fn new(threads: u32) -> Self {
-        let (bsend, brecv) = chan::sync::<B>(0); // not sure why B is explicit
-        let (rsend, rrecv) = chan::sync(0);
+        let (bsend, brecv) = chan::bounded::<B>(0);
+        let (rsend, rrecv) = chan::bounded(0);
         for _ in 0..threads {
             let brecv = brecv.clone();
             let rsend = rsend.clone();
@@ -188,14 +189,14 @@ impl<B: Batchable + Send + 'static> Sorters<B> {
                 for mut batch in brecv {
                     results.push(batch.create_fst());
                 }
-                rsend.send(results);
+                rsend.send(results).unwrap();
             });
         }
         Sorters { send: bsend, results: rrecv }
     }
 
     fn create_fst(&self, batch: B) {
-        self.send.send(batch);
+        self.send.send(batch).unwrap();
     }
 
     fn results(self) -> Vec<Result<PathBuf, Error>> {

@@ -1,8 +1,9 @@
 use std::ascii;
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io;
 use std::path::{Path, PathBuf};
 
+use bstr::{io::BufReadExt, BString};
 use csv;
 use fst::raw::{Fst, Output};
 use fst::{IntoStreamer, Streamer};
@@ -95,8 +96,9 @@ pub struct ConcatLines {
     cur: Option<Lines>,
 }
 
-type Lines =
-    io::Lines<io::BufReader<Box<dyn io::Read + Send + Sync + 'static>>>;
+type Lines = bstr::io::ByteLines<
+    io::BufReader<Box<dyn io::Read + Send + Sync + 'static>>,
+>;
 
 impl ConcatLines {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatLines {
@@ -106,7 +108,7 @@ impl ConcatLines {
 }
 
 impl Iterator for ConcatLines {
-    type Item = io::Result<String>;
+    type Item = io::Result<BString>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -118,13 +120,13 @@ impl Iterator for ConcatLines {
                             Err(err) => return Some(Err(err)),
                             Ok(rdr) => rdr,
                         };
-                        self.cur = Some(rdr.lines());
+                        self.cur = Some(rdr.byte_lines());
                     }
                 }
             }
-            match self.cur.as_mut().and_then(|lines| Iterator::next(lines)) {
+            match self.cur.as_mut().and_then(|lines| lines.next()) {
                 None => self.cur = None,
-                Some(r) => return Some(r),
+                Some(r) => return Some(r.map(BString::from)),
             }
         }
     }
@@ -136,7 +138,7 @@ pub struct ConcatCsv {
 }
 
 type Reader = Box<dyn io::Read + Send + Sync + 'static>;
-type Rows = csv::DeserializeRecordsIntoIter<Reader, (String, u64)>;
+type Rows = csv::DeserializeRecordsIntoIter<Reader, (BString, u64)>;
 
 impl ConcatCsv {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatCsv {
@@ -144,7 +146,7 @@ impl ConcatCsv {
         ConcatCsv { inputs: inputs, cur: None }
     }
 
-    fn read_row(&mut self) -> Option<Result<(String, u64), Error>> {
+    fn read_row(&mut self) -> Option<Result<(BString, u64), Error>> {
         let rdr = match self.cur {
             None => return None,
             Some(ref mut rdr) => rdr,
@@ -158,7 +160,7 @@ impl ConcatCsv {
 }
 
 impl Iterator for ConcatCsv {
-    type Item = Result<(String, u64), Error>;
+    type Item = Result<(BString, u64), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {

@@ -1,12 +1,4 @@
-#![allow(dead_code)]
-
-use std::env;
-use std::error;
-use std::io::{self, Write};
-use std::process;
-
-use docopt::Docopt;
-use serde::Deserialize;
+use anyhow::Error;
 
 macro_rules! w {
     ($wtr:expr, $($tt:tt)*) => {{
@@ -15,104 +7,31 @@ macro_rules! w {
     }}
 }
 
-macro_rules! fail {
-    ($($tt:tt)*) => { return Err(From::from(format!($($tt)*))); }
-}
-
+mod app;
 mod cmd;
 mod merge;
 mod util;
 
-pub type Error = Box<dyn error::Error + Send + Sync>;
-
-const USAGE: &'static str = "
-Usage:
-    fst <command> [<args>...]
-    fst --help
-    fst --version
-
-Commands:
-    csv     Emit statistics about nodes or edges.
-    dot     Emit a dot representation of an FST.
-    dupes   Emit diagnostic info about frequency of duplicate nodes.
-    fuzzy   Run fuzzy queries based on edit distance.
-    grep    Search an FST with a regex.
-    map     Create a new map of key-value pairs.
-    node    Show a single node.
-    range   Run range queries.
-    rust    Emit a Rust source code for this FST.
-    set     Create a new set of keys.
-    union   Union two or more FSTs.
-
-Options:
-    -h, --help     Show this help message.
-    -v, --version  Show version.
-";
-
-#[derive(Debug, Deserialize)]
-struct Args {
-    arg_command: Option<Command>,
-}
-
-#[derive(Debug, Deserialize)]
-enum Command {
-    Csv,
-    Dot,
-    Dupes,
-    Fuzzy,
-    Grep,
-    Map,
-    Node,
-    Range,
-    Rust,
-    Set,
-    Union,
-}
-
-impl Command {
-    fn run(self) -> Result<(), Error> {
-        use self::Command::*;
-
-        let argv: Vec<String> = env::args().collect();
-        match self {
-            Csv => cmd::csv::run(argv),
-            Dot => cmd::dot::run(argv),
-            Dupes => cmd::dupes::run(argv),
-            Fuzzy => cmd::fuzzy::run(argv),
-            Grep => cmd::grep::run(argv),
-            Map => cmd::map::run(argv),
-            Node => cmd::node::run(argv),
-            Range => cmd::range::run(argv),
-            Rust => cmd::rust::run(argv),
-            Set => cmd::set::run(argv),
-            Union => cmd::union::run(argv),
+fn main() -> Result<(), Error> {
+    match crate::app::app().get_matches().subcommand() {
+        ("csv", Some(m)) => cmd::csv::run(m),
+        ("dot", Some(m)) => cmd::dot::run(m),
+        ("dupes", Some(m)) => cmd::dupes::run(m),
+        ("fuzzy", Some(m)) => cmd::fuzzy::run(m),
+        ("grep", Some(m)) => cmd::grep::run(m),
+        ("map", Some(m)) => cmd::map::run(m),
+        ("node", Some(m)) => cmd::node::run(m),
+        ("range", Some(m)) => cmd::range::run(m),
+        ("rust", Some(m)) => cmd::rust::run(m),
+        ("set", Some(m)) => cmd::set::run(m),
+        ("union", Some(m)) => cmd::union::run(m),
+        ("", _) => {
+            app::app().print_help()?;
+            println!("");
+            Ok(())
         }
-    }
-}
-
-fn main() {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| {
-            d.options_first(true).version(Some(version())).deserialize()
-        })
-        .unwrap_or_else(|e| e.exit());
-    let cmd = args.arg_command.expect("BUG: expected a command");
-    if let Err(err) = cmd.run() {
-        writeln!(&mut io::stderr(), "{}", err).unwrap();
-        process::exit(1);
-    }
-}
-
-fn version() -> String {
-    let (maj, min, pat) = (
-        option_env!("CARGO_PKG_VERSION_MAJOR"),
-        option_env!("CARGO_PKG_VERSION_MINOR"),
-        option_env!("CARGO_PKG_VERSION_PATCH"),
-    );
-    match (maj, min, pat) {
-        (Some(maj), Some(min), Some(pat)) => {
-            format!("{}.{}.{}", maj, min, pat)
+        (unknown, _) => {
+            Err(anyhow::anyhow!("unrecognized command: {}", unknown))
         }
-        _ => "N/A".to_owned(),
     }
 }

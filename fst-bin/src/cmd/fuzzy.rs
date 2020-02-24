@@ -1,60 +1,54 @@
 use std::io;
+use std::path::PathBuf;
 
-use docopt::Docopt;
+use bstr::{BString, ByteVec};
 use fst::automaton::Levenshtein;
-use serde::Deserialize;
 
-use crate::util;
-use crate::Error;
+use crate::{util, Error};
 
-const USAGE: &'static str = "
-Issues a fuzzy query against the given transducer.
-
-A fuzzy query returns all search results within a particular edit distance
-of the query given.
-
-WARNING: This works by building a Levenshtein automaton, which is currently
-rather expensive (in time and space) with a big edit distance. This will be
-improved in the future.
-
-Usage:
-    fst fuzzy [options] <fst> <query>
-    fst fuzzy --help
-
-Options:
-    -h, --help          Display this message.
-    -d, --distance ARG  All terms in the fst within this distance are shown.
-                        The distance is measured in the number of character
-                        insertions, deletions and substitutions on the query
-                        to get the term. In this case, a \"character\" is a
-                        single Unicode codepoint. [default: 1]
-    -o, --outputs       When set, output values are shown as CSV data.
-    -s, --start ARG     Only show results greater than or equal to this.
-    -e, --end ARG       Only show results less than or equal to this.
-";
-
-#[derive(Debug, Deserialize)]
-struct Args {
-    arg_fst: String,
-    arg_query: String,
-    flag_distance: u32,
-    flag_outputs: bool,
-    flag_start: Option<String>,
-    flag_end: Option<String>,
+pub fn run(matches: &clap::ArgMatches) -> Result<(), Error> {
+    Args::new(matches).and_then(|args| args.run())
 }
 
-pub fn run(argv: Vec<String>) -> Result<(), Error> {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.argv(&argv).deserialize())
-        .unwrap_or_else(|e| e.exit());
-    let fst = unsafe { util::mmap_fst(&args.arg_fst)? };
-    let lev = Levenshtein::new(&args.arg_query, args.flag_distance)?;
-    let mut q = fst.search(&lev);
-    if let Some(ref start) = args.flag_start {
-        q = q.ge(start);
+#[derive(Debug)]
+struct Args {
+    input: PathBuf,
+    query: String,
+    distance: u32,
+    outputs: bool,
+    start: Option<BString>,
+    end: Option<BString>,
+}
+
+impl Args {
+    fn new(m: &clap::ArgMatches) -> Result<Args, Error> {
+        Ok(Args {
+            input: m.value_of_os("input").map(PathBuf::from).unwrap(),
+            query: m
+                .value_of_os("query")
+                .map(|v| v.to_string_lossy().into_owned())
+                .unwrap(),
+            distance: m.value_of_lossy("distance").unwrap().parse()?,
+            outputs: m.is_present("outputs"),
+            start: m
+                .value_of_os("start")
+                .map(|v| Vec::from_os_str_lossy(v).into_owned().into()),
+            end: m
+                .value_of_os("end")
+                .map(|v| Vec::from_os_str_lossy(v).into_owned().into()),
+        })
     }
-    if let Some(ref end) = args.flag_end {
-        q = q.le(end);
+
+    fn run(&self) -> Result<(), Error> {
+        let fst = unsafe { util::mmap_fst(&self.input)? };
+        let lev = Levenshtein::new(&self.query, self.distance)?;
+        let mut q = fst.search(&lev);
+        if let Some(ref start) = self.start {
+            q = q.ge(start);
+        }
+        if let Some(ref end) = self.end {
+            q = q.le(end);
+        }
+        util::print_stream(io::BufWriter::new(io::stdout()), self.outputs, q)
     }
-    util::print_stream(io::BufWriter::new(io::stdout()), args.flag_outputs, q)
 }

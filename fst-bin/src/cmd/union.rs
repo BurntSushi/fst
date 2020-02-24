@@ -1,51 +1,51 @@
 use std::fs;
+use std::path::PathBuf;
 
-use docopt::Docopt;
-use serde::Deserialize;
+use crate::{util, Error};
 
-use crate::util;
-use crate::Error;
-
-const USAGE: &'static str = "
-Unions all of the transducer inputs into a single transducer.
-
-Any output values are dropped. Stated differently, the output transducer is
-always a set.
-
-Usage:
-    fst union [options] <input>... <output>
-    fst union --help
-
-Options:
-    -h, --help       Show this help message.
-    -f, --force      Overwrites the output if a file already exists.
-";
-
-#[derive(Debug, Deserialize)]
-struct Args {
-    arg_input: Vec<String>,
-    arg_output: String,
-    flag_force: bool,
+pub fn run(matches: &clap::ArgMatches) -> Result<(), Error> {
+    Args::new(matches).and_then(|args| args.run())
 }
 
-pub fn run(argv: Vec<String>) -> Result<(), Error> {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.argv(&argv).deserialize())
-        .unwrap_or_else(|e| e.exit());
-    if !args.flag_force && fs::metadata(&args.arg_output).is_ok() {
-        fail!("Output file already exists: {}", args.arg_output);
+#[derive(Debug)]
+struct Args {
+    input: Vec<PathBuf>,
+    output: PathBuf,
+    force: bool,
+}
+
+impl Args {
+    fn new(m: &clap::ArgMatches) -> Result<Args, Error> {
+        Ok(Args {
+            input: m
+                .values_of_os("input")
+                .unwrap()
+                .map(PathBuf::from)
+                .collect(),
+            output: m.value_of_os("output").map(PathBuf::from).unwrap(),
+            force: m.is_present("force"),
+        })
     }
 
-    let wtr = util::get_buf_writer(Some(&args.arg_output))?;
-    let mut merged = fst::SetBuilder::new(wtr)?;
+    fn run(&self) -> Result<(), Error> {
+        if !self.force && fs::metadata(&self.output).is_ok() {
+            anyhow::bail!(
+                "Output file already exists: {}",
+                self.output.display()
+            );
+        }
 
-    let mut sets = vec![];
-    for set_path in &args.arg_input {
-        let fst = unsafe { util::mmap_fst(set_path)? };
-        sets.push(fst::Set::from(fst));
+        let wtr = util::get_buf_writer(Some(&self.output))?;
+        let mut merged = fst::SetBuilder::new(wtr)?;
+
+        let mut sets = vec![];
+        for set_path in &self.input {
+            let fst = unsafe { util::mmap_fst(set_path)? };
+            sets.push(fst::Set::from(fst));
+        }
+        let union = sets.iter().collect::<fst::set::OpBuilder>().union();
+        merged.extend_stream(union)?;
+        merged.finish()?;
+        Ok(())
     }
-    let union = sets.iter().collect::<fst::set::OpBuilder>().union();
-    merged.extend_stream(union)?;
-    merged.finish()?;
-    Ok(())
 }

@@ -1,86 +1,102 @@
+use std::path::PathBuf;
+
 use bit_set::BitSet;
 use csv;
-use docopt::Docopt;
-use serde::Deserialize;
 
 use crate::util;
 use crate::Error;
 
-const USAGE: &'static str = "
-Emit information in CSV format about the transducer.
-
-If <output> is not set, then CSV data is emitted to stdout.
-
-Usage:
-    fst csv edges <input> [<output>]
-    fst csv nodes <input> [<output>]
-    fst csv --help
-
-Options:
-    -h, --help       Display this message.
-";
-
-#[derive(Debug, Deserialize)]
-struct Args {
-    cmd_edges: bool,
-    cmd_nodes: bool,
-    arg_input: String,
-    arg_output: Option<String>,
+pub fn run(matches: &clap::ArgMatches) -> Result<(), Error> {
+    Args::new(matches).and_then(|args| args.run())
 }
 
-pub fn run(argv: Vec<String>) -> Result<(), Error> {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.argv(&argv).deserialize())
-        .unwrap_or_else(|e| e.exit());
+#[derive(Debug)]
+struct Args {
+    input: PathBuf,
+    output: Option<PathBuf>,
+    which: Which,
+}
 
-    let wtr = util::get_writer(args.arg_output.as_ref())?;
-    let mut wtr = csv::Writer::from_writer(wtr);
+#[derive(Debug)]
+enum Which {
+    Edges,
+    Nodes,
+}
 
-    let fst = unsafe { util::mmap_fst(args.arg_input)? };
-    let mut set = BitSet::with_capacity(fst.len());
-
-    if args.cmd_edges {
-        wtr.serialize(("addr_in", "addr_out", "input", "output"))?;
-        let mut stack = vec![fst.root().addr()];
-        set.insert(fst.root().addr());
-        while let Some(addr) = stack.pop() {
-            for t in fst.node(addr).transitions() {
-                if !set.contains(t.addr) {
-                    stack.push(t.addr);
-                    set.insert(t.addr);
-                }
-                wtr.serialize((addr, t.addr, t.inp as char, t.out.value()))?;
+impl Args {
+    fn new(m: &clap::ArgMatches) -> Result<Args, Error> {
+        let (which, m) = match m.subcommand() {
+            ("edges", Some(m)) => (Which::Edges, m),
+            ("nodes", Some(m)) => (Which::Nodes, m),
+            (unknown, _) => {
+                anyhow::bail!("unrecognized csv sub-command: {}", unknown)
             }
-        }
-    } else {
-        wtr.serialize((
-            "addr",
-            "state",
-            "size",
-            "transitions",
-            "final",
-            "final_output",
-        ))?;
-        let mut stack = vec![fst.root().addr()];
-        set.insert(fst.root().addr());
-        while let Some(addr) = stack.pop() {
-            let node = fst.node(addr);
-            for t in node.transitions() {
-                if !set.contains(t.addr) {
-                    stack.push(t.addr);
-                    set.insert(t.addr);
-                }
-            }
-            let row = &[
-                node.addr().to_string(),
-                node.state().to_string(),
-                node.as_slice().len().to_string(),
-                node.len().to_string(),
-                node.is_final().to_string(),
-                node.final_output().value().to_string(),
-            ];
-            wtr.write_record(row.iter())?;
-        }
+        };
+        Ok(Args {
+            input: m.value_of_os("input").map(PathBuf::from).unwrap(),
+            output: m.value_of_os("output").map(PathBuf::from),
+            which,
+        })
     }
-    wtr.flush().map_err(From::from)
+
+    fn run(&self) -> Result<(), Error> {
+        let wtr = util::get_writer(self.output.as_ref())?;
+        let mut wtr = csv::Writer::from_writer(wtr);
+
+        let fst = unsafe { util::mmap_fst(&self.input)? };
+        let mut set = BitSet::with_capacity(fst.len());
+
+        match self.which {
+            Which::Edges => {
+                wtr.serialize(("addr_in", "addr_out", "input", "output"))?;
+                let mut stack = vec![fst.root().addr()];
+                set.insert(fst.root().addr());
+                while let Some(addr) = stack.pop() {
+                    for t in fst.node(addr).transitions() {
+                        if !set.contains(t.addr) {
+                            stack.push(t.addr);
+                            set.insert(t.addr);
+                        }
+                        wtr.serialize((
+                            addr,
+                            t.addr,
+                            t.inp as char,
+                            t.out.value(),
+                        ))?;
+                    }
+                }
+            }
+            Which::Nodes => {
+                wtr.serialize((
+                    "addr",
+                    "state",
+                    "size",
+                    "transitions",
+                    "final",
+                    "final_output",
+                ))?;
+                let mut stack = vec![fst.root().addr()];
+                set.insert(fst.root().addr());
+                while let Some(addr) = stack.pop() {
+                    let node = fst.node(addr);
+                    for t in node.transitions() {
+                        if !set.contains(t.addr) {
+                            stack.push(t.addr);
+                            set.insert(t.addr);
+                        }
+                    }
+                    let row = &[
+                        node.addr().to_string(),
+                        node.state().to_string(),
+                        node.as_slice().len().to_string(),
+                        node.len().to_string(),
+                        node.is_final().to_string(),
+                        node.final_output().value().to_string(),
+                    ];
+                    wtr.write_record(row.iter())?;
+                }
+            }
+        }
+        wtr.flush().map_err(From::from)
+    }
 }

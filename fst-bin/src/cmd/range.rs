@@ -1,49 +1,43 @@
+use std::ffi::OsString;
 use std::io;
+use std::path::PathBuf;
 
-use docopt::Docopt;
-use serde::Deserialize;
+use bstr::ByteVec;
 
 use crate::util;
 use crate::Error;
 
-const USAGE: &'static str = "
-Issues a range query against the given transducer.
-
-A range query returns all search results within a particular.
-
-If neither the start or the end of the range is specified, then all entries
-in the transducer are shown.
-
-Usage:
-    fst range [options] <fst>
-    fst range --help
-
-Options:
-    -h, --help          Display this message.
-    -o, --outputs       When set, output values are shown as CSV data.
-    -s, --start ARG     Only show results greater than or equal to this.
-    -e, --end ARG       Only show results less than or equal to this.
-";
-
-#[derive(Debug, Deserialize)]
-struct Args {
-    arg_fst: String,
-    flag_outputs: bool,
-    flag_start: Option<String>,
-    flag_end: Option<String>,
+pub fn run(matches: &clap::ArgMatches) -> Result<(), Error> {
+    Args::new(matches).and_then(|args| args.run())
 }
 
-pub fn run(argv: Vec<String>) -> Result<(), Error> {
-    let args: Args = Docopt::new(USAGE)
-        .and_then(|d| d.argv(&argv).deserialize())
-        .unwrap_or_else(|e| e.exit());
-    let fst = unsafe { util::mmap_fst(&args.arg_fst)? };
-    let mut q = fst.range();
-    if let Some(ref start) = args.flag_start {
-        q = q.ge(start);
+#[derive(Debug)]
+struct Args {
+    input: PathBuf,
+    outputs: bool,
+    start: Option<OsString>,
+    end: Option<OsString>,
+}
+
+impl Args {
+    fn new(m: &clap::ArgMatches) -> Result<Args, Error> {
+        Ok(Args {
+            input: m.value_of_os("input").map(PathBuf::from).unwrap(),
+            outputs: m.is_present("outputs"),
+            start: m.value_of_os("start").map(|v| v.to_os_string()),
+            end: m.value_of_os("end").map(|v| v.to_os_string()),
+        })
     }
-    if let Some(ref end) = args.flag_end {
-        q = q.le(end);
+
+    fn run(&self) -> Result<(), Error> {
+        let fst = unsafe { util::mmap_fst(&self.input)? };
+        let mut q = fst.range();
+        if let Some(ref start) = self.start {
+            q = q.ge(Vec::from_os_str_lossy(start));
+        }
+        if let Some(ref end) = self.end {
+            q = q.le(Vec::from_os_str_lossy(end));
+        }
+        util::print_stream(io::BufWriter::new(io::stdout()), self.outputs, q)
     }
-    util::print_stream(io::BufWriter::new(io::stdout()), args.flag_outputs, q)
 }

@@ -38,11 +38,17 @@ impl Args {
     }
 
     fn run(&self) -> Result<(), Error> {
+        let reverse =
+            std::env::var("FST_BIN_DFA_REVERSE").map_or(false, |v| v == "1");
+        let minimize =
+            std::env::var("FST_BIN_DFA_MINIMIZE").map_or(false, |v| v == "1");
         let fst = unsafe { util::mmap_fst(&self.input)? };
         let dense_dfa = dense::Builder::new()
             .anchored(true)
+            .minimize(minimize)
             .byte_classes(true)
             .premultiply(true)
+            .reverse(reverse)
             .build(&self.regex)?;
         let dfa = match dense_dfa {
             dense::DenseDFA::PremultipliedByteClass(dfa) => dfa,

@@ -357,6 +357,39 @@ impl<D: AsRef<[u8]>> Fst<D> {
         self.as_ref().contains_key(key.as_ref())
     }
 
+    /// Retrieves the key associated with the given value.
+    ///
+    /// This is like `get_key_into`, but will return the key itself without
+    /// allowing the caller to reuse an allocation.
+    ///
+    /// If the given value does not exist, then `None` is returned.
+    ///
+    /// The values in this FST are not monotonically increasing when sorted
+    /// lexicographically by key, then this routine has unspecified behavior.
+    #[inline]
+    pub fn get_key(&self, value: u64) -> Option<Vec<u8>> {
+        let mut key = vec![];
+        if self.get_key_into(value, &mut key) {
+            Some(key)
+        } else {
+            None
+        }
+    }
+
+    /// Retrieves the key associated with the given value.
+    ///
+    /// If the given value does not exist, then `false` is returned. In this
+    /// case, the contents of `key` are unspecified.
+    ///
+    /// The given buffer is not clearer before the key is written to it.
+    ///
+    /// The values in this FST are not monotonically increasing when sorted
+    /// lexicographically by key, then this routine has unspecified behavior.
+    #[inline]
+    pub fn get_key_into(&self, value: u64, key: &mut Vec<u8>) -> bool {
+        self.as_ref().get_key_into(value, key)
+    }
+
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
     #[inline]
@@ -549,6 +582,25 @@ impl<'f> FstRef<'f> {
             }
         }
         node.is_final()
+    }
+
+    fn get_key_into(&self, mut value: u64, key: &mut Vec<u8>) -> bool {
+        let mut node = self.root();
+        while value != 0 || !node.is_final() {
+            let trans = node
+                .transitions()
+                .take_while(|t| t.out.value() <= value)
+                .last();
+            node = match trans {
+                None => return false,
+                Some(t) => {
+                    value -= t.out.value();
+                    key.push(t.inp);
+                    self.node(t.addr)
+                }
+            };
+        }
+        true
     }
 
     fn len(&self) -> usize {

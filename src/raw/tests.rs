@@ -517,3 +517,39 @@ fn bytes_written() {
     let footer_size = 24;
     assert_eq!(counted_len + footer_size, fst1_len);
 }
+
+#[test]
+fn get_key_simple() {
+    let map = fst_map(vec![("abc", 2), ("xyz", 3)]);
+    assert_eq!(map.get_key(0), None);
+    assert_eq!(map.get_key(1), None);
+    assert_eq!(map.get_key(2), Some(b"abc".to_vec()));
+    assert_eq!(map.get_key(3), Some(b"xyz".to_vec()));
+    assert_eq!(map.get_key(4), None);
+}
+
+#[test]
+fn get_key_words() {
+    let words: Vec<(Vec<u8>, u64)> = TEXT
+        .lines()
+        .enumerate()
+        .map(|(i, line)| (line.as_bytes().to_vec(), i as u64))
+        .collect();
+    let map = fst_map(words.clone());
+    for (key, value) in words {
+        assert_eq!(map.get_key(value), Some(key));
+    }
+}
+
+#[test]
+fn get_key_words_discontiguous() {
+    let words: Vec<(Vec<u8>, u64)> = TEXT
+        .lines()
+        .enumerate()
+        .map(|(i, line)| (line.as_bytes().to_vec(), i as u64 * 2))
+        .collect();
+    let map = fst_map(words.clone());
+    for (key, value) in words {
+        assert_eq!(map.get_key(value), Some(key));
+    }
+}

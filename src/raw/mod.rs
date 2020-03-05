@@ -281,6 +281,51 @@ struct Meta {
     len: usize,
 }
 
+impl Fst<Vec<u8>> {
+    /// Create a new FST from an iterator of lexicographically ordered byte
+    /// strings. Every key's value is set to `0`.
+    ///
+    /// If the iterator does not yield values in lexicographic order, then an
+    /// error is returned.
+    ///
+    /// Note that this is a convenience function to build an FST in memory.
+    /// To build an FST that streams to an arbitrary `io::Write`, use
+    /// `raw::Builder`.
+    pub fn from_iter_set<K, I>(iter: I) -> Result<Fst<Vec<u8>>>
+    where
+        K: AsRef<[u8]>,
+        I: IntoIterator<Item = K>,
+    {
+        let mut builder = Builder::memory();
+        for k in iter {
+            builder.add(k)?;
+        }
+        Ok(builder.into_fst())
+    }
+
+    /// Create a new FST from an iterator of lexicographically ordered byte
+    /// strings. The iterator should consist of tuples, where the first element
+    /// is the byte string and the second element is its corresponding value.
+    ///
+    /// If the iterator does not yield unique keys in lexicographic order, then
+    /// an error is returned.
+    ///
+    /// Note that this is a convenience function to build an FST in memory.
+    /// To build an FST that streams to an arbitrary `io::Write`, use
+    /// `raw::Builder`.
+    pub fn from_iter_map<K, I>(iter: I) -> Result<Fst<Vec<u8>>>
+    where
+        K: AsRef<[u8]>,
+        I: IntoIterator<Item = (K, u64)>,
+    {
+        let mut builder = Builder::memory();
+        for (k, v) in iter {
+            builder.insert(k, v)?;
+        }
+        Ok(builder.into_fst())
+    }
+}
+
 impl<D: AsRef<[u8]>> Fst<D> {
     /// Creates a transducer from its representation as a raw byte sequence.
     ///

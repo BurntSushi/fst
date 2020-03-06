@@ -15,7 +15,8 @@ license = "Unlicense/MIT"
 edition = "2018"
 
 [workspace]
-members = ["bench", "fst-bin"]
+members = ["bench"]
+exclude = ["fst-bin"]
 
 [features]
 default = []

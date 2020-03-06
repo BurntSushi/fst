@@ -263,12 +263,13 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// # Example
     ///
     /// An implementation of regular expressions for `Automaton` is available
-    /// in the `fst-regex` crate, which can be used to search maps.
+    /// in the `regex-automata` crate with the `fst1` feature enabled, which
+    /// can be used to search maps.
     ///
     /// # Example
     ///
     /// An implementation of subsequence search for `Automaton` can be used
-    /// to search sets:
+    /// to search maps:
     ///
     /// ```rust
     /// use fst::automaton::Subsequence;
@@ -301,6 +302,62 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// ```
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
         StreamBuilder(self.0.search(aut))
+    }
+
+    /// Executes an automaton on the keys of this map and yields matching
+    /// keys along with the corresponding matching states in the given
+    /// automaton.
+    ///
+    /// Note that this returns a `StreamWithStateBuilder`, which can be used to
+    /// add a range query to the search (see the `range` method).
+    ///
+    /// Memory requirements are the same as described on `Map::stream`.
+    ///
+    #[cfg_attr(
+        feature = "levenshtein",
+        doc = r##"
+# Example
+
+An implementation of fuzzy search using Levenshtein automata can be used
+to search maps:
+
+```rust
+use fst::automaton::Levenshtein;
+use fst::{IntoStreamer, Streamer, Map};
+
+# fn main() { example().unwrap(); }
+fn example() -> Result<(), Box<dyn std::error::Error>> {
+    let map = Map::from_iter(vec![
+        ("foo", 1),
+        ("foob", 2),
+        ("foobar", 3),
+        ("fozb", 4),
+    ]).unwrap();
+
+    let query = Levenshtein::new("foo", 2)?;
+    let mut stream = map.search_with_state(&query).into_stream();
+
+    let mut kvs = vec![];
+    while let Some((k, v, s)) = stream.next() {
+        kvs.push((String::from_utf8(k.to_vec())?, v, s));
+    }
+    // Currently, there isn't much interesting that you can do with the states.
+    assert_eq!(kvs, vec![
+        ("foo".to_string(), 1, Some(183)),
+        ("foob".to_string(), 2, Some(123)),
+        ("fozb".to_string(), 4, Some(83)),
+    ]);
+
+    Ok(())
+}
+```
+"##
+    )]
+    pub fn search_with_state<A: Automaton>(
+        &self,
+        aut: A,
+    ) -> StreamWithStateBuilder<'_, A> {
+        StreamWithStateBuilder(self.0.search_with_state(aut))
     }
 
     /// Returns the number of elements in this map.
@@ -667,6 +724,30 @@ impl<'m, A: Automaton> Stream<'m, A> {
     }
 }
 
+/// A lexicographically ordered stream of key-value-state triples from a map
+/// and an automaton.
+///
+/// The key-values are from the map while the states are from the automaton.
+///
+/// The `A` type parameter corresponds to an optional automaton to filter
+/// the stream. By default, no filtering is done.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct StreamWithState<'m, A = AlwaysMatch>(raw::StreamWithState<'m, A>)
+where
+    A: Automaton;
+
+impl<'a, 'm, A: 'a + Automaton> Streamer<'a> for StreamWithState<'m, A>
+where
+    A::State: Clone,
+{
+    type Item = (&'a [u8], u64, A::State);
+
+    fn next(&'a mut self) -> Option<(&'a [u8], u64, A::State)> {
+        self.0.next().map(|(key, out, state)| (key, out.value(), state))
+    }
+}
+
 /// A lexicographically ordered stream of keys from a map.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
@@ -712,22 +793,22 @@ pub struct StreamBuilder<'m, A = AlwaysMatch>(raw::StreamBuilder<'m, A>);
 
 impl<'m, A: Automaton> StreamBuilder<'m, A> {
     /// Specify a greater-than-or-equal-to bound.
-    pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> Self {
+    pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> StreamBuilder<'m, A> {
         StreamBuilder(self.0.ge(bound))
     }
 
     /// Specify a greater-than bound.
-    pub fn gt<T: AsRef<[u8]>>(self, bound: T) -> Self {
+    pub fn gt<T: AsRef<[u8]>>(self, bound: T) -> StreamBuilder<'m, A> {
         StreamBuilder(self.0.gt(bound))
     }
 
     /// Specify a less-than-or-equal-to bound.
-    pub fn le<T: AsRef<[u8]>>(self, bound: T) -> Self {
+    pub fn le<T: AsRef<[u8]>>(self, bound: T) -> StreamBuilder<'m, A> {
         StreamBuilder(self.0.le(bound))
     }
 
     /// Specify a less-than bound.
-    pub fn lt<T: AsRef<[u8]>>(self, bound: T) -> Self {
+    pub fn lt<T: AsRef<[u8]>>(self, bound: T) -> StreamBuilder<'m, A> {
         StreamBuilder(self.0.lt(bound))
     }
 }
@@ -738,6 +819,74 @@ impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
 
     fn into_stream(self) -> Self::Into {
         Stream(self.0.into_stream())
+    }
+}
+
+/// A builder for constructing range queries on streams that include automaton
+/// states.
+///
+/// In general, one should use `StreamBuilder` unless you have a specific need
+/// for accessing the states of the underlying automaton that is being used to
+/// filter this stream.
+///
+/// Once all bounds are set, one should call `into_stream` to get a
+/// `Stream`.
+///
+/// Bounds are not additive. That is, if `ge` is called twice on the same
+/// builder, then the second setting wins.
+///
+/// The `A` type parameter corresponds to an optional automaton to filter
+/// the stream. By default, no filtering is done.
+///
+/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+pub struct StreamWithStateBuilder<'m, A = AlwaysMatch>(
+    raw::StreamWithStateBuilder<'m, A>,
+);
+
+impl<'m, A: Automaton> StreamWithStateBuilder<'m, A> {
+    /// Specify a greater-than-or-equal-to bound.
+    pub fn ge<T: AsRef<[u8]>>(
+        self,
+        bound: T,
+    ) -> StreamWithStateBuilder<'m, A> {
+        StreamWithStateBuilder(self.0.ge(bound))
+    }
+
+    /// Specify a greater-than bound.
+    pub fn gt<T: AsRef<[u8]>>(
+        self,
+        bound: T,
+    ) -> StreamWithStateBuilder<'m, A> {
+        StreamWithStateBuilder(self.0.gt(bound))
+    }
+
+    /// Specify a less-than-or-equal-to bound.
+    pub fn le<T: AsRef<[u8]>>(
+        self,
+        bound: T,
+    ) -> StreamWithStateBuilder<'m, A> {
+        StreamWithStateBuilder(self.0.le(bound))
+    }
+
+    /// Specify a less-than bound.
+    pub fn lt<T: AsRef<[u8]>>(
+        self,
+        bound: T,
+    ) -> StreamWithStateBuilder<'m, A> {
+        StreamWithStateBuilder(self.0.lt(bound))
+    }
+}
+
+impl<'m, 'a, A: 'a + Automaton> IntoStreamer<'a>
+    for StreamWithStateBuilder<'m, A>
+where
+    A::State: Clone,
+{
+    type Item = (&'a [u8], u64, A::State);
+    type Into = StreamWithState<'m, A>;
+
+    fn into_stream(self) -> StreamWithState<'m, A> {
+        StreamWithState(self.0.into_stream())
     }
 }
 

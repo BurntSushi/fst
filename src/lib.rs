@@ -311,6 +311,7 @@ pub use crate::map::{Map, MapBuilder};
 pub use crate::set::{Set, SetBuilder};
 pub use crate::stream::{IntoStreamer, Streamer};
 
+mod bytes;
 mod error;
 #[path = "automaton/mod.rs"]
 mod inner_automaton;

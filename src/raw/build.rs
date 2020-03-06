@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io;
 
 use byteorder::{LittleEndian, WriteBytesExt};
 
@@ -219,8 +219,12 @@ impl<W: io::Write> Builder<W> {
         let root_addr = self.compile(&root_node)?;
         self.wtr.write_u64::<LittleEndian>(self.len as u64)?;
         self.wtr.write_u64::<LittleEndian>(root_addr as u64)?;
-        self.wtr.flush()?;
-        Ok(self.wtr.into_inner())
+
+        let sum = self.wtr.masked_checksum();
+        let mut wtr = self.wtr.into_inner();
+        wtr.write_u32::<LittleEndian>(sum)?;
+        wtr.flush()?;
+        Ok(wtr)
     }
 
     fn insert_output<B>(&mut self, bs: B, out: Option<Output>) -> Result<()>

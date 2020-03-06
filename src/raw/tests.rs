@@ -206,7 +206,7 @@ fn fst_map_100000_lengths() {
 
 #[test]
 fn invalid_version() {
-    match Fst::new(vec![0; 32]) {
+    match Fst::new(vec![0; 36]) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => assert_eq!(got, 0),
         Err(err) => panic!("expected version error, got {:?}", err),
         Ok(_) => panic!("expected version error, got FST"),
@@ -217,7 +217,7 @@ fn invalid_version() {
 fn invalid_version_crate_too_old() {
     use byteorder::{ByteOrder, LittleEndian};
 
-    let mut buf = vec![0; 32];
+    let mut buf = vec![0; 36];
     LittleEndian::write_u64(&mut buf, VERSION + 1);
     match Fst::new(buf) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => {
@@ -514,7 +514,7 @@ fn bytes_written() {
     let counted_len = bfst1.bytes_written();
     let bytes = bfst1.into_inner().unwrap();
     let fst1_len = bytes.len() as u64;
-    let footer_size = 24;
+    let footer_size = 28;
     assert_eq!(counted_len + footer_size, fst1_len);
 }
 
@@ -551,5 +551,41 @@ fn get_key_words_discontiguous() {
     let map = fst_map(words.clone());
     for (key, value) in words {
         assert_eq!(map.get_key(value), Some(key));
+    }
+}
+
+#[test]
+fn verify_ok_nonempty() {
+    let words: Vec<(Vec<u8>, u64)> = TEXT
+        .lines()
+        .enumerate()
+        .map(|(i, line)| (line.as_bytes().to_vec(), i as u64 * 2))
+        .collect();
+    let map = fst_map(words.clone());
+    assert!(map.verify().is_ok());
+}
+
+#[test]
+fn verify_ok_empty() {
+    let map = fst_map(Vec::<(&str, u64)>::new());
+    assert!(map.verify().is_ok());
+}
+
+#[test]
+fn verify_err() {
+    let mut b = Builder::memory();
+    b.add(b"bar").unwrap();
+    b.add(b"baz").unwrap();
+    let mut bytes = b.into_inner().unwrap();
+
+    {
+        let fst = Fst::new(&bytes).unwrap();
+        assert!(fst.verify().is_ok());
+    }
+
+    bytes[17] = b'\xFF';
+    {
+        let fst = Fst::new(&bytes).unwrap();
+        assert!(fst.verify().is_err());
     }
 }

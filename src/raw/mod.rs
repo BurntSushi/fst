@@ -39,6 +39,8 @@ pub use self::ops::{
 mod build;
 mod common_inputs;
 mod counting_writer;
+mod crc32;
+mod crc32_table;
 mod error;
 mod node;
 mod ops;
@@ -279,6 +281,7 @@ struct Meta {
     root_addr: CompiledAddr,
     ty: FstType,
     len: usize,
+    checksum: u32,
 }
 
 impl Fst<Vec<u8>> {
@@ -329,16 +332,19 @@ impl Fst<Vec<u8>> {
 impl<D: AsRef<[u8]>> Fst<D> {
     /// Creates a transducer from its representation as a raw byte sequence.
     ///
-    /// Note that this operation is very cheap (no allocations and no copies).
+    /// This operation is intentionally very cheap (no allocations and no
+    /// copies). In particular, no verification on the integrity of the
+    /// FST is performed. Callers may opt into integrity checks via the
+    /// [`Fst::verify`](struct.Fst.html#method.verify) method.
     ///
     /// The fst must have been written with a compatible finite state
     /// transducer builder (`Builder` qualifies). If the format is invalid or
     /// if there is a mismatch between the API version of this library and the
     /// fst, then an error is returned.
     #[inline]
-    pub fn new(data: D) -> Result<Self> {
+    pub fn new(data: D) -> Result<Fst<D>> {
         let bytes = data.as_ref();
-        if bytes.len() < 32 {
+        if bytes.len() < 36 {
             return Err(Error::Format { size: bytes.len() }.into());
         }
         // The read_u64 unwraps below are OK because they can never fail.
@@ -353,20 +359,23 @@ impl<D: AsRef<[u8]>> Fst<D> {
             );
         }
         let ty = (&bytes[8..]).read_u64::<LittleEndian>().unwrap();
+        let checksum =
+            (&bytes[bytes.len() - 4..]).read_u32::<LittleEndian>().unwrap();
         let root_addr = {
-            let mut last = &bytes[bytes.len() - 8..];
+            let mut last = &bytes[bytes.len() - 12..];
             u64_to_usize(last.read_u64::<LittleEndian>().unwrap())
         };
         let len = {
-            let mut last2 = &bytes[bytes.len() - 16..];
+            let mut last2 = &bytes[bytes.len() - 20..];
             u64_to_usize(last2.read_u64::<LittleEndian>().unwrap())
         };
         // The root node is always the last node written, so its address should
         // be near the end. After the root node is written, we still have to
-        // write the root *address* and the number of keys in the FST.
-        // That's 16 bytes. The extra byte comes from the fact that the root
-        // address points to the last byte in the root node, rather than the
-        // byte immediately following the root node.
+        // write the root *address* and the number of keys in the FST, along
+        // with the checksum. That's 20 bytes. The extra byte used below (21
+        // and not 20) comes from the fact that the root address points to
+        // the last byte in the root node, rather than the byte immediately
+        // following the root node.
         //
         // If this check passes, it is still possible that the FST is invalid
         // but probably unlikely. If this check reports a false positive, then
@@ -378,13 +387,13 @@ impl<D: AsRef<[u8]>> Fst<D> {
         // has a root node that is empty and final, which means it has the
         // special address `0`. In that case, the FST is the smallest it can
         // be: the version, type, root address and number of nodes. That's
-        // 32 bytes (8 byte u64 each).
-        if (root_addr == EMPTY_ADDRESS && bytes.len() != 32)
-            && root_addr + 17 != bytes.len()
+        // 36 bytes (8 byte u64 each).
+        if (root_addr == EMPTY_ADDRESS && bytes.len() != 36)
+            && root_addr + 21 != bytes.len()
         {
             return Err(Error::Format { size: bytes.len() }.into());
         }
-        let meta = Meta { version, root_addr, ty, len };
+        let meta = Meta { version, root_addr, ty, len, checksum };
         Ok(Fst { meta, data })
     }
 
@@ -484,6 +493,24 @@ impl<D: AsRef<[u8]>> Fst<D> {
     #[inline]
     pub fn size(&self) -> usize {
         self.as_ref().size()
+    }
+
+    /// Attempts to verify this FST by computing its checksum.
+    ///
+    /// This will scan over all of the bytes in the underlying FST, so this
+    /// may be an expensive operation depending on the size of the FST.
+    #[inline]
+    pub fn verify(&self) -> Result<()> {
+        use crate::raw::crc32::CheckSummer;
+
+        let expected = self.as_ref().meta.checksum;
+        let mut summer = CheckSummer::new();
+        summer.update(&self.as_bytes()[..self.as_bytes().len() - 4]);
+        let got = summer.masked();
+        if expected == got {
+            return Ok(());
+        }
+        Err(Error::ChecksumMismatch { expected, got }.into())
     }
 
     /// Creates a new fst operation with this fst added to it.

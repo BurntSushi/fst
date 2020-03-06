@@ -30,6 +30,14 @@ pub enum Error {
         /// The number of bytes given to the FST constructor.
         size: usize,
     },
+    /// An error that is returned if verification of an FST fails because of a
+    /// checksum mismatch.
+    ChecksumMismatch {
+        /// The checksum that was expected.
+        expected: u32,
+        /// The checksum that was actually computed.
+        got: u32,
+    },
     /// A duplicate key was inserted into a finite state transducer, which is
     /// not allowed.
     DuplicateKey {
@@ -81,6 +89,11 @@ FST.",
 Error opening FST with size {} bytes: An unknown error occurred. This \
 usually means you're trying to read data that isn't actually an encoded FST.",
                 size
+            ),
+            ChecksumMismatch { expected, got } => write!(
+                f,
+                "FST verification failed: expected checksum of {} but got {}",
+                expected, got,
             ),
             DuplicateKey { ref got } => write!(
                 f,

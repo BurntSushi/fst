@@ -21,9 +21,8 @@ Most of the rest of the types are streams from set operations.
 use std::cmp;
 use std::fmt;
 
-use byteorder::{LittleEndian, ReadBytesExt};
-
 use crate::automaton::{AlwaysMatch, Automaton};
+use crate::bytes;
 use crate::error::Result;
 use crate::stream::{IntoStreamer, Streamer};
 
@@ -44,7 +43,6 @@ mod crc32_table;
 mod error;
 mod node;
 mod ops;
-mod pack;
 mod registry;
 mod registry_minimal;
 #[cfg(test)]
@@ -352,22 +350,21 @@ impl<D: AsRef<[u8]>> Fst<D> {
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
         // N bytes (no unexpected EOF).
-        let version = (&bytes[0..]).read_u64::<LittleEndian>().unwrap();
+        let version = bytes::read_u64_le(&bytes);
         if version == 0 || version > VERSION {
             return Err(
                 Error::Version { expected: VERSION, got: version }.into()
             );
         }
-        let ty = (&bytes[8..]).read_u64::<LittleEndian>().unwrap();
-        let checksum =
-            (&bytes[bytes.len() - 4..]).read_u32::<LittleEndian>().unwrap();
+        let ty = bytes::read_u64_le(&bytes[8..]);
+        let checksum = bytes::read_u32_le(&bytes[bytes.len() - 4..]);
         let root_addr = {
-            let mut last = &bytes[bytes.len() - 12..];
-            u64_to_usize(last.read_u64::<LittleEndian>().unwrap())
+            let last = &bytes[bytes.len() - 12..];
+            u64_to_usize(bytes::read_u64_le(last))
         };
         let len = {
-            let mut last2 = &bytes[bytes.len() - 20..];
-            u64_to_usize(last2.read_u64::<LittleEndian>().unwrap())
+            let last2 = &bytes[bytes.len() - 20..];
+            u64_to_usize(bytes::read_u64_le(last2))
         };
         // The root node is always the last node written, so its address should
         // be near the end. After the root node is written, we still have to

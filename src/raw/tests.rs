@@ -215,10 +215,8 @@ fn invalid_version() {
 
 #[test]
 fn invalid_version_crate_too_old() {
-    use byteorder::{ByteOrder, LittleEndian};
-
     let mut buf = vec![0; 36];
-    LittleEndian::write_u64(&mut buf, VERSION + 1);
+    crate::bytes::write_u64_le(VERSION + 1, &mut buf);
     match Fst::new(buf) {
         Err(Error::Fst(raw::Error::Version { got, .. })) => {
             assert_eq!(got, VERSION + 1);

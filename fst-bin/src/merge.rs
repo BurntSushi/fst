@@ -32,7 +32,7 @@ impl<I> Merger<I>
 where
     I: Iterator<Item = Result<(BString, u64), Error>> + Send + 'static,
 {
-    pub fn new<T, P>(it: T, output: P) -> Self
+    pub fn new<T, P>(it: T, output: P) -> Merger<I>
     where
         P: AsRef<Path>,
         T: IntoIterator<IntoIter = I, Item = I::Item>,
@@ -49,7 +49,7 @@ where
         }
     }
 
-    pub fn value_merger<F>(mut self, f: F) -> Self
+    pub fn value_merger<F>(mut self, f: F) -> Merger<I>
     where
         F: Fn(u64, u64) -> u64 + Send + Sync + 'static,
     {
@@ -57,27 +57,27 @@ where
         self
     }
 
-    pub fn fd_limit(mut self, fd_limit: u32) -> Self {
+    pub fn fd_limit(mut self, fd_limit: u32) -> Merger<I> {
         self.fd_limit = fd_limit;
         self
     }
 
-    pub fn batch_size(mut self, batch_size: u32) -> Self {
+    pub fn batch_size(mut self, batch_size: u32) -> Merger<I> {
         self.batch_size = batch_size;
         self
     }
 
-    pub fn threads(mut self, threads: u32) -> Self {
+    pub fn threads(mut self, threads: u32) -> Merger<I> {
         self.threads = threads;
         self
     }
 
-    pub fn tmp_dir<P: AsRef<Path>>(mut self, path: P) -> Self {
+    pub fn tmp_dir<P: AsRef<Path>>(mut self, path: P) -> Merger<I> {
         self.tmp_dir = path.as_ref().to_path_buf();
         self
     }
 
-    pub fn keep_tmp_dir(mut self, yes: bool) -> Self {
+    pub fn keep_tmp_dir(mut self, yes: bool) -> Merger<I> {
         self.keep_tmp_dir = yes;
         self
     }
@@ -117,7 +117,7 @@ where
             for (i, union_batch) in batches.into_iter().enumerate() {
                 sorters.create_fst(UnionBatch {
                     tmp_dir: tmp_dir_path.clone(),
-                    gen: gen,
+                    gen,
                     index: i,
                     fsts: union_batch?,
                     value_merger: self.value_merger.clone(),
@@ -178,7 +178,7 @@ struct Sorters<B> {
 }
 
 impl<B: Batchable + Send + 'static> Sorters<B> {
-    fn new(threads: u32) -> Self {
+    fn new(threads: u32) -> Sorters<B> {
         let (bsend, brecv) = chan::bounded::<B>(0);
         let (rsend, rrecv) = chan::bounded(0);
         for _ in 0..threads {

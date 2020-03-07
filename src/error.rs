@@ -1,4 +1,3 @@
-use std::error;
 use std::fmt;
 use std::io;
 
@@ -33,20 +32,18 @@ impl From<raw::Error> for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::Error::*;
         match *self {
-            Fst(ref err) => err.fmt(f),
-            Io(ref err) => err.fmt(f),
+            Error::Fst(ref err) => err.fmt(f),
+            Error::Io(ref err) => err.fmt(f),
         }
     }
 }
 
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        use self::Error::*;
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
-            Fst(ref err) => Some(err),
-            Io(ref err) => Some(err),
+            Error::Fst(ref err) => Some(err),
+            Error::Io(ref err) => Some(err),
         }
     }
 }

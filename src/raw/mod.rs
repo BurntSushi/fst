@@ -26,10 +26,10 @@ use crate::bytes;
 use crate::error::Result;
 use crate::stream::{IntoStreamer, Streamer};
 
-pub use self::build::Builder;
-pub use self::error::Error;
-pub use self::node::{Node, Transitions};
-pub use self::ops::{
+pub use crate::raw::build::Builder;
+pub use crate::raw::error::Error;
+pub use crate::raw::node::{Node, Transitions};
+pub use crate::raw::ops::{
     Difference, IndexedValue, Intersection, OpBuilder, SymmetricDifference,
     Union,
 };
@@ -621,7 +621,7 @@ impl<'a, 'f, D: AsRef<[u8]>> IntoStreamer<'a> for &'f Fst<D> {
     type Into = Stream<'f>;
 
     #[inline]
-    fn into_stream(self) -> Self::Into {
+    fn into_stream(self) -> Stream<'f> {
         StreamBuilder::new(self.as_ref(), AlwaysMatch).into_stream()
     }
 }
@@ -761,7 +761,7 @@ pub struct StreamBuilder<'f, A = AlwaysMatch> {
 }
 
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
-    fn new(fst: FstRef<'f>, aut: A) -> Self {
+    fn new(fst: FstRef<'f>, aut: A) -> StreamBuilder<'f, A> {
         StreamBuilder {
             fst,
             aut,
@@ -1001,7 +1001,7 @@ impl<'f, A: Automaton> Stream<'f, A> {
 impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
     type Item = (&'a [u8], Output);
 
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<(&'a [u8], Output)> {
         self.0.next_with(|_| ()).map(|(key, out, _)| (key, out))
     }
 }
@@ -1287,7 +1287,7 @@ pub struct Transition {
 
 impl Default for Transition {
     #[inline]
-    fn default() -> Self {
+    fn default() -> Transition {
         Transition { inp: 0, out: Output::zero(), addr: NONE_ADDRESS }
     }
 }

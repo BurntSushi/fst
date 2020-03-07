@@ -1,6 +1,5 @@
 #[cfg(feature = "levenshtein")]
 pub use self::levenshtein::{Levenshtein, LevenshteinError};
-use self::StartsWithStateInternal::*;
 
 #[cfg(feature = "levenshtein")]
 mod levenshtein;
@@ -109,23 +108,23 @@ pub trait Automaton {
 impl<'a, T: Automaton> Automaton for &'a T {
     type State = T::State;
 
-    fn start(&self) -> Self::State {
+    fn start(&self) -> T::State {
         (*self).start()
     }
 
-    fn is_match(&self, state: &Self::State) -> bool {
+    fn is_match(&self, state: &T::State) -> bool {
         (*self).is_match(state)
     }
 
-    fn can_match(&self, state: &Self::State) -> bool {
+    fn can_match(&self, state: &T::State) -> bool {
         (*self).can_match(state)
     }
 
-    fn will_always_match(&self, state: &Self::State) -> bool {
+    fn will_always_match(&self, state: &T::State) -> bool {
         (*self).will_always_match(state)
     }
 
-    fn accept(&self, state: &Self::State, byte: u8) -> Self::State {
+    fn accept(&self, state: &T::State, byte: u8) -> T::State {
         (*self).accept(state, byte)
     }
 }
@@ -138,13 +137,11 @@ impl<'a, T: Automaton> Automaton for &'a T {
 /// ```rust
 /// extern crate fst;
 ///
-/// use std::error::Error;
-///
 /// use fst::{Automaton, IntoStreamer, Streamer, Set};
 /// use fst::automaton::Str;
 ///
 /// # fn main() { example().unwrap(); }
-/// fn example() -> Result<(), Box<Error>> {
+/// fn example() -> Result<(), Box<dyn std::error::Error>> {
 ///     let paths = vec!["/home/projects/bar", "/home/projects/foo", "/tmp/foo"];
 ///     let set = Set::from_iter(paths)?;
 ///
@@ -212,13 +209,11 @@ impl<'a> Automaton for Str<'a> {
 /// ```rust
 /// extern crate fst;
 ///
-/// use std::error::Error;
-///
 /// use fst::{IntoStreamer, Streamer, Set};
 /// use fst::automaton::Subsequence;
 ///
 /// # fn main() { example().unwrap(); }
-/// fn example() -> Result<(), Box<Error>> {
+/// fn example() -> Result<(), Box<dyn std::error::Error>> {
 ///     let paths = vec!["/home/projects/bar", "/home/projects/foo", "/tmp/foo"];
 ///     let set = Set::from_iter(paths)?;
 ///
@@ -317,9 +312,9 @@ impl Automaton for AlwaysMatch {
 pub struct StartsWith<A>(A);
 
 /// The `Automaton` state for `StartsWith<A>`.
-pub struct StartsWithState<A: Automaton>(StartsWithStateInternal<A>);
+pub struct StartsWithState<A: Automaton>(StartsWithStateKind<A>);
 
-enum StartsWithStateInternal<A: Automaton> {
+enum StartsWithStateKind<A: Automaton> {
     Done,
     Running(A::State),
 }
@@ -331,31 +326,31 @@ impl<A: Automaton> Automaton for StartsWith<A> {
         StartsWithState({
             let inner = self.0.start();
             if self.0.is_match(&inner) {
-                Done
+                StartsWithStateKind::Done
             } else {
-                Running(inner)
+                StartsWithStateKind::Running(inner)
             }
         })
     }
 
     fn is_match(&self, state: &StartsWithState<A>) -> bool {
         match state.0 {
-            Done => true,
-            Running(_) => false,
+            StartsWithStateKind::Done => true,
+            StartsWithStateKind::Running(_) => false,
         }
     }
 
     fn can_match(&self, state: &StartsWithState<A>) -> bool {
         match state.0 {
-            Done => true,
-            Running(ref inner) => self.0.can_match(inner),
+            StartsWithStateKind::Done => true,
+            StartsWithStateKind::Running(ref inner) => self.0.can_match(inner),
         }
     }
 
     fn will_always_match(&self, state: &StartsWithState<A>) -> bool {
         match state.0 {
-            Done => true,
-            Running(_) => false,
+            StartsWithStateKind::Done => true,
+            StartsWithStateKind::Running(_) => false,
         }
     }
 
@@ -365,13 +360,13 @@ impl<A: Automaton> Automaton for StartsWith<A> {
         byte: u8,
     ) -> StartsWithState<A> {
         StartsWithState(match state.0 {
-            Done => Done,
-            Running(ref inner) => {
+            StartsWithStateKind::Done => StartsWithStateKind::Done,
+            StartsWithStateKind::Running(ref inner) => {
                 let next_inner = self.0.accept(inner, byte);
                 if self.0.is_match(&next_inner) {
-                    Done
+                    StartsWithStateKind::Done
                 } else {
-                    Running(next_inner)
+                    StartsWithStateKind::Running(next_inner)
                 }
             }
         })

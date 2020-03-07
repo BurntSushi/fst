@@ -103,14 +103,14 @@ type Lines = bstr::io::ByteLines<
 impl ConcatLines {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatLines {
         inputs.reverse(); // treat it as a stack
-        ConcatLines { inputs: inputs, cur: None }
+        ConcatLines { inputs, cur: None }
     }
 }
 
 impl Iterator for ConcatLines {
     type Item = io::Result<BString>;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<io::Result<BString>> {
         loop {
             if self.cur.is_none() {
                 match self.inputs.pop() {
@@ -143,7 +143,7 @@ type Rows = csv::DeserializeRecordsIntoIter<Reader, (BString, u64)>;
 impl ConcatCsv {
     pub fn new(mut inputs: Vec<PathBuf>) -> ConcatCsv {
         inputs.reverse(); // treat it as a stack
-        ConcatCsv { inputs: inputs, cur: None }
+        ConcatCsv { inputs, cur: None }
     }
 
     fn read_row(&mut self) -> Option<Result<(BString, u64), Error>> {
@@ -162,7 +162,7 @@ impl ConcatCsv {
 impl Iterator for ConcatCsv {
     type Item = Result<(BString, u64), Error>;
 
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next(&mut self) -> Option<Result<(BString, u64), Error>> {
         loop {
             if self.cur.is_none() {
                 match self.inputs.pop() {

@@ -99,7 +99,7 @@ struct LastTransition {
 impl Builder<Vec<u8>> {
     /// Create a builder that builds an fst in memory.
     #[inline]
-    pub fn memory() -> Self {
+    pub fn memory() -> Builder<Vec<u8>> {
         Builder::new(Vec::with_capacity(10 * (1 << 10))).unwrap()
     }
 
@@ -447,7 +447,7 @@ impl BuilderNodeUnfinished {
 }
 
 impl Clone for BuilderNode {
-    fn clone(&self) -> Self {
+    fn clone(&self) -> BuilderNode {
         BuilderNode {
             is_final: self.is_final,
             final_output: self.final_output,
@@ -455,7 +455,7 @@ impl Clone for BuilderNode {
         }
     }
 
-    fn clone_from(&mut self, source: &Self) {
+    fn clone_from(&mut self, source: &BuilderNode) {
         self.is_final = source.is_final;
         self.final_output = source.final_output;
         self.trans.clear();
@@ -464,7 +464,7 @@ impl Clone for BuilderNode {
 }
 
 impl Default for BuilderNode {
-    fn default() -> Self {
+    fn default() -> BuilderNode {
         BuilderNode {
             is_final: false,
             final_output: Output::zero(),

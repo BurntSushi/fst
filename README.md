@@ -23,11 +23,10 @@ Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
 https://docs.rs/fst
 
 The
-[`fst-regex`](https://docs.rs/fst-regex)
-and
-[`fst-levenshtein`](https://docs.rs/fst-levenshtein)
-crates provide regular expression matching and fuzzy searching on FSTs,
-respectively.
+[`regex-automata`](https://docs.rs/regex-automata)
+crate provides implementations of the `fst::Automata` trait when its
+`transducer` feature is enabled. This permits using DFAs compiled by
+`regex-automata` to search finite state transducers produced by this crate.
 
 
 ### Installation
@@ -36,27 +35,21 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
 ```toml,ignore
 [dependencies]
-fst = "0.3"
+fst = "0.4"
 ```
 
 
 ### Example
 
 This example demonstrates building a set in memory and executing a fuzzy query
-against it. You'll need `fst = "0.3"` and `fst-levenshtein = "0.2"` in your
-`Cargo.toml`.
+against it. You'll need `fst = "0.4"` with the `levenshtein` feature enabled in
+your `Cargo.toml`.
 
 ```rust
-extern crate fst;
-extern crate fst_levenshtein;
-
-use std::error::Error;
-use std::process;
-
 use fst::{IntoStreamer, Set};
-use fst_levenshtein::Levenshtein;
+use fst::automaton::Levenshtein;
 
-fn try_main() -> Result<(), Box<Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
   // A convenient way to create sets in memory.
   let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
   let set = Set::from_iter(keys)?;
@@ -71,13 +64,13 @@ fn try_main() -> Result<(), Box<Error>> {
   assert_eq!(keys, vec!["fo", "fob", "foo", "food"]);
   Ok(())
 }
-
-fn main() {
-  if let Err(err) = try_main() {
-    eprintln!("{}", err);
-    process::exit(1);
-  }
-}
 ```
 
 Check out the documentation for a lot more examples!
+
+
+### Cargo features
+
+* `levenshtein` - **Disabled** by default. This adds the `Levenshtein`
+  automaton to the `automaton` sub-module. This includes an additional
+  dependency on `utf8-ranges`.

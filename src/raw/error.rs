@@ -70,10 +70,9 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::Error::*;
         match *self {
-            FromUtf8(ref err) => err.fmt(f),
-            Version { expected, got } => write!(
+            Error::FromUtf8(ref err) => err.fmt(f),
+            Error::Version { expected, got } => write!(
                 f,
                 "\
 Error opening FST: expected API version {}, got API version {}. \
@@ -83,24 +82,24 @@ to change the version of the 'fst' crate you're using, or re-generate the
 FST.",
                 expected, got
             ),
-            Format { size } => write!(
+            Error::Format { size } => write!(
                 f,
                 "\
 Error opening FST with size {} bytes: An unknown error occurred. This \
 usually means you're trying to read data that isn't actually an encoded FST.",
                 size
             ),
-            ChecksumMismatch { expected, got } => write!(
+            Error::ChecksumMismatch { expected, got } => write!(
                 f,
                 "FST verification failed: expected checksum of {} but got {}",
                 expected, got,
             ),
-            DuplicateKey { ref got } => write!(
+            Error::DuplicateKey { ref got } => write!(
                 f,
                 "Error inserting duplicate key: '{}'.",
                 format_bytes(&*got)
             ),
-            OutOfOrder { ref previous, ref got } => write!(
+            Error::OutOfOrder { ref previous, ref got } => write!(
                 f,
                 "\
 Error inserting out-of-order key: '{}'. (Previous key was '{}'.) Keys must be \
@@ -108,7 +107,7 @@ inserted in lexicographic order.",
                 format_bytes(&*got),
                 format_bytes(&*previous)
             ),
-            WrongType { expected, got } => write!(
+            Error::WrongType { expected, got } => write!(
                 f,
                 "\
 Error opening FST: expected type '{}', got type '{}'.",
@@ -135,7 +134,7 @@ impl std::error::Error for Error {
 
 impl From<FromUtf8Error> for Error {
     #[inline]
-    fn from(err: FromUtf8Error) -> Self {
+    fn from(err: FromUtf8Error) -> Error {
         Error::FromUtf8(err)
     }
 }

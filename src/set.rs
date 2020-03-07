@@ -411,7 +411,7 @@ impl<'s, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'s Set<D> {
     type Into = Stream<'s>;
 
     #[inline]
-    fn into_stream(self) -> Self::Into {
+    fn into_stream(self) -> Stream<'s> {
         Stream(self.0.stream())
     }
 }
@@ -518,7 +518,7 @@ pub struct SetBuilder<W>(raw::Builder<W>);
 impl SetBuilder<Vec<u8>> {
     /// Create a builder that builds a set in memory.
     #[inline]
-    pub fn memory() -> Self {
+    pub fn memory() -> SetBuilder<Vec<u8>> {
         SetBuilder(raw::Builder::memory())
     }
 
@@ -789,7 +789,7 @@ pub struct OpBuilder<'s>(raw::OpBuilder<'s>);
 impl<'s> OpBuilder<'s> {
     /// Create a new set operation builder.
     #[inline]
-    pub fn new() -> Self {
+    pub fn new() -> OpBuilder<'s> {
         OpBuilder(raw::OpBuilder::new())
     }
 
@@ -800,7 +800,7 @@ impl<'s> OpBuilder<'s> {
     ///
     /// The stream must emit a lexicographically ordered sequence of byte
     /// strings.
-    pub fn add<I, S>(mut self, streamable: I) -> Self
+    pub fn add<I, S>(mut self, streamable: I) -> OpBuilder<'s>
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
         S: 's + for<'a> Streamer<'a, Item = &'a [u8]>,
@@ -943,7 +943,7 @@ where
     I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
     S: 'f + for<'a> Streamer<'a, Item = &'a [u8]>,
 {
-    fn from_iter<T>(it: T) -> Self
+    fn from_iter<T>(it: T) -> OpBuilder<'f>
     where
         T: IntoIterator<Item = I>,
     {
@@ -962,7 +962,7 @@ impl<'a, 's> Streamer<'a> for Union<'s> {
     type Item = &'a [u8];
 
     #[inline]
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
     }
 }
@@ -976,7 +976,7 @@ impl<'a, 's> Streamer<'a> for Intersection<'s> {
     type Item = &'a [u8];
 
     #[inline]
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
     }
 }
@@ -994,7 +994,7 @@ impl<'a, 's> Streamer<'a> for Difference<'s> {
     type Item = &'a [u8];
 
     #[inline]
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
     }
 }
@@ -1009,7 +1009,7 @@ impl<'a, 's> Streamer<'a> for SymmetricDifference<'s> {
     type Item = &'a [u8];
 
     #[inline]
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
     }
 }
@@ -1024,7 +1024,7 @@ struct StreamZeroOutput<S>(S);
 impl<'a, S: Streamer<'a>> Streamer<'a> for StreamZeroOutput<S> {
     type Item = (S::Item, raw::Output);
 
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<(S::Item, raw::Output)> {
         self.0.next().map(|key| (key, raw::Output::zero()))
     }
 }

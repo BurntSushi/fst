@@ -1,6 +1,3 @@
-
-
-
 use std::cmp;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
@@ -90,13 +87,13 @@ impl Levenshtein {
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
     #[inline]
-    pub fn new(query: &str, distance: u32) -> Result<Self, Error> {
+    pub fn new(query: &str, distance: u32) -> Result<Levenshtein, Error> {
         let lev = DynamicLevenshtein {
             query: query.to_owned(),
             dist: distance as usize,
         };
         let dfa = DfaBuilder::new(lev.clone()).build()?;
-        Ok(Levenshtein { prog: lev, dfa: dfa })
+        Ok(Levenshtein { prog: lev, dfa })
     }
 }
 
@@ -197,10 +194,10 @@ struct DfaBuilder {
 }
 
 impl DfaBuilder {
-    fn new(lev: DynamicLevenshtein) -> Self {
+    fn new(lev: DynamicLevenshtein) -> DfaBuilder {
         DfaBuilder {
             dfa: Dfa { states: Vec::with_capacity(16) },
-            lev: lev,
+            lev,
             cache: HashMap::with_capacity(1024),
         }
     }
@@ -251,9 +248,7 @@ impl DfaBuilder {
             Entry::Occupied(v) => (*v.get(), true),
             Entry::Vacant(v) => {
                 let is_match = self.lev.is_match(lev_state);
-                self.dfa
-                    .states
-                    .push(State { next: [None; 256], is_match: is_match });
+                self.dfa.states.push(State { next: [None; 256], is_match });
                 (*v.insert(self.dfa.states.len() - 1), false)
             }
         })
@@ -314,7 +309,7 @@ impl DfaBuilder {
     }
 
     fn new_state(&mut self, is_match: bool) -> usize {
-        self.dfa.states.push(State { next: [None; 256], is_match: is_match });
+        self.dfa.states.push(State { next: [None; 256], is_match });
         self.dfa.states.len() - 1
     }
 }

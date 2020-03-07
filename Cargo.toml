@@ -26,6 +26,7 @@ levenshtein = ["utf8-ranges"]
 utf8-ranges = { version = "1.0.4", optional = true }
 
 [dev-dependencies]
+doc-comment = "0.3.1"
 fnv = "1.0.6"
 memmap = "0.7"
 quickcheck = { version = "0.9.2", default-features = false }

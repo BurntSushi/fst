@@ -48,7 +48,7 @@ pub struct OpBuilder<'f> {
 impl<'f> OpBuilder<'f> {
     /// Create a new set operation builder.
     #[inline]
-    pub fn new() -> Self {
+    pub fn new() -> OpBuilder<'f> {
         OpBuilder { streams: vec![] }
     }
 
@@ -59,7 +59,7 @@ impl<'f> OpBuilder<'f> {
     ///
     /// The stream must emit a lexicographically ordered sequence of key-value
     /// pairs.
-    pub fn add<I, S>(mut self, stream: I) -> Self
+    pub fn add<I, S>(mut self, stream: I) -> OpBuilder<'f>
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
         S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
@@ -188,7 +188,7 @@ where
     I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
     S: 'f + for<'a> Streamer<'a, Item = (&'a [u8], Output)>,
 {
-    fn from_iter<T>(it: T) -> Self
+    fn from_iter<T>(it: T) -> OpBuilder<'f>
     where
         T: IntoIterator<Item = I>,
     {
@@ -210,7 +210,7 @@ pub struct Union<'f> {
 impl<'a, 'f> Streamer<'a> for Union<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         if let Some(slot) = self.cur_slot.take() {
             self.heap.refill(slot);
         }
@@ -244,7 +244,7 @@ pub struct Intersection<'f> {
 impl<'a, 'f> Streamer<'a> for Intersection<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         if let Some(slot) = self.cur_slot.take() {
             self.heap.refill(slot);
         }
@@ -290,7 +290,7 @@ pub struct Difference<'f> {
 impl<'a, 'f> Streamer<'a> for Difference<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         loop {
             match self.set.next() {
                 None => return None,
@@ -329,7 +329,7 @@ pub struct SymmetricDifference<'f> {
 impl<'a, 'f> Streamer<'a> for SymmetricDifference<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
-    fn next(&'a mut self) -> Option<Self::Item> {
+    fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         if let Some(slot) = self.cur_slot.take() {
             self.heap.refill(slot);
         }

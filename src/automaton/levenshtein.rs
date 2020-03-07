@@ -109,7 +109,10 @@ impl Levenshtein {
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
     #[inline]
-    pub fn new(query: &str, distance: u32) -> Result<Self, LevenshteinError> {
+    pub fn new(
+        query: &str,
+        distance: u32,
+    ) -> Result<Levenshtein, LevenshteinError> {
         let lev = DynamicLevenshtein {
             query: query.to_owned(),
             dist: distance as usize,
@@ -216,7 +219,7 @@ struct DfaBuilder {
 }
 
 impl DfaBuilder {
-    fn new(lev: DynamicLevenshtein) -> Self {
+    fn new(lev: DynamicLevenshtein) -> DfaBuilder {
         DfaBuilder {
             dfa: Dfa { states: Vec::with_capacity(16) },
             lev,

@@ -20,7 +20,7 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
 ```ignore
 [dependencies]
-fst = "0.2"
+fst = "0.4"
 ```
 
 The examples in this documentation will show the rest.
@@ -52,13 +52,11 @@ This requires the `levenshtein` feature in this crate to be enabled. It is not
 enabled by default.
 
 ```rust
-use std::error::Error;
-
 use fst::{IntoStreamer, Streamer, Set};
 use fst::automaton::Levenshtein;
 
 # fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<dyn Error>> {
+fn example() -> Result<(), Box<dyn std::error::Error>> {
     // A convenient way to create sets in memory.
     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
     let set = Set::from_iter(keys)?;
@@ -167,8 +165,8 @@ the `transducer` feature enabled:
 
 ```toml
 [dependencies]
-fst = "0.3"
-regex-automata = { version = "0.1.9", features = ["transducer"] }
+fst = "0.4"
+regex-automata = { version = "0.1.8", features = ["transducer"] }
 ```
 
 # Example: searching multiple sets efficiently
@@ -184,14 +182,12 @@ The example below shows how to find all keys that start with `B` or `G`. The
 example below uses sets, but the same operations are available on maps too.
 
 ```rust
-use std::error::Error;
-
 use fst::automaton::{Automaton, Str};
 use fst::set;
 use fst::{IntoStreamer, Set, Streamer};
 
 # fn main() { example().unwrap(); }
-fn example() -> Result<(), Box<dyn Error>> {
+fn example() -> Result<(), Box<dyn std::error::Error>> {
     let set1 = Set::from_iter(&["AC/DC", "Aerosmith"])?;
     let set2 = Set::from_iter(&["Bob Seger", "Bruce Springsteen"])?;
     let set3 = Set::from_iter(&["George Thorogood", "Golden Earring"])?;
@@ -304,6 +300,9 @@ data structures found in the standard library, such as `BTreeSet` and
 */
 
 #![deny(missing_docs)]
+
+#[cfg(all(feature = "levenshtein", doctest))]
+doc_comment::doctest!("../README.md");
 
 pub use crate::automaton::Automaton;
 pub use crate::error::{Error, Result};

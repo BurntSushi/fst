@@ -57,10 +57,9 @@ impl<'f> Node<'f> {
         addr: CompiledAddr,
         data: &[u8],
     ) -> Node<'_> {
-        use self::State::*;
         let state = State::new(data, addr);
         match state {
-            EmptyFinal => Node {
+            State::EmptyFinal => Node {
                 data: &[],
                 version,
                 state: State::EmptyFinal,
@@ -71,7 +70,7 @@ impl<'f> Node<'f> {
                 sizes: PackSizes::new(),
                 final_output: Output::zero(),
             },
-            OneTransNext(s) => {
+            State::OneTransNext(s) => {
                 let data = &data[..addr + 1];
                 Node {
                     data,
@@ -85,7 +84,7 @@ impl<'f> Node<'f> {
                     final_output: Output::zero(),
                 }
             }
-            OneTrans(s) => {
+            State::OneTrans(s) => {
                 let data = &data[..addr + 1];
                 let sizes = s.sizes(data);
                 Node {
@@ -100,7 +99,7 @@ impl<'f> Node<'f> {
                     final_output: Output::zero(),
                 }
             }
-            AnyTrans(s) => {
+            State::AnyTrans(s) => {
                 let data = &data[..addr + 1];
                 let sizes = s.sizes(data);
                 let ntrans = s.ntrans(data);
@@ -162,18 +161,17 @@ impl<'f> Node<'f> {
     /// Returns the transition address of the `i`th transition.
     #[inline]
     pub fn transition_addr(&self, i: usize) -> CompiledAddr {
-        use self::State::*;
         match self.state {
-            OneTransNext(s) => {
+            State::OneTransNext(s) => {
                 assert!(i == 0);
                 s.trans_addr(self)
             }
-            OneTrans(s) => {
+            State::OneTrans(s) => {
                 assert!(i == 0);
                 s.trans_addr(self)
             }
-            AnyTrans(s) => s.trans_addr(self, i),
-            EmptyFinal => panic!("out of bounds"),
+            State::AnyTrans(s) => s.trans_addr(self, i),
+            State::EmptyFinal => panic!("out of bounds"),
         }
     }
 
@@ -182,14 +180,13 @@ impl<'f> Node<'f> {
     /// If no transition for this byte exists, then `None` is returned.
     #[inline]
     pub fn find_input(&self, b: u8) -> Option<usize> {
-        use self::State::*;
         match self.state {
-            OneTransNext(s) if s.input(self) == b => Some(0),
-            OneTransNext(_) => None,
-            OneTrans(s) if s.input(self) == b => Some(0),
-            OneTrans(_) => None,
-            AnyTrans(s) => s.find_input(self, b),
-            EmptyFinal => None,
+            State::OneTransNext(s) if s.input(self) == b => Some(0),
+            State::OneTransNext(_) => None,
+            State::OneTrans(s) if s.input(self) == b => Some(0),
+            State::OneTrans(_) => None,
+            State::AnyTrans(s) => s.find_input(self, b),
+            State::EmptyFinal => None,
         }
     }
 
@@ -236,12 +233,11 @@ impl<'f> Node<'f> {
     #[doc(hidden)]
     #[inline]
     pub fn state(&self) -> &'static str {
-        use self::State::*;
         match self.state {
-            OneTransNext(_) => "OTN",
-            OneTrans(_) => "OT",
-            AnyTrans(_) => "AT",
-            EmptyFinal => "EF",
+            State::OneTransNext(_) => "OTN",
+            State::OneTrans(_) => "OT",
+            State::AnyTrans(_) => "AT",
+            State::EmptyFinal => "EF",
         }
     }
 
@@ -303,15 +299,14 @@ struct StateAnyTrans(u8);
 
 impl State {
     fn new(data: &[u8], addr: CompiledAddr) -> State {
-        use self::State::*;
         if addr == EMPTY_ADDRESS {
-            return EmptyFinal;
+            return State::EmptyFinal;
         }
         let v = data[addr];
         match (v & 0b11_000000) >> 6 {
-            0b11 => OneTransNext(StateOneTransNext(v)),
-            0b10 => OneTrans(StateOneTrans(v)),
-            _ => AnyTrans(StateAnyTrans(v)),
+            0b11 => State::OneTransNext(StateOneTransNext(v)),
+            0b10 => State::OneTrans(StateOneTrans(v)),
+            _ => State::AnyTrans(StateAnyTrans(v)),
         }
     }
 }
@@ -332,7 +327,7 @@ impl StateOneTransNext {
     }
 
     #[inline]
-    fn new() -> Self {
+    fn new() -> StateOneTransNext {
         StateOneTransNext(0b11_000000)
     }
 
@@ -401,7 +396,7 @@ impl StateOneTrans {
     }
 
     #[inline]
-    fn new() -> Self {
+    fn new() -> StateOneTrans {
         StateOneTrans(0b10_000000)
     }
 
@@ -548,7 +543,7 @@ impl StateAnyTrans {
     }
 
     #[inline]
-    fn new() -> Self {
+    fn new() -> StateAnyTrans {
         StateAnyTrans(0b00_000000)
     }
 
@@ -745,12 +740,12 @@ struct PackSizes(u8);
 
 impl PackSizes {
     #[inline]
-    fn new() -> Self {
+    fn new() -> PackSizes {
         PackSizes(0)
     }
 
     #[inline]
-    fn decode(v: u8) -> Self {
+    fn decode(v: u8) -> PackSizes {
         PackSizes(v)
     }
 

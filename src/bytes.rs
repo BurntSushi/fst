@@ -1,20 +1,5 @@
-#![allow(warnings)]
-
 use std::convert::TryInto;
 use std::io;
-
-/// Read a u16 in little endian format from the beginning of the given slice.
-/// This panics if the slice has length less than 2.
-pub fn read_u16_le(slice: &[u8]) -> u16 {
-    u16::from_le_bytes(slice[..2].try_into().unwrap())
-}
-
-/// Read a u24 (returned as a u32 with the most significant 8 bits always set
-/// to 0) in little endian format from the beginning of the given slice. This
-/// panics if the slice has length less than 3.
-pub fn read_u24_le(slice: &[u8]) -> u32 {
-    slice[0] as u32 | (slice[1] as u32) << 8 | (slice[2] as u32) << 16
-}
 
 /// Read a u32 in little endian format from the beginning of the given slice.
 /// This panics if the slice has length less than 4.
@@ -22,30 +7,10 @@ pub fn read_u32_le(slice: &[u8]) -> u32 {
     u32::from_le_bytes(slice[..4].try_into().unwrap())
 }
 
-/// Like read_u32_le, but from an io::Read implementation. If io::Read does
-/// not yield at least 4 bytes, then this returns an unexpected EOF error.
-pub fn io_read_u32_le<R: io::Read>(mut rdr: R) -> io::Result<u32> {
-    let mut buf = [0; 4];
-    rdr.read_exact(&mut buf)?;
-    Ok(u32::from_le_bytes(buf))
-}
-
-/// Write a u16 in little endian format to the beginning of the given slice.
-/// This panics if the slice has length less than 2.
-pub fn write_u16_le(n: u16, slice: &mut [u8]) {
-    assert!(slice.len() >= 2);
-    let bytes = n.to_le_bytes();
-    slice[0] = bytes[0];
-    slice[1] = bytes[1];
-}
-
-/// Write a u24 (given as a u32 where the most significant 8 bits are ignored)
-/// in little endian format to the beginning of the given slice. This panics
-/// if the slice has length less than 3.
-pub fn write_u24_le(n: u32, slice: &mut [u8]) {
-    slice[0] = n as u8;
-    slice[1] = (n >> 8) as u8;
-    slice[2] = (n >> 16) as u8;
+/// Read a u64 in little endian format from the beginning of the given slice.
+/// This panics if the slice has length less than 8.
+pub fn read_u64_le(slice: &[u8]) -> u64 {
+    u64::from_le_bytes(slice[..8].try_into().unwrap())
 }
 
 /// Write a u32 in little endian format to the beginning of the given slice.
@@ -59,34 +24,116 @@ pub fn write_u32_le(n: u32, slice: &mut [u8]) {
     slice[3] = bytes[3];
 }
 
-/// https://developers.google.com/protocol-buffers/docs/encoding#varints
-pub fn write_varu64(data: &mut [u8], mut n: u64) -> usize {
-    let mut i = 0;
-    while n >= 0b1000_0000 {
-        data[i] = (n as u8) | 0b1000_0000;
-        n >>= 7;
-        i += 1;
-    }
-    data[i] = n as u8;
-    i + 1
+/// Like write_u32_le, but to an io::Write implementation. If every byte could
+/// not be writen, then this returns an error.
+pub fn io_write_u32_le<W: io::Write>(n: u32, mut wtr: W) -> io::Result<()> {
+    let mut buf = [0; 4];
+    write_u32_le(n, &mut buf);
+    wtr.write_all(&buf)
 }
 
-/// https://developers.google.com/protocol-buffers/docs/encoding#varints
-pub fn read_varu64(data: &[u8]) -> (u64, usize) {
-    let mut n: u64 = 0;
-    let mut shift: u32 = 0;
-    for (i, &b) in data.iter().enumerate() {
-        if b < 0b1000_0000 {
-            return match (b as u64).checked_shl(shift) {
-                None => (0, 0),
-                Some(b) => (n | b, i + 1),
-            };
-        }
-        match ((b as u64) & 0b0111_1111).checked_shl(shift) {
-            None => return (0, 0),
-            Some(b) => n |= b,
-        }
-        shift += 7;
+/// Write a u64 in little endian format to the beginning of the given slice.
+/// This panics if the slice has length less than 8.
+pub fn write_u64_le(n: u64, slice: &mut [u8]) {
+    assert!(slice.len() >= 8);
+    let bytes = n.to_le_bytes();
+    slice[0] = bytes[0];
+    slice[1] = bytes[1];
+    slice[2] = bytes[2];
+    slice[3] = bytes[3];
+    slice[4] = bytes[4];
+    slice[5] = bytes[5];
+    slice[6] = bytes[6];
+    slice[7] = bytes[7];
+}
+
+/// Like write_u64_le, but to an io::Write implementation. If every byte could
+/// not be writen, then this returns an error.
+pub fn io_write_u64_le<W: io::Write>(n: u64, mut wtr: W) -> io::Result<()> {
+    let mut buf = [0; 8];
+    write_u64_le(n, &mut buf);
+    wtr.write_all(&buf)
+}
+
+/// pack_uint packs the given integer in the smallest number of bytes possible,
+/// and writes it to the given writer. The number of bytes written is returned
+/// on success.
+pub fn pack_uint<W: io::Write>(wtr: W, n: u64) -> io::Result<u8> {
+    let nbytes = pack_size(n);
+    pack_uint_in(wtr, n, nbytes).map(|_| nbytes)
+}
+
+/// pack_uint_in is like pack_uint, but always uses the number of bytes given
+/// to pack the number given.
+///
+/// `nbytes` must be >= pack_size(n) and <= 8, where `pack_size(n)` is the
+/// smallest number of bytes that can store the integer given.
+pub fn pack_uint_in<W: io::Write>(
+    mut wtr: W,
+    mut n: u64,
+    nbytes: u8,
+) -> io::Result<()> {
+    assert!(1 <= nbytes && nbytes <= 8);
+    let mut buf = [0u8; 8];
+    for i in 0..nbytes {
+        buf[i as usize] = n as u8;
+        n = n >> 8;
     }
-    (0, 0)
+    wtr.write_all(&buf[..nbytes as usize])?;
+    Ok(())
+}
+
+/// unpack_uint is the dual of pack_uint. It unpacks the integer at the current
+/// position in `slice` after reading `nbytes` bytes.
+///
+/// `nbytes` must be >= 1 and <= 8.
+pub fn unpack_uint(slice: &[u8], nbytes: u8) -> u64 {
+    assert!(1 <= nbytes && nbytes <= 8);
+
+    let mut n = 0;
+    for (i, &b) in slice[..nbytes as usize].iter().enumerate() {
+        n = n | ((b as u64) << (8 * i));
+    }
+    n
+}
+
+/// pack_size returns the smallest number of bytes that can encode `n`.
+pub fn pack_size(n: u64) -> u8 {
+    if n < 1 << 8 {
+        1
+    } else if n < 1 << 16 {
+        2
+    } else if n < 1 << 24 {
+        3
+    } else if n < 1 << 32 {
+        4
+    } else if n < 1 << 40 {
+        5
+    } else if n < 1 << 48 {
+        6
+    } else if n < 1 << 56 {
+        7
+    } else {
+        8
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quickcheck::{QuickCheck, StdGen};
+    use std::io;
+
+    #[test]
+    fn prop_pack_in_out() {
+        fn p(num: u64) -> bool {
+            let mut buf = io::Cursor::new(vec![]);
+            let size = pack_uint(&mut buf, num).unwrap();
+            buf.set_position(0);
+            num == unpack_uint(buf.get_ref(), size)
+        }
+        QuickCheck::new()
+            .gen(StdGen::new(::rand::thread_rng(), 257)) // pick byte boundary
+            .quickcheck(p as fn(u64) -> bool);
+    }
 }

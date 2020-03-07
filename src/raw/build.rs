@@ -1,7 +1,6 @@
 use std::io;
 
-use byteorder::{LittleEndian, WriteBytesExt};
-
+use crate::bytes;
 use crate::error::Result;
 use crate::raw::counting_writer::CountingWriter;
 use crate::raw::error::Error;
@@ -125,9 +124,9 @@ impl<W: io::Write> Builder<W> {
         // Don't allow any nodes to have address 0-7. We use these to encode
         // the API version. We also use addresses `0` and `1` as special
         // sentinel values, so they should never correspond to a real node.
-        wtr.write_u64::<LittleEndian>(VERSION)?;
+        bytes::io_write_u64_le(VERSION, &mut wtr)?;
         // Similarly for 8-15 for the fst type.
-        wtr.write_u64::<LittleEndian>(ty)?;
+        bytes::io_write_u64_le(ty, &mut wtr)?;
         Ok(Builder {
             wtr,
             unfinished: UnfinishedNodes::new(),
@@ -217,12 +216,12 @@ impl<W: io::Write> Builder<W> {
         self.compile_from(0)?;
         let root_node = self.unfinished.pop_root();
         let root_addr = self.compile(&root_node)?;
-        self.wtr.write_u64::<LittleEndian>(self.len as u64)?;
-        self.wtr.write_u64::<LittleEndian>(root_addr as u64)?;
+        bytes::io_write_u64_le(self.len as u64, &mut self.wtr)?;
+        bytes::io_write_u64_le(root_addr as u64, &mut self.wtr)?;
 
         let sum = self.wtr.masked_checksum();
         let mut wtr = self.wtr.into_inner();
-        wtr.write_u32::<LittleEndian>(sum)?;
+        bytes::io_write_u32_le(sum, &mut wtr)?;
         wtr.flush()?;
         Ok(wtr)
     }

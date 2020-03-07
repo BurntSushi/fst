@@ -3,11 +3,9 @@ use std::fmt;
 use std::io;
 use std::ops::Range;
 
-use byteorder::WriteBytesExt;
-
+use crate::bytes;
 use crate::raw::build::BuilderNode;
 use crate::raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
-use crate::raw::pack::{pack_size, pack_uint, pack_uint_in, unpack_uint};
 use crate::raw::{
     u64_to_usize, CompiledAddr, Output, Transition, EMPTY_ADDRESS,
 };
@@ -325,9 +323,10 @@ impl StateOneTransNext {
         let mut state = StateOneTransNext::new();
         state.set_common_input(input);
         if state.common_input().is_none() {
-            wtr.write_u8(input)?;
+            wtr.write_all(&[input])?;
         }
-        wtr.write_u8(state.0).map_err(From::from)
+        wtr.write_all(&[state.0])?;
+        Ok(())
     }
 
     #[inline(always)]
@@ -381,20 +380,21 @@ impl StateOneTrans {
     ) -> io::Result<()> {
         let out = trans.out.value();
         let output_pack_size =
-            if out == 0 { 0 } else { pack_uint(&mut wtr, out)? };
+            if out == 0 { 0 } else { bytes::pack_uint(&mut wtr, out)? };
         let trans_pack_size = pack_delta(&mut wtr, addr, trans.addr)?;
 
         let mut pack_sizes = PackSizes::new();
         pack_sizes.set_output_pack_size(output_pack_size);
         pack_sizes.set_transition_pack_size(trans_pack_size);
-        wtr.write_u8(pack_sizes.encode())?;
+        wtr.write_all(&[pack_sizes.encode()])?;
 
         let mut state = StateOneTrans::new();
         state.set_common_input(trans.inp);
         if state.common_input().is_none() {
-            wtr.write_u8(trans.inp)?;
+            wtr.write_all(&[trans.inp])?;
         }
-        wtr.write_u8(state.0).map_err(From::from)
+        wtr.write_all(&[state.0])?;
+        Ok(())
     }
 
     fn new() -> Self {
@@ -454,7 +454,7 @@ impl StateOneTrans {
                 - self.input_len()
                 - 1 // pack size
                 - tsize - osize;
-        Output::new(unpack_uint(&node.data[i..], osize as u8))
+        Output::new(bytes::unpack_uint(&node.data[i..], osize as u8))
     }
 
     #[inline(always)]
@@ -477,11 +477,11 @@ impl StateAnyTrans {
         assert!(node.trans.len() <= 256);
 
         let mut tsize = 0;
-        let mut osize = pack_size(node.final_output.value());
+        let mut osize = bytes::pack_size(node.final_output.value());
         let mut any_outs = !node.final_output.is_zero();
         for t in &node.trans {
             tsize = cmp::max(tsize, pack_delta_size(addr, t.addr));
-            osize = cmp::max(osize, pack_size(t.out.value()));
+            osize = cmp::max(osize, bytes::pack_size(t.out.value()));
             any_outs = any_outs || !t.out.is_zero();
         }
 
@@ -499,17 +499,21 @@ impl StateAnyTrans {
 
         if any_outs {
             if node.is_final {
-                pack_uint_in(&mut wtr, node.final_output.value(), osize)?;
+                bytes::pack_uint_in(
+                    &mut wtr,
+                    node.final_output.value(),
+                    osize,
+                )?;
             }
             for t in node.trans.iter().rev() {
-                pack_uint_in(&mut wtr, t.out.value(), osize)?;
+                bytes::pack_uint_in(&mut wtr, t.out.value(), osize)?;
             }
         }
         for t in node.trans.iter().rev() {
             pack_delta_in(&mut wtr, addr, t.addr, tsize)?;
         }
         for t in node.trans.iter().rev() {
-            wtr.write_u8(t.inp)?;
+            wtr.write_all(&[t.inp])?;
         }
         if node.trans.len() > TRANS_INDEX_THRESHOLD {
             // A value of 255 indicates that no transition exists for the byte
@@ -523,18 +527,19 @@ impl StateAnyTrans {
             wtr.write_all(&index)?;
         }
 
-        wtr.write_u8(pack_sizes.encode())?;
+        wtr.write_all(&[pack_sizes.encode()])?;
         if state.state_ntrans().is_none() {
             if node.trans.len() == 256 {
                 // 256 can't be represented in a u8, so we abuse the fact that
                 // the # of transitions can never be 1 here, since 1 is always
                 // encoded in the state byte.
-                wtr.write_u8(1)?;
+                wtr.write_all(&[1])?;
             } else {
-                wtr.write_u8(node.trans.len() as u8)?;
+                wtr.write_all(&[node.trans.len() as u8])?;
             }
         }
-        wtr.write_u8(state.0).map_err(From::from)
+        wtr.write_all(&[state.0])?;
+        Ok(())
     }
 
     #[inline(always)]
@@ -638,7 +643,7 @@ impl StateAnyTrans {
                  - self.total_trans_size(version, sizes, ntrans)
                  - (ntrans * osize) // output values
                  - osize; // the desired output value
-        Output::new(unpack_uint(&data[at..], osize as u8))
+        Output::new(bytes::unpack_uint(&data[at..], osize as u8))
     }
 
     #[inline(always)]
@@ -720,7 +725,7 @@ impl StateAnyTrans {
                  - self.total_trans_size(node.version, node.sizes, node.ntrans)
                  - (i * osize) // the previous outputs
                  - osize; // the desired output value
-        Output::new(unpack_uint(&node.data[at..], osize as u8))
+        Output::new(bytes::unpack_uint(&node.data[at..], osize as u8))
     }
 }
 
@@ -840,7 +845,7 @@ fn pack_delta_in<W: io::Write>(
     } else {
         node_addr - trans_addr
     };
-    pack_uint_in(wtr, delta_addr as u64, nbytes)
+    bytes::pack_uint_in(wtr, delta_addr as u64, nbytes)
 }
 
 fn pack_delta_size(node_addr: CompiledAddr, trans_addr: CompiledAddr) -> u8 {
@@ -849,16 +854,15 @@ fn pack_delta_size(node_addr: CompiledAddr, trans_addr: CompiledAddr) -> u8 {
     } else {
         node_addr - trans_addr
     };
-    pack_size(delta_addr as u64)
+    bytes::pack_size(delta_addr as u64)
 }
 
-#[inline(always)]
 fn unpack_delta(
     slice: &[u8],
     trans_pack_size: usize,
     node_addr: usize,
 ) -> CompiledAddr {
-    let delta = unpack_uint(slice, trans_pack_size as u8);
+    let delta = bytes::unpack_uint(slice, trans_pack_size as u8);
     let delta_addr = u64_to_usize(delta);
     if delta_addr == EMPTY_ADDRESS {
         EMPTY_ADDRESS

@@ -585,7 +585,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     }
 
     /// Returns the root node of this fst.
-    #[inline(always)]
+    #[inline]
     pub fn root(&self) -> Node<'_> {
         self.as_ref().root()
     }
@@ -632,6 +632,7 @@ struct FstRef<'f> {
 }
 
 impl<'f> FstRef<'f> {
+    #[inline]
     fn get(&self, key: &[u8]) -> Option<Output> {
         let mut node = self.root();
         let mut out = Output::zero();
@@ -652,6 +653,7 @@ impl<'f> FstRef<'f> {
         }
     }
 
+    #[inline]
     fn contains_key(&self, key: &[u8]) -> bool {
         let mut node = self.root();
         for &b in key {
@@ -663,6 +665,7 @@ impl<'f> FstRef<'f> {
         node.is_final()
     }
 
+    #[inline]
     fn get_key_into(&self, mut value: u64, key: &mut Vec<u8>) -> bool {
         let mut node = self.root();
         while value != 0 || !node.is_final() {
@@ -682,42 +685,52 @@ impl<'f> FstRef<'f> {
         true
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.meta.len
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         self.meta.len == 0
     }
 
+    #[inline]
     fn size(&self) -> usize {
         self.as_bytes().len()
     }
 
+    #[inline]
     fn fst_type(&self) -> FstType {
         self.meta.ty
     }
 
+    #[inline]
     fn root_addr(&self) -> CompiledAddr {
         self.meta.root_addr
     }
 
+    #[inline]
     fn root(&self) -> Node<'f> {
         self.node(self.root_addr())
     }
 
+    #[inline]
     fn node(&self, addr: CompiledAddr) -> Node<'f> {
         Node::new(self.meta.version, addr, self.as_bytes())
     }
 
+    #[inline]
     fn to_vec(&self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }
 
+    #[inline]
     fn as_bytes(&self) -> &'f [u8] {
         self.data
     }
 
+    #[inline]
     fn empty_final_output(&self) -> Option<Output> {
         let root = self.root();
         if root.is_final() {
@@ -883,6 +896,7 @@ enum Bound {
 }
 
 impl Bound {
+    #[inline]
     fn exceeded_by(&self, inp: &[u8]) -> bool {
         match *self {
             Bound::Included(ref v) => inp > v,
@@ -891,6 +905,7 @@ impl Bound {
         }
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         match *self {
             Bound::Included(ref v) => v.is_empty(),
@@ -899,6 +914,7 @@ impl Bound {
         }
     }
 
+    #[inline]
     fn is_inclusive(&self) -> bool {
         match *self {
             Bound::Excluded(_) => false,

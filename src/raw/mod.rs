@@ -28,7 +28,6 @@ use crate::stream::{IntoStreamer, Streamer};
 
 pub use self::build::Builder;
 pub use self::error::Error;
-use self::node::node_new;
 pub use self::node::{Node, Transitions};
 pub use self::ops::{
     Difference, IndexedValue, Intersection, OpBuilder, SymmetricDifference,
@@ -708,7 +707,7 @@ impl<'f> FstRef<'f> {
     }
 
     fn node(&self, addr: CompiledAddr) -> Node<'f> {
-        node_new(self.meta.version, addr, self.as_bytes())
+        Node::new(self.meta.version, addr, self.as_bytes())
     }
 
     fn to_vec(&self) -> Vec<u8> {

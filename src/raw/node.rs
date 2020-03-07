@@ -48,77 +48,76 @@ impl<'f> fmt::Debug for Node<'f> {
     }
 }
 
-/// Creates a new note at the address given.
-///
-/// `data` should be a slice to an entire FST.
-///
-/// This is a free function so that we can export it to parent modules, but
-/// not to consumers of this crate.
-#[inline(always)]
-pub fn node_new(version: u64, addr: CompiledAddr, data: &[u8]) -> Node<'_> {
-    use self::State::*;
-    let state = State::new(data, addr);
-    match state {
-        EmptyFinal => Node {
-            data: &[],
-            version,
-            state: State::EmptyFinal,
-            start: EMPTY_ADDRESS,
-            end: EMPTY_ADDRESS,
-            is_final: true,
-            ntrans: 0,
-            sizes: PackSizes::new(),
-            final_output: Output::zero(),
-        },
-        OneTransNext(s) => {
-            let data = &data[..addr + 1];
-            Node {
-                data,
+impl<'f> Node<'f> {
+    /// Creates a new note at the address given.
+    ///
+    /// `data` should be a slice to an entire FST.
+    pub(crate) fn new(
+        version: u64,
+        addr: CompiledAddr,
+        data: &[u8],
+    ) -> Node<'_> {
+        use self::State::*;
+        let state = State::new(data, addr);
+        match state {
+            EmptyFinal => Node {
+                data: &[],
                 version,
-                state,
-                start: addr,
-                end: s.end_addr(data),
-                is_final: false,
+                state: State::EmptyFinal,
+                start: EMPTY_ADDRESS,
+                end: EMPTY_ADDRESS,
+                is_final: true,
+                ntrans: 0,
                 sizes: PackSizes::new(),
-                ntrans: 1,
                 final_output: Output::zero(),
+            },
+            OneTransNext(s) => {
+                let data = &data[..addr + 1];
+                Node {
+                    data,
+                    version,
+                    state,
+                    start: addr,
+                    end: s.end_addr(data),
+                    is_final: false,
+                    sizes: PackSizes::new(),
+                    ntrans: 1,
+                    final_output: Output::zero(),
+                }
             }
-        }
-        OneTrans(s) => {
-            let data = &data[..addr + 1];
-            let sizes = s.sizes(data);
-            Node {
-                data,
-                version,
-                state,
-                start: addr,
-                end: s.end_addr(data, sizes),
-                is_final: false,
-                ntrans: 1,
-                sizes,
-                final_output: Output::zero(),
+            OneTrans(s) => {
+                let data = &data[..addr + 1];
+                let sizes = s.sizes(data);
+                Node {
+                    data,
+                    version,
+                    state,
+                    start: addr,
+                    end: s.end_addr(data, sizes),
+                    is_final: false,
+                    ntrans: 1,
+                    sizes,
+                    final_output: Output::zero(),
+                }
             }
-        }
-        AnyTrans(s) => {
-            let data = &data[..addr + 1];
-            let sizes = s.sizes(data);
-            let ntrans = s.ntrans(data);
-            Node {
-                data,
-                version,
-                state,
-                start: addr,
-                end: s.end_addr(version, data, sizes, ntrans),
-                is_final: s.is_final_state(),
-                ntrans,
-                sizes,
-                final_output: s.final_output(version, data, sizes, ntrans),
+            AnyTrans(s) => {
+                let data = &data[..addr + 1];
+                let sizes = s.sizes(data);
+                let ntrans = s.ntrans(data);
+                Node {
+                    data,
+                    version,
+                    state,
+                    start: addr,
+                    end: s.end_addr(version, data, sizes, ntrans),
+                    is_final: s.is_final_state(),
+                    ntrans,
+                    sizes,
+                    final_output: s.final_output(version, data, sizes, ntrans),
+                }
             }
         }
     }
-}
-
-impl<'f> Node<'f> {
     /// Returns an iterator over all transitions in this node in lexicographic
     /// order.
     #[inline]
@@ -876,7 +875,7 @@ mod tests {
     use quickcheck::{quickcheck, TestResult};
 
     use crate::raw::build::BuilderNode;
-    use crate::raw::node::{node_new, Node};
+    use crate::raw::node::Node;
     use crate::raw::{Builder, CompiledAddr, Output, Transition, VERSION};
     use crate::stream::Streamer;
 
@@ -926,7 +925,7 @@ mod tests {
 
     fn roundtrip(bnode: &BuilderNode) -> bool {
         let (addr, bytes) = compile(bnode);
-        let node = node_new(VERSION, addr, &bytes);
+        let node = Node::new(VERSION, addr, &bytes);
         nodes_equal(&node, &bnode)
     }
 
@@ -942,7 +941,7 @@ mod tests {
             trans: vec![],
         };
         let (addr, buf) = compile(&bnode);
-        let node = node_new(VERSION, addr, &buf);
+        let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 3);
         roundtrip(&bnode);
     }
@@ -955,7 +954,7 @@ mod tests {
             trans: vec![trans(20, b'a')],
         };
         let (addr, buf) = compile(&bnode);
-        let node = node_new(VERSION, addr, &buf);
+        let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 3);
         roundtrip(&bnode);
     }
@@ -968,7 +967,7 @@ mod tests {
             trans: vec![trans(2, b'\xff')],
         };
         let (addr, buf) = compile(&bnode);
-        let node = node_new(VERSION, addr, &buf);
+        let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 4);
         roundtrip(&bnode);
     }
@@ -988,7 +987,7 @@ mod tests {
             ],
         };
         let (addr, buf) = compile(&bnode);
-        let node = node_new(VERSION, addr, &buf);
+        let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 14);
         roundtrip(&bnode);
     }
@@ -1001,7 +1000,7 @@ mod tests {
             trans: (0..256).map(|i| trans(0, i as u8)).collect(),
         };
         let (addr, buf) = compile(&bnode);
-        let node = node_new(VERSION, addr, &buf);
+        let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.transitions().count(), 256);
         assert_eq!(node.len(), node.transitions().count());
         roundtrip(&bnode);

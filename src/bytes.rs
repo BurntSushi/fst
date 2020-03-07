@@ -3,18 +3,21 @@ use std::io;
 
 /// Read a u32 in little endian format from the beginning of the given slice.
 /// This panics if the slice has length less than 4.
+#[inline]
 pub fn read_u32_le(slice: &[u8]) -> u32 {
     u32::from_le_bytes(slice[..4].try_into().unwrap())
 }
 
 /// Read a u64 in little endian format from the beginning of the given slice.
 /// This panics if the slice has length less than 8.
+#[inline]
 pub fn read_u64_le(slice: &[u8]) -> u64 {
     u64::from_le_bytes(slice[..8].try_into().unwrap())
 }
 
 /// Write a u32 in little endian format to the beginning of the given slice.
 /// This panics if the slice has length less than 4.
+#[inline]
 pub fn write_u32_le(n: u32, slice: &mut [u8]) {
     assert!(slice.len() >= 4);
     let bytes = n.to_le_bytes();
@@ -26,6 +29,7 @@ pub fn write_u32_le(n: u32, slice: &mut [u8]) {
 
 /// Like write_u32_le, but to an io::Write implementation. If every byte could
 /// not be writen, then this returns an error.
+#[inline]
 pub fn io_write_u32_le<W: io::Write>(n: u32, mut wtr: W) -> io::Result<()> {
     let mut buf = [0; 4];
     write_u32_le(n, &mut buf);
@@ -34,6 +38,7 @@ pub fn io_write_u32_le<W: io::Write>(n: u32, mut wtr: W) -> io::Result<()> {
 
 /// Write a u64 in little endian format to the beginning of the given slice.
 /// This panics if the slice has length less than 8.
+#[inline]
 pub fn write_u64_le(n: u64, slice: &mut [u8]) {
     assert!(slice.len() >= 8);
     let bytes = n.to_le_bytes();
@@ -49,6 +54,7 @@ pub fn write_u64_le(n: u64, slice: &mut [u8]) {
 
 /// Like write_u64_le, but to an io::Write implementation. If every byte could
 /// not be writen, then this returns an error.
+#[inline]
 pub fn io_write_u64_le<W: io::Write>(n: u64, mut wtr: W) -> io::Result<()> {
     let mut buf = [0; 8];
     write_u64_le(n, &mut buf);
@@ -58,6 +64,7 @@ pub fn io_write_u64_le<W: io::Write>(n: u64, mut wtr: W) -> io::Result<()> {
 /// pack_uint packs the given integer in the smallest number of bytes possible,
 /// and writes it to the given writer. The number of bytes written is returned
 /// on success.
+#[inline]
 pub fn pack_uint<W: io::Write>(wtr: W, n: u64) -> io::Result<u8> {
     let nbytes = pack_size(n);
     pack_uint_in(wtr, n, nbytes).map(|_| nbytes)
@@ -68,6 +75,7 @@ pub fn pack_uint<W: io::Write>(wtr: W, n: u64) -> io::Result<u8> {
 ///
 /// `nbytes` must be >= pack_size(n) and <= 8, where `pack_size(n)` is the
 /// smallest number of bytes that can store the integer given.
+#[inline]
 pub fn pack_uint_in<W: io::Write>(
     mut wtr: W,
     mut n: u64,
@@ -87,6 +95,7 @@ pub fn pack_uint_in<W: io::Write>(
 /// position in `slice` after reading `nbytes` bytes.
 ///
 /// `nbytes` must be >= 1 and <= 8.
+#[inline]
 pub fn unpack_uint(slice: &[u8], nbytes: u8) -> u64 {
     assert!(1 <= nbytes && nbytes <= 8);
 
@@ -98,6 +107,7 @@ pub fn unpack_uint(slice: &[u8], nbytes: u8) -> u64 {
 }
 
 /// pack_size returns the smallest number of bytes that can encode `n`.
+#[inline]
 pub fn pack_size(n: u64) -> u8 {
     if n < 1 << 8 {
         1

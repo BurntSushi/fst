@@ -13,5 +13,5 @@ license = "Unlicense/MIT"
 edition = "2018"
 
 [dependencies]
-fst = { path = "..", version = "0.3.1" }
+fst = "0.3.1"
 utf8-ranges = "1"

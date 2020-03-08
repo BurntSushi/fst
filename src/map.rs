@@ -51,7 +51,7 @@ use crate::Result;
 /// Keys will always be byte strings; however, we may grow more conveniences
 /// around dealing with them (such as a serialization/deserialization step,
 /// although it isn't clear where exactly this should live).
-pub struct Map<D: AsRef<[u8]>>(raw::Fst<D>);
+pub struct Map<D>(raw::Fst<D>);
 
 impl Map<Vec<u8>> {
     /// Create a `Map` from an iterator of lexicographically ordered byte

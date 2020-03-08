@@ -1,12 +1,5 @@
 use anyhow::Error;
 
-macro_rules! w {
-    ($wtr:expr, $($tt:tt)*) => {{
-        use std::io::Write;
-        let _ = writeln!(&mut $wtr, $($tt)*);
-    }}
-}
-
 mod app;
 mod cmd;
 mod merge;

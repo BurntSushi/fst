@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::PathBuf;
 
 use crate::{util, Error};
@@ -24,7 +25,7 @@ impl Args {
         let mut wtr = util::get_buf_writer::<&str>(None)?;
         let fst = unsafe { util::mmap_fst(&self.input)? };
         let node = fst.node(self.node_address);
-        w!(wtr, "{:?}", node);
+        writeln!(wtr, "{:?}", node)?;
         Ok(())
     }
 }

@@ -31,12 +31,16 @@ impl Args {
         let mut bytes = vec![];
         rdr.read_to_end(&mut bytes)?;
 
-        w!(wtr, "lazy_static! {{");
-        w!(wtr, "    pub static ref {}: ::fst::raw::Fst = ", self.name);
-        w!(wtr, "        ::fst::raw::Fst::new({}_BYTES).unwrap();", self.name);
-        w!(wtr, "}}\n");
+        writeln!(wtr, "lazy_static! {{")?;
+        writeln!(wtr, "    pub static ref {}: ::fst::raw::Fst = ", self.name)?;
+        writeln!(
+            wtr,
+            "        ::fst::raw::Fst::new({}_BYTES).unwrap();",
+            self.name
+        )?;
+        writeln!(wtr, "}}\n")?;
 
-        w!(wtr, "const {}_BYTES: &'static [u8] = b\"\\", self.name);
+        writeln!(wtr, "const {}_BYTES: &'static [u8] = b\"\\", self.name)?;
         let mut column = 0;
         for b in bytes {
             let escaped = if (b as char).is_whitespace() {
@@ -51,7 +55,7 @@ impl Args {
             column += escaped.len();
             write!(wtr, "{}", escaped)?;
         }
-        w!(wtr, "\\\n\";");
+        writeln!(wtr, "\\\n\";")?;
 
         Ok(())
     }

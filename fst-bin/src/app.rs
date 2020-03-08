@@ -384,7 +384,7 @@ pub fn app() -> clap::App<'static, 'static> {
             "Overwrites the output if the destination file already exists.",
         ));
 
-    clap::App::new("ucd-generate")
+    clap::App::new("fst")
         .author(clap::crate_authors!())
         .version(clap::crate_version!())
         .about(ABOUT)

@@ -71,15 +71,15 @@ impl Args {
             node_counts.into_iter().filter(|&(_, c)| c > self.min).collect();
         counts.sort_by(|&(_, ref c1), &(_, ref c2)| c1.cmp(c2).reverse());
 
-        w!(wtr, "Total nodes:           {}", total);
-        w!(wtr, "Unique nodes:          {}", unique);
-        w!(wtr, "Nodes with duplicates: {}", counts.len());
-        w!(wtr, "----------------------------------");
+        writeln!(wtr, "Total nodes:           {}", total)?;
+        writeln!(wtr, "Unique nodes:          {}", unique)?;
+        writeln!(wtr, "Nodes with duplicates: {}", counts.len())?;
+        writeln!(wtr, "----------------------------------")?;
 
         for &(ref fnode, count) in counts.iter().take(self.limit) {
-            w!(wtr, "Duplicated {} times", count);
-            w!(wtr, "{:#?}", fnode);
-            w!(wtr, "----------------------------------");
+            writeln!(wtr, "Duplicated {} times", count)?;
+            writeln!(wtr, "{:#?}", fnode)?;
+            writeln!(wtr, "----------------------------------")?;
         }
 
         wtr.flush()?;

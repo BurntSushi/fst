@@ -16,7 +16,7 @@ edition = "2018"
 
 [workspace]
 members = ["bench"]
-exclude = ["fst-bin"]
+exclude = ["fst-bin", "fst-levenshtein", "fst-regex"]
 
 [features]
 default = []

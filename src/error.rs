@@ -33,8 +33,8 @@ impl From<raw::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Error::Fst(ref err) => err.fmt(f),
-            Error::Io(ref err) => err.fmt(f),
+            Error::Fst(_) => write!(f, "FST error"),
+            Error::Io(_) => write!(f, "I/O error"),
         }
     }
 }

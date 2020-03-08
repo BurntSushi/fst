@@ -122,14 +122,17 @@ Unions all of the transducer inputs into a single transducer.
 
 Any output values are dropped. Stated differently, the resulting transducer is
 always a set.
+";
 
-Usage:
-    fst union [options] <input>... <output>
-    fst union --help
+const ABOUT_VERIFY: &str = "\
+Performs verification on the FST to check its integrity. This works by
+computing a checksum of the FST's underlying data and comparing it to an
+expected checksum. If the checksums do not match, then it's likely that the
+FST is corrupt in some fashion and must be re-generated.
 
-Options:
-    -h, --help       Show this help message.
-    -f, --force      Overwrites the output if a file already exists.
+This will also return an error if this command is called on an FST without a
+checksum, such as all FSTs generated prior to 'fst 0.4'. All FSTs generated
+at or after 'fst 0.4' have checksums.
 ";
 
 pub fn app() -> clap::App<'static, 'static> {
@@ -384,6 +387,10 @@ pub fn app() -> clap::App<'static, 'static> {
             "Overwrites the output if the destination file already exists.",
         ));
 
+    let verify = cmd("verify", ABOUT_VERIFY).arg(
+        pos("input").required(true).multiple(true).help("The FST to verify."),
+    );
+
     clap::App::new("fst")
         .author(clap::crate_authors!())
         .version(clap::crate_version!())
@@ -401,4 +408,5 @@ pub fn app() -> clap::App<'static, 'static> {
         .subcommand(rust)
         .subcommand(set)
         .subcommand(union)
+        .subcommand(verify)
 }

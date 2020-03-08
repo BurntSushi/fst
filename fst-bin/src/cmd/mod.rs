@@ -9,3 +9,4 @@ pub mod range;
 pub mod rust;
 pub mod set;
 pub mod union;
+pub mod verify;

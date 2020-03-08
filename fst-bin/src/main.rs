@@ -18,6 +18,7 @@ fn main() -> Result<(), Error> {
         ("rust", Some(m)) => cmd::rust::run(m),
         ("set", Some(m)) => cmd::set::run(m),
         ("union", Some(m)) => cmd::union::run(m),
+        ("verify", Some(m)) => cmd::verify::run(m),
         ("", _) => {
             app::app().print_help()?;
             println!("");

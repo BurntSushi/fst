@@ -5,6 +5,9 @@ use std::string::FromUtf8Error;
 use crate::raw::FstType;
 
 /// An error that occurred while using a finite state transducer.
+///
+/// This enum is non-exhaustive. New variants may be added to it in
+/// compatible releases.
 pub enum Error {
     /// A version mismatch occurred while reading a finite state transducer.
     ///
@@ -38,6 +41,10 @@ pub enum Error {
         /// The checksum that was actually computed.
         got: u32,
     },
+    /// An error that is returned if the caller attempts to verify an FST
+    /// that does not have a checksum, as is the case for all FSTs generated
+    /// by this crate before version `0.4`.
+    ChecksumMissing,
     /// A duplicate key was inserted into a finite state transducer, which is
     /// not allowed.
     DuplicateKey {
@@ -66,6 +73,13 @@ pub enum Error {
     },
     /// An error that occurred when trying to decode a UTF-8 byte key.
     FromUtf8(FromUtf8Error),
+    /// Hints that destructuring should not be exhaustive.
+    ///
+    /// This enum may grow additional variants, so this makes sure clients
+    /// don't count on exhaustive matching. (Otherwise, adding a new variant
+    /// could break existing code.)
+    #[doc(hidden)]
+    __Nonexhaustive,
 }
 
 impl fmt::Display for Error {
@@ -94,6 +108,10 @@ usually means you're trying to read data that isn't actually an encoded FST.",
                 "FST verification failed: expected checksum of {} but got {}",
                 expected, got,
             ),
+            Error::ChecksumMissing => write!(
+                f,
+                "FST verification failed: FST does not contain a checksum",
+            ),
             Error::DuplicateKey { ref got } => write!(
                 f,
                 "Error inserting duplicate key: '{}'.",
@@ -113,6 +131,7 @@ inserted in lexicographic order.",
 Error opening FST: expected type '{}', got type '{}'.",
                 expected, got
             ),
+            Error::__Nonexhaustive => unreachable!(),
         }
     }
 }

@@ -57,7 +57,7 @@ mod tests;
 /// regenerating the finite state transducer or switching to a version of this
 /// crate that is compatible with the serialized transducer. This particular
 /// behavior may be relaxed in future versions.
-pub const VERSION: u64 = 2;
+pub const VERSION: u64 = 3;
 
 /// A sentinel value used to indicate an empty final state.
 const EMPTY_ADDRESS: CompiledAddr = 0;
@@ -278,7 +278,9 @@ struct Meta {
     root_addr: CompiledAddr,
     ty: FstType,
     len: usize,
-    checksum: u32,
+    /// A checksum is missing when the FST version is <= 2. (Checksums were
+    /// added in version 3.)
+    checksum: Option<u32>,
 }
 
 impl Fst<Vec<u8>> {
@@ -356,13 +358,19 @@ impl<D: AsRef<[u8]>> Fst<D> {
             );
         }
         let ty = bytes::read_u64_le(&bytes[8..]);
-        let checksum = bytes::read_u32_le(&bytes[bytes.len() - 4..]);
+
+        let (end, checksum) = if version <= 2 {
+            (bytes.len(), None)
+        } else {
+            let checksum = bytes::read_u32_le(&bytes[bytes.len() - 4..]);
+            (bytes.len() - 4, Some(checksum))
+        };
         let root_addr = {
-            let last = &bytes[bytes.len() - 12..];
+            let last = &bytes[end - 8..];
             u64_to_usize(bytes::read_u64_le(last))
         };
         let len = {
-            let last2 = &bytes[bytes.len() - 20..];
+            let last2 = &bytes[end - 16..];
             u64_to_usize(bytes::read_u64_le(last2))
         };
         // The root node is always the last node written, so its address should
@@ -384,8 +392,13 @@ impl<D: AsRef<[u8]>> Fst<D> {
         // special address `0`. In that case, the FST is the smallest it can
         // be: the version, type, root address and number of nodes. That's
         // 36 bytes (8 byte u64 each).
-        if (root_addr == EMPTY_ADDRESS && bytes.len() != 36)
-            && root_addr + 21 != bytes.len()
+        //
+        // And finally, our calculation changes somewhat based on version.
+        // If the FST version is less than 3, then it does not have a checksum.
+        let (empty_total, addr_offset) =
+            if version <= 2 { (32, 17) } else { (36, 21) };
+        if (root_addr == EMPTY_ADDRESS && bytes.len() != empty_total)
+            && root_addr + addr_offset != bytes.len()
         {
             return Err(Error::Format { size: bytes.len() }.into());
         }
@@ -495,11 +508,21 @@ impl<D: AsRef<[u8]>> Fst<D> {
     ///
     /// This will scan over all of the bytes in the underlying FST, so this
     /// may be an expensive operation depending on the size of the FST.
+    ///
+    /// This returns an error in two cases:
+    ///
+    /// 1. When a checksum does not exist, which is the case for FSTs that were
+    ///    produced by the `fst` crate before version `0.4`.
+    /// 2. When the checksum in the FST does not match the computed checksum
+    ///    performed by this procedure.
     #[inline]
     pub fn verify(&self) -> Result<()> {
         use crate::raw::crc32::CheckSummer;
 
-        let expected = self.as_ref().meta.checksum;
+        let expected = match self.as_ref().meta.checksum {
+            None => return Err(Error::ChecksumMissing.into()),
+            Some(expected) => expected,
+        };
         let mut summer = CheckSummer::new();
         summer.update(&self.as_bytes()[..self.as_bytes().len() - 4]);
         let got = summer.masked();

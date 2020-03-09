@@ -86,10 +86,10 @@ jobs:
         echo "target flag is: ${{ env.TARGET }}"
 
     - name: Build
-      run: ${{ env.CARGO }} build --verbose ${{ env.TARGET }}
+      run: ${{ env.CARGO }} build --verbose --all ${{ env.TARGET }}
 
     - name: Build docs
-      run: ${{ env.CARGO }} doc --verbose ${{ env.TARGET }}
+      run: ${{ env.CARGO }} doc --verbose --all ${{ env.TARGET }}
 
     - name: Run tests
       run: ${{ env.CARGO }} test --verbose --all ${{ env.TARGET }}
@@ -97,9 +97,9 @@ jobs:
     - name: Run tests without default features
       run: ${{ env.CARGO }} test --verbose --lib --no-default-features ${{ env.TARGET }}
 
-    # Disable this for now until we publish regex-automata with fst support.
-    # - name: Build fst CLI tool
-      # run: ${{ env.CARGO }} build --verbose --manifest-path fst-bin/Cargo.toml ${{ env.TARGET }}
+    Disable this for now until we publish regex-automata with fst support.
+    - name: Build fst CLI tool
+      run: ${{ env.CARGO }} build --verbose --manifest-path fst-bin/Cargo.toml ${{ env.TARGET }}
 
     - name: Compile benchmarks
       run: ${{ env.CARGO }} bench --manifest-path bench/Cargo.toml --verbose ${{ env.TARGET }} -- --test

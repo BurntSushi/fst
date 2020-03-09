@@ -166,7 +166,7 @@ the `transducer` feature enabled:
 ```toml
 [dependencies]
 fst = "0.4"
-regex-automata = { version = "0.1.8", features = ["transducer"] }
+regex-automata = { version = "0.1.9", features = ["transducer"] }
 ```
 
 # Example: searching multiple sets efficiently

@@ -26,9 +26,9 @@ bstr = "0.2.11"
 clap = { version = "2.33.0", default-features = false }
 crossbeam-channel = "0.4.2"
 csv = "1.1.3"
-fst = { path = "..", version = "0.4", features = ["levenshtein"] }
+fst = { version = "0.4.0", features = ["levenshtein"] }
 memmap = "0.7"
 num_cpus = "1.5"
-regex-automata = { version = "*", path = "/home/andrew/rust/regex-automata", features = ["transducer"] }
+regex-automata = { version = "0.1.9", features = ["transducer"] }
 serde = { version = "1.0.104", features = ["derive"] }
 tempfile = "3.1.0"

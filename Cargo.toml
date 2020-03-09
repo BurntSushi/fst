@@ -15,8 +15,8 @@ license = "Unlicense/MIT"
 edition = "2018"
 
 [workspace]
-members = ["bench"]
-exclude = ["fst-bin", "fst-levenshtein", "fst-regex"]
+members = ["bench", "fst-bin"]
+exclude = ["fst-levenshtein", "fst-regex"]
 
 [features]
 default = []

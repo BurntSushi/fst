@@ -97,7 +97,6 @@ jobs:
     - name: Run tests without default features
       run: ${{ env.CARGO }} test --verbose --lib --no-default-features ${{ env.TARGET }}
 
-    Disable this for now until we publish regex-automata with fst support.
     - name: Build fst CLI tool
       run: ${{ env.CARGO }} build --verbose --manifest-path fst-bin/Cargo.toml ${{ env.TARGET }}
 

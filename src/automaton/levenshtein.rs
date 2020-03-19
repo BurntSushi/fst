@@ -111,12 +111,10 @@ impl Levenshtein {
     #[inline]
     pub fn new(
         query: &str,
-        distance: u32,
+        distance: usize,
     ) -> Result<Levenshtein, LevenshteinError> {
-        let lev = DynamicLevenshtein {
-            query: query.to_owned(),
-            dist: distance as usize,
-        };
+        let lev =
+            DynamicLevenshtein { query: query.to_owned(), dist: distance };
         let dfa = DfaBuilder::new(lev.clone()).build()?;
         Ok(Levenshtein { prog: lev, dfa })
     }
@@ -165,27 +163,58 @@ impl DynamicLevenshtein {
     }
 }
 
+/// Levenshtein automaton state.
+///
+/// It is useful for obtaining edit distance while searching.
+/// See examples in documentation for `Map::search_with_state`
+/// or `Set::search_with_state`.
+///
+/// This is only defined when the `levenshtein` crate feature is enabled.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct LevenshteinState {
+    /// Internal state index.
+    pub state_idx: usize,
+    /// Levenshtein edit distance.
+    pub distance: Option<usize>,
+}
+
 impl Automaton for Levenshtein {
-    type State = Option<usize>;
+    type State = Option<LevenshteinState>;
 
     #[inline]
-    fn start(&self) -> Option<usize> {
-        Some(0)
+    fn start(&self) -> Option<LevenshteinState> {
+        Some(LevenshteinState {
+            state_idx: 0,
+            distance: self.dfa.states[0].distance,
+        })
     }
 
     #[inline]
-    fn is_match(&self, state: &Option<usize>) -> bool {
-        state.map(|state| self.dfa.states[state].is_match).unwrap_or(false)
+    fn is_match(&self, state: &Option<LevenshteinState>) -> bool {
+        state
+            .map(|state| self.dfa.states[state.state_idx].is_match)
+            .unwrap_or(false)
     }
 
     #[inline]
-    fn can_match(&self, state: &Option<usize>) -> bool {
+    fn can_match(&self, state: &Option<LevenshteinState>) -> bool {
         state.is_some()
     }
 
     #[inline]
-    fn accept(&self, state: &Option<usize>, byte: u8) -> Option<usize> {
-        state.and_then(|state| self.dfa.states[state].next[byte as usize])
+    fn accept(
+        &self,
+        state: &Option<LevenshteinState>,
+        byte: u8,
+    ) -> Option<LevenshteinState> {
+        state.and_then(|state| {
+            self.dfa.states[state.state_idx].next[byte as usize].map(
+                |next_state_idx| LevenshteinState {
+                    state_idx: next_state_idx,
+                    distance: self.dfa.states[next_state_idx].distance,
+                },
+            )
+        })
     }
 }
 
@@ -197,12 +226,14 @@ struct Dfa {
 struct State {
     next: [Option<usize>; 256],
     is_match: bool,
+    distance: Option<usize>,
 }
 
 impl fmt::Debug for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "State {{")?;
         writeln!(f, "  is_match: {:?}", self.is_match)?;
+        writeln!(f, "  distance: {:?}", self.distance)?;
         for i in 0..256 {
             if let Some(si) = self.next[i] {
                 writeln!(f, "  {:?}: {:?}", i, si)?;
@@ -273,7 +304,11 @@ impl DfaBuilder {
             Entry::Occupied(v) => (*v.get(), true),
             Entry::Vacant(v) => {
                 let is_match = self.lev.is_match(lev_state);
-                self.dfa.states.push(State { next: [None; 256], is_match });
+                self.dfa.states.push(State {
+                    next: [None; 256],
+                    is_match,
+                    distance: lev_state.last().copied(),
+                });
                 (*v.insert(self.dfa.states.len() - 1), false)
             }
         })
@@ -334,7 +369,11 @@ impl DfaBuilder {
     }
 
     fn new_state(&mut self, is_match: bool) -> usize {
-        self.dfa.states.push(State { next: [None; 256], is_match });
+        self.dfa.states.push(State {
+            next: [None; 256],
+            is_match,
+            distance: None,
+        });
         self.dfa.states.len() - 1
     }
 }

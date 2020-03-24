@@ -107,7 +107,7 @@ pub type CompiledAddr = usize;
 /// Consider that your keys are abbreviations of some of the months in the
 /// Gregorian calendar:
 ///
-/// ```ignore
+/// ```plain
 /// jan
 /// feb
 /// mar
@@ -151,7 +151,7 @@ pub type CompiledAddr = usize;
 /// Let's move on to finite state transducers. Consider the same set of keys
 /// as above, but let's assign their numeric month values:
 ///
-/// ```ignore
+/// ```plain
 /// jan,1
 /// feb,2
 /// mar,3
@@ -199,7 +199,7 @@ pub type CompiledAddr = usize;
 /// ridiuclous. Consider the particular case of storing all billion strings
 /// in the range `0000000001-1000000000`, e.g.,
 ///
-/// ```ignore
+/// ```plain
 /// 0000000001
 /// 0000000002
 /// ...

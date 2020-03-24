@@ -54,7 +54,7 @@ pub struct Builder<W> {
     ///
     /// A finished node is one that has been compiled and written to `wtr`.
     /// After this point, the node is considered immutable and will never
-    /// Achange.
+    /// change.
     registry: Registry,
     /// The last word added.
     ///

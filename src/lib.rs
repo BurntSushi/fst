@@ -18,7 +18,7 @@ bibliography for algorithms used in this crate, see the docs for the
 
 Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
-```ignore
+```plain
 [dependencies]
 fst = "0.4"
 ```

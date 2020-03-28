@@ -68,6 +68,11 @@ pub trait Automaton {
     /// Return the next state given `state` and an input.
     fn accept(&self, state: &Self::State, byte: u8) -> Self::State;
 
+    /// If applicable, return the next state when the end of a key is seen.
+    fn accept_eof(&self, _: &Self::State) -> Option<Self::State> {
+        None
+    }
+
     /// Returns an automaton that matches the strings that start with something
     /// this automaton matches.
     fn starts_with(self) -> StartsWith<Self>
@@ -126,6 +131,10 @@ impl<'a, T: Automaton> Automaton for &'a T {
 
     fn accept(&self, state: &T::State, byte: u8) -> T::State {
         (*self).accept(state, byte)
+    }
+
+    fn accept_eof(&self, state: &Self::State) -> Option<Self::State> {
+        (*self).accept_eof(state)
     }
 }
 

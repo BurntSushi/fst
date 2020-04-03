@@ -639,6 +639,14 @@ impl<D: AsRef<[u8]>> Fst<D> {
     }
 }
 
+impl<D> Fst<D> {
+    /// Returns the underlying data which constitutes the FST itself.
+    #[inline]
+    pub fn into_inner(self) -> D {
+        self.data
+    }
+}
+
 impl<'a, 'f, D: AsRef<[u8]>> IntoStreamer<'a> for &'f Fst<D> {
     type Item = (&'a [u8], Output);
     type Into = Stream<'f>;

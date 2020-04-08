@@ -454,6 +454,34 @@ impl<D: AsRef<[u8]>> Fst<D> {
         self.as_ref().get_key_into(value, key)
     }
 
+    /// find the longest key that is prefix of the given value.
+    ///
+    /// If the key exists, then `Some((value, key_len))` is returned, where
+    /// `value` is the value associated with the key, and `key_len` is the
+    /// length of the found key. Otherwise `None` is returned.
+    ///
+    /// This can be used to e.g. build tokenizing functions.
+    #[inline]
+    pub fn find_longest_prefix(&self, value: &[u8]) -> Option<(u64, usize)> {
+        let mut node = self.root();
+        let mut out = Output::zero();
+        let mut last_match = None;
+        for (i, &b) in value.iter().enumerate() {
+            if let Some(trans_index) = node.find_input(b) {
+                let t = node.transition(trans_index);
+                node = self.node(t.addr);
+                out = out.cat(t.out);
+                if node.is_final() {
+                    last_match =
+                        Some((out.cat(node.final_output()).value(), i + 1));
+                }
+            } else {
+                return last_match;
+            }
+        }
+        last_match
+    }
+
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
     #[inline]

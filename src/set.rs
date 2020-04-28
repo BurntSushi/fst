@@ -26,6 +26,7 @@ use crate::Result;
 ///
 /// 1. Once constructed, a `Set` can never be modified.
 /// 2. Sets must be constructed with lexicographically ordered byte sequences.
+#[derive(Clone)]
 pub struct Set<D>(raw::Fst<D>);
 
 impl Set<Vec<u8>> {
@@ -372,6 +373,12 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     #[inline]
     pub fn as_fst(&self) -> &raw::Fst<D> {
         &self.0
+    }
+
+    /// Returns the underlying raw finite state transducer.
+    #[inline]
+    pub fn into_fst(self) -> raw::Fst<D> {
+        self.0
     }
 }
 

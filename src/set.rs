@@ -26,6 +26,7 @@ use crate::Result;
 ///
 /// 1. Once constructed, a `Set` can never be modified.
 /// 2. Sets must be constructed with lexicographically ordered byte sequences.
+#[derive(Clone)]
 pub struct Set<D>(raw::Fst<D>);
 
 impl Set<Vec<u8>> {

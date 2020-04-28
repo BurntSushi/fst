@@ -425,6 +425,12 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     pub fn as_fst(&self) -> &raw::Fst<D> {
         &self.0
     }
+
+    /// Returns the underlying raw finite state transducer.
+    #[inline]
+    pub fn into_fst(self) -> raw::Fst<D> {
+        self.0
+    }
 }
 
 impl Default for Map<Vec<u8>> {

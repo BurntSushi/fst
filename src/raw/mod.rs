@@ -646,6 +646,16 @@ impl<D> Fst<D> {
     pub fn into_inner(self) -> D {
         self.data
     }
+
+    /// Maps the underlying data of the fst to another data type.
+    #[inline]
+    pub fn map_data<F, T>(self, mut f: F) -> Result<Fst<T>>
+    where
+        F: FnMut(D) -> T,
+        T: AsRef<[u8]>,
+    {
+        Fst::new(f(self.into_inner()))
+    }
 }
 
 impl<'a, 'f, D: AsRef<[u8]>> IntoStreamer<'a> for &'f Fst<D> {

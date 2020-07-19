@@ -276,7 +276,7 @@ pub fn app() -> clap::App<'static, 'static> {
             "The number of simultaneous workers to run. The default of 0 \
              will use the number of logical CPUs reported by your system.",
         ))
-        .arg(flag("tmp-dir").help(
+        .arg(flag("tmp-dir").takes_value(true).help(
             "A temporary directory used to store intermediate transducers. \
              This defaults to the default temporary directory reported by \
              your system.",
@@ -362,7 +362,7 @@ pub fn app() -> clap::App<'static, 'static> {
             "The number of simultaneous workers to run. The default of 0 \
              will use the number of logical CPUs reported by your system.",
         ))
-        .arg(flag("tmp-dir").help(
+        .arg(flag("tmp-dir").takes_value(true).help(
             "A temporary directory used to store intermediate transducers. \
              This defaults to the default temporary directory reported by \
              your system.",

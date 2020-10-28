@@ -647,6 +647,12 @@ impl<D> Fst<D> {
         self.data
     }
 
+    /// Returns a borrow to the underlying data which constitutes the FST itself.
+    #[inline]
+    pub fn as_inner(&self) -> &D {
+        &self.data
+    }
+
     /// Maps the underlying data of the fst to another data type.
     #[inline]
     pub fn map_data<F, T>(self, mut f: F) -> Result<Fst<T>>

@@ -83,6 +83,7 @@ Check out the documentation for a lot more examples!
       prefix_length, max_expansions and so on. It also supports obtain 
       sorted results of levenshtein automaton by similarity; 
   3)  Support visualization of levenshtein automaton by generating 
-      picture file through dot file.
+      picture file through dot file,one effect drawing was shown as follows:
+      ![Image text](https://github.com/apollo008/fst/tree/fst-levenshtein-0.4.4/data/lev.png)
 
 

@@ -84,6 +84,7 @@ Check out the documentation for a lot more examples!
       sorted results of levenshtein automaton by similarity; 
   3)  Support visualization of levenshtein automaton by generating 
       picture file through dot file,one effect drawing was shown as follows:
-      ![Image text](https://github.com/apollo008/fst/tree/fst-levenshtein-0.4.4/data/lev.png)
+      
+      <img src="https://github.com/apollo008/fst-levenshtein-0.4.4/blob/fst-levenshtein-0.4.4/data/lev.png" alt="levenshtein" width=375 />
 
 

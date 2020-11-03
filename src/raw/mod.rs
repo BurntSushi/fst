@@ -24,7 +24,7 @@ use std::fmt;
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::bytes;
 use crate::error::Result;
-use crate::stream::{IntoStreamer, Streamer};
+use crate::stream::{IntoStreamer, Streamer,LevenshteinStreamer};
 
 pub use crate::raw::build::Builder;
 pub use crate::raw::error::Error;
@@ -33,6 +33,8 @@ pub use crate::raw::ops::{
     Difference, IndexedValue, Intersection, OpBuilder, SymmetricDifference,
     Union,
 };
+use crate::automaton::{Levenshtein,LevenshteinResultItem,FstLevenshteinFuzzySearchResults};
+use std::collections::BinaryHeap;
 
 mod build;
 mod common_inputs;
@@ -1030,6 +1032,24 @@ impl<'f, A: Automaton> Stream<'f, A> {
         Ok(vs)
     }
 
+
+    /// Convert this stream into a levenshtein result.
+    pub fn into_levenshtein(mut self, max_expansions: usize) -> Result<FstLevenshteinFuzzySearchResults> {
+        let mut heap : BinaryHeap<LevenshteinResultItem> = BinaryHeap::new();
+        while let Some((k, output, similarity)) = self.next_levenshtein() {
+            let k = String::from_utf8(k.to_vec()).map_err(Error::from)?;
+            // println!("{:?}/{:?}", k.to_owned(), similarity);
+            if let Some((edit_distance, similarity)) = similarity {
+                heap.push(LevenshteinResultItem::new(&k, &output,edit_distance, similarity));
+                if heap.len() > max_expansions {
+                    heap.pop();
+                }
+            }
+        }
+        let vec = heap.into_sorted_vec();
+        Ok(FstLevenshteinFuzzySearchResults::new(vec))
+    }
+
     /// Convert this stream into a vector of outputs.
     pub fn into_values(mut self) -> Vec<u64> {
         let mut vs = vec![];
@@ -1045,6 +1065,14 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
 
     fn next(&'a mut self) -> Option<(&'a [u8], Output)> {
         self.0.next_with(|_| ()).map(|(key, out, _)| (key, out))
+    }
+}
+
+impl<'f, 'a, A: Automaton> LevenshteinStreamer<'a> for Stream<'f, A> {
+    type Item = (&'a [u8], Output, Option<(usize, f64)>);
+
+    fn next_levenshtein(&'a mut self) -> Option<Self::Item> {
+        self.0.next_with_levenshtein()
     }
 }
 
@@ -1242,6 +1270,70 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
         }
         None
     }
+
+
+    fn next_with_levenshtein( &mut self, ) -> Option<(&[u8], Output, Option<(usize, f64)>)> {
+        if let Some(out) = self.empty_output.take() {
+            if self.end_at.exceeded_by(&[]) {
+                self.stack.clear();
+                return None;
+            }
+
+            let start = self.aut.start();
+            if self.aut.is_match(&start) {
+                let similarity = self.aut.levenshtein_compute_similarity(&start, 0);
+                return Some((&[], out, similarity));
+            }
+        }
+        while let Some(state) = self.stack.pop() {
+            if state.trans >= state.node.len()
+                || !self.aut.can_match(&state.aut_state)
+            {
+                if state.node.addr() != self.fst.root_addr() {
+                    self.inp.pop().unwrap();
+                }
+                continue;
+            }
+            let trans = state.node.transition(state.trans);
+            let out = state.out.cat(trans.out);
+            let next_state = self.aut.accept(&state.aut_state, trans.inp);
+            let mut is_match = self.aut.is_match(&next_state);
+            let next_node = self.fst.node(trans.addr);
+            self.inp.push(trans.inp);
+            if next_node.is_final() {
+                if let Some(eof_state) = self.aut.accept_eof(&next_state) {
+                    is_match = self.aut.is_match(&eof_state);
+                }
+            }
+            let mut similarity = None;
+            if next_node.is_final() && is_match {
+                let matched_term_len: i32 = String::from_utf8(self.inp.clone()).unwrap().chars().count() as i32;
+                similarity = self.aut.levenshtein_compute_similarity(&next_state, matched_term_len);
+            }
+
+            self.stack.push(StreamState { trans: state.trans + 1, ..state });
+            self.stack.push(StreamState {
+                node: next_node,
+                trans: 0,
+                out,
+                aut_state: next_state,
+            });
+            if self.end_at.exceeded_by(&self.inp) {
+                // We are done, forever.
+                self.stack.clear();
+                return None;
+            }
+            if next_node.is_final() && is_match {
+                return Some((
+                    &self.inp,
+                    out.cat(next_node.final_output()),
+                    similarity,
+                ));
+            }
+        }
+        None
+    }
+
 }
 
 impl<'a, 'f, A: 'a + Automaton> Streamer<'a> for StreamWithState<'f, A>

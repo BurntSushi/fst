@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
   let set = Set::from_iter(keys)?;
 
   // Build our fuzzy query.
-  let lev = Levenshtein::new("foo", 1)?;
+  let lev = Levenshtein::new("foo", 1,0,0)?;
 
   // Apply our fuzzy query to the set we built.
   let stream = set.search(lev).into_stream();

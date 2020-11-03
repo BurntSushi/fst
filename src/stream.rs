@@ -106,6 +106,19 @@ pub trait Streamer<'a> {
     fn next(&'a mut self) -> Option<Self::Item>;
 }
 
+/// levenshtein streamer trait
+pub trait LevenshteinStreamer<'a> {
+    /// The type of the item emitted by this stream.
+    type Item: 'a;
+
+    /// Emits the next element in this stream, or `None` to indicate the stream
+    /// has been exhausted.
+    ///
+    /// It is not specified what a stream does after `None` is emitted. In most
+    /// cases, `None` should be emitted on every subsequent call.
+    fn next_levenshtein(&'a mut self) -> Option<Self::Item>;
+}
+
 /// IntoStreamer describes types that can be converted to streams.
 ///
 /// This is analogous to the `IntoIterator` trait for `Iterator` in

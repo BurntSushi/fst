@@ -22,13 +22,27 @@ exclude = ["fst-levenshtein", "fst-regex"]
 default = []
 levenshtein = ["utf8-ranges"]
 
+
+[lib]
+name = "fst"
+#crate-type = ["staticlib","dylib"]
+#crate-type = ["staticlib"]
+#crate-type = ["dylib"]
+crate-type = ["cdylib","rlib"]
+
+
 [dependencies]
+libc = "0.2.0"
+byteorder = "1"
+memmap = "0.7"
 utf8-ranges = { version = "1.0.4", optional = true }
+hex ="0.3"
+
+
 
 [dev-dependencies]
 doc-comment = "0.3.1"
 fnv = "1.0.6"
-memmap = "0.7"
 quickcheck = { version = "0.9.2", default-features = false }
 rand = "0.7.3"
 
@@ -40,3 +54,10 @@ debug = true
 
 [package.metadata.docs.rs]
 features = ["levenshtein"]
+
+
+
+#compile arguments: cargo build --release  --features "levenshtein"
+#test arguments: cargo test --release  --features "levenshtein" -- --nocapture
+#cargo clean
+#test arguments: cargo test --release  --features "levenshtein"

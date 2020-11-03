@@ -1,8 +1,16 @@
 #[cfg(feature = "levenshtein")]
-pub use self::levenshtein::{Levenshtein, LevenshteinError};
+pub use self::levenshtein::{Levenshtein};
+pub use self::damerau_levenshtein::{DamerauLevenshtein};
+pub use self::dyn_levenshtein::{CommonDynLevenshtein, DamerauDynLevState, DamerauDynLevenshtein, DynLevenshteinTrait,DynLevenshteinStateTrait};
+pub use self::levenshtein_dfa::{Dfa,DfaBuilder,LevenshteinError,};
+pub use self::levenshtein_resultitem::{LevenshteinResultItem,FstLevenshteinFuzzySearchResults};
 
 #[cfg(feature = "levenshtein")]
 mod levenshtein;
+mod dyn_levenshtein;
+mod levenshtein_dfa;
+mod levenshtein_resultitem;
+mod damerau_levenshtein;
 
 /// Automaton describes types that behave as a finite automaton.
 ///
@@ -28,6 +36,11 @@ mod levenshtein;
 pub trait Automaton {
     /// The type of the state used in the automaton.
     type State;
+
+    /// for levenshtein automaton, compute the similarity for levenshtein
+    fn levenshtein_compute_similarity(&self, state: &Self::State, matched_term_char_count: i32) -> Option<(usize,f64)> {
+        None
+    }
 
     /// Returns a single start state for this automaton.
     ///

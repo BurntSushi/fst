@@ -1,11 +1,10 @@
-use crate::automaton::{CommonDynLevenshtein, Dfa, LevenshteinError, DfaBuilder, DynLevenshteinTrait};
+use crate::automaton::{DamerauDynLevenshtein, Dfa, LevenshteinError, DfaBuilder, DynLevenshteinTrait};
 use std::cmp::min;
 use std::fmt;
 use crate::Automaton;
 use crate::inner_automaton::levenshtein_dfa::{substr2, substr, compute_levenshtein_similarity};
-use crate::inner_automaton::dyn_levenshtein::CommonDynLevState;
 use std::collections::HashMap;
-
+use crate::inner_automaton::DamerauDynLevState;
 
 /// A Unicode aware Levenshtein automaton for running efficient fuzzy queries.
 ///
@@ -26,14 +25,14 @@ use std::collections::HashMap;
 /// from `foo`.
 ///
 /// ```rust
-/// use fst::automaton::Levenshtein;
+/// use fst::automaton::DamerauLevenshtein;
 /// use fst::{IntoStreamer, Streamer, Set};
 ///
 /// fn main() {
 ///     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
 ///     let set = Set::from_iter(keys).unwrap();
 ///
-///     let lev = Levenshtein::new("foo", 1,0,0).unwrap();
+///     let lev = DamerauLevenshtein::new("foo", 1,0,0).unwrap();
 ///     let mut stream = set.search(&lev).into_stream();
 ///
 ///     let mut keys = vec![];
@@ -63,12 +62,15 @@ use std::collections::HashMap;
 ///
 /// This is important functionality, so one should count on this implementation
 /// being vastly improved in the future.
-pub struct Levenshtein {
-    prog: CommonDynLevenshtein,
-    dfa: Dfa,
+pub struct DamerauLevenshtein {
+    /// Damerau dynamic levenshtein
+    pub prog: DamerauDynLevenshtein,
+
+    /// dfa
+    pub dfa: Dfa,
 }
 
-impl Levenshtein {
+impl DamerauLevenshtein {
     /// Create a new Levenshtein query.
     ///
     /// The query finds all matching terms that are at most `distance`
@@ -79,6 +81,10 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
+    ///
+    ///
+    /// under transpostions case, the last two characters are transpositions equically, it means '1' edit distance, else it means '2' edit distance.
+    ///
     /// params -- prefixlen_non_similarity:
     ///                                   it may be the field name prefix for query term,such as length of 'title_' for term:'titile_望京花园西区', it can be 0.
     /// params -- prefixlen_similarity:
@@ -86,7 +92,8 @@ impl Levenshtein {
     ///                                  it also can be 0.
     ///                                  NOTE that  only prefixlen_similarity will be used to compute levenshtein similarity
     #[inline]
-    pub fn new(query: &str, distance: u32, prefixlen_non_similarity: u32, prefixlen_similarity: u32) -> Result<Levenshtein, LevenshteinError> {
+    pub fn new(query: &str, distance: u32, prefixlen_non_similarity: u32, prefixlen_similarity: u32)
+        -> Result<DamerauLevenshtein, LevenshteinError> {
 
         let mut prefixlen_nonsim = prefixlen_non_similarity;
         let mut prefixlen_sim = prefixlen_similarity;
@@ -100,21 +107,22 @@ impl Levenshtein {
         }
         let prefixlen: usize = prefixlen_nonsim as usize + prefixlen_sim as usize;
 
-        let lev = CommonDynLevenshtein::new(
+        let lev = DamerauDynLevenshtein::new(
             substr2(&query, prefixlen),
             min(distance as usize, 2 ),
             substr(&query, 0,prefixlen),
             prefixlen_nonsim,
-            prefixlen_sim, );
-
+            prefixlen_sim,
+        );
         let dfa = DfaBuilder::new(lev.clone()).build()?;
-        Ok(Levenshtein { prog: lev, dfa })
+        Ok(DamerauLevenshtein{ prog: lev, dfa })
     }
+
 
 
     /// new by draw dot drawing file
     #[inline]
-    pub fn new_by_dot(query: &str, distance: u32, prefixlen_non_similarity: u32, prefixlen_similarity: u32, output_dot_path: String ) -> Result<Levenshtein, LevenshteinError> {
+    pub fn new_by_dot(query: &str, distance: u32, prefixlen_non_similarity: u32, prefixlen_similarity: u32, output_dot_path: String) -> Result<DamerauLevenshtein, LevenshteinError> {
 
         let mut prefixlen_nonsim = prefixlen_non_similarity;
         let mut prefixlen_sim = prefixlen_similarity;
@@ -128,19 +136,20 @@ impl Levenshtein {
         }
         let prefixlen: usize = prefixlen_nonsim as usize + prefixlen_sim as usize;
 
-        let lev = CommonDynLevenshtein::new(
+        let lev = DamerauDynLevenshtein::new(
             substr2(&query, prefixlen),
             min(distance as usize, 2 ),
             substr(&query, 0,prefixlen),
             prefixlen_nonsim,
-            prefixlen_sim, );
-
-        let dfa = DfaBuilder::new_by_dot(lev.clone(), output_dot_path).build_by_dot()?;
-        Ok(Levenshtein { prog: lev, dfa })
+            prefixlen_sim,
+        );
+        let dfa = DfaBuilder::new_by_dot(lev.clone(),output_dot_path).build_by_dot()?;
+        Ok(DamerauLevenshtein{ prog: lev, dfa })
     }
+
 }
 
-impl fmt::Debug for Levenshtein {
+impl fmt::Debug for DamerauLevenshtein {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -150,7 +159,8 @@ impl fmt::Debug for Levenshtein {
     }
 }
 
-impl Automaton for Levenshtein {
+
+impl Automaton for DamerauLevenshtein {
     /// (状态机的状态序号，莱温斯坦编辑距离)
     type State = Option<(usize, Option<usize>)>;
 
@@ -199,4 +209,7 @@ impl Automaton for Levenshtein {
         Some(  (next_value.unwrap(), edit_distance)  )
     }
 }
+
+
+
 

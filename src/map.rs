@@ -2,7 +2,7 @@ use std::fmt;
 use std::io;
 use std::iter::{self, FromIterator};
 
-use crate::automaton::{AlwaysMatch, Automaton};
+use crate::automaton::{AlwaysMatch, Automaton, Levenshtein, FstLevenshteinFuzzySearchResults, DamerauLevenshtein};
 use crate::raw;
 pub use crate::raw::IndexedValue;
 use crate::stream::{IntoStreamer, Streamer};
@@ -335,7 +335,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
         ("fozb", 4),
     ]).unwrap();
 
-    let query = Levenshtein::new("foo", 2)?;
+    let query = Levenshtein::new("foo", 2, 0, 0)?;
     let mut stream = map.search_with_state(&query).into_stream();
 
     let mut kvs = vec![];
@@ -344,9 +344,9 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Currently, there isn't much interesting that you can do with the states.
     assert_eq!(kvs, vec![
-        ("foo".to_string(), 1, Some(183)),
-        ("foob".to_string(), 2, Some(123)),
-        ("fozb".to_string(), 4, Some(83)),
+        ("foo".to_string(), 1, Some( (201,  Some(0),) ), ),
+        ("foob".to_string(), 2, Some( (48,  Some(1),) ), ),
+        ("fozb".to_string(), 4, Some( (44,  Some(2),) ), ),
     ]);
 
     Ok(())
@@ -709,6 +709,20 @@ impl<W: io::Write> MapBuilder<W> {
 pub struct Stream<'m, A = AlwaysMatch>(raw::Stream<'m, A>)
 where
     A: Automaton;
+
+impl<'s> Stream<'s, Levenshtein> {
+    /// implement into levenshtein
+    pub fn into_levenshtein(self, max_expansions: usize) -> Result<FstLevenshteinFuzzySearchResults> {
+        self.0.into_levenshtein(max_expansions)
+    }
+}
+
+impl<'s> Stream<'s, DamerauLevenshtein> {
+    /// implement into levenshtein
+    pub fn into_levenshtein(self, max_expansions: usize) -> Result<FstLevenshteinFuzzySearchResults> {
+        self.0.into_levenshtein(max_expansions)
+    }
+}
 
 impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     type Item = (&'a [u8], u64);

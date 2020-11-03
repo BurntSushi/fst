@@ -2,10 +2,11 @@ use std::fmt;
 use std::io;
 use std::iter::{self, FromIterator};
 
-use crate::automaton::{AlwaysMatch, Automaton};
+use crate::automaton::{AlwaysMatch, Automaton, DamerauLevenshtein};
 use crate::raw;
 use crate::stream::{IntoStreamer, Streamer};
 use crate::Result;
+use crate::automaton::{Levenshtein,LevenshteinResultItem, FstLevenshteinFuzzySearchResults};
 
 /// Set is a lexicographically ordered set of byte strings.
 ///
@@ -223,7 +224,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
         "fozb",
     ]).unwrap();
 
-    let query = Levenshtein::new("foo", 2)?;
+    let query = Levenshtein::new("foo", 2, 0, 0)?;
     let mut stream = set.search_with_state(&query).into_stream();
 
     let mut vs = vec![];
@@ -232,9 +233,9 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Currently, there isn't much interesting that you can do with the states.
     assert_eq!(vs, vec![
-        ("foo".to_string(), Some(183)),
-        ("foob".to_string(), Some(123)),
-        ("fozb".to_string(), Some(83)),
+        ("foo".to_string(), Some( (201,  Some(0),) ), ),
+        ("foob".to_string(), Some( (48,  Some(1),) ), ),
+        ("fozb".to_string(), Some( (44,  Some(2),) ), ),
     ]);
 
     Ok(())
@@ -640,6 +641,22 @@ impl<W: io::Write> SetBuilder<W> {
 pub struct Stream<'s, A = AlwaysMatch>(raw::Stream<'s, A>)
 where
     A: Automaton;
+
+
+impl<'s> Stream<'s, Levenshtein> {
+    /// implement into levenshtein
+    pub fn into_levenshtein(self, max_expansions: usize) -> Result<FstLevenshteinFuzzySearchResults> {
+        self.0.into_levenshtein(max_expansions)
+    }
+}
+
+impl<'s> Stream<'s, DamerauLevenshtein> {
+    /// implement into levenshtein
+    pub fn into_levenshtein(self, max_expansions: usize) -> Result<FstLevenshteinFuzzySearchResults> {
+        self.0.into_levenshtein(max_expansions)
+    }
+}
+
 
 impl<'s, A: Automaton> Stream<'s, A> {
     /// Convert this stream into a vector of Unicode strings.

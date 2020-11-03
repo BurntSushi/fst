@@ -35,7 +35,7 @@ where
 #[test]
 fn levenshtein_simple() {
     let set = fst_set(vec!["woof", "wood", "banana"]);
-    let q = Levenshtein::new("woog", 1).unwrap();
+    let q = Levenshtein::new("woog", 1,0,0,).unwrap();
     let vs = set.search(&q).into_stream().into_byte_keys();
     assert_eq!(vs, vec!["wood".as_bytes(), "woof".as_bytes()]);
 }
@@ -43,10 +43,10 @@ fn levenshtein_simple() {
 #[cfg(feature = "levenshtein")]
 #[test]
 fn levenshtein_unicode() {
-    let set = fst_set(vec!["woof", "wood", "banana", "☃snowman☃"]);
-    let q = Levenshtein::new("snoman", 3).unwrap();
+    let set = fst_set(vec!["woof", "wood", "banana", "☃snowman"]);
+    let q = Levenshtein::new("snoman", 2, 0,0, ).unwrap();
     let vs = set.search(&q).into_stream().into_byte_keys();
-    assert_eq!(vs, vec!["☃snowman☃".as_bytes()]);
+    assert_eq!(vs, vec!["☃snowman".as_bytes()]);
 }
 
 #[cfg(feature = "levenshtein")]
@@ -54,7 +54,7 @@ fn levenshtein_unicode() {
 fn complement_small() {
     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
     let set = Set::from_iter(keys).unwrap();
-    let lev = Levenshtein::new("foo", 1).unwrap();
+    let lev = Levenshtein::new("foo", 1, 0, 0,).unwrap();
     let stream = set.search(lev.complement()).into_stream();
 
     let keys = stream.into_strs().unwrap();
@@ -69,7 +69,7 @@ fn startswith_small() {
         "fritter", "frothing",
     ];
     let set = Set::from_iter(keys).unwrap();
-    let lev = Levenshtein::new("foo", 1).unwrap();
+    let lev = Levenshtein::new("foo", 1, 0, 0).unwrap();
     let stream = set.search(lev.starts_with()).into_stream();
 
     let keys = stream.into_strs().unwrap();
@@ -86,7 +86,7 @@ fn startswith_small() {
 fn intersection_small() {
     let keys = vec!["fab", "fo", "fob", "focus", "foo", "food", "foul", "goo"];
     let set = Set::from_iter(keys).unwrap();
-    let lev = Levenshtein::new("foo", 1).unwrap();
+    let lev = Levenshtein::new("foo", 1, 0, 0,).unwrap();
     let prefix = Str::new("fo").starts_with();
     let stream = set.search(lev.intersection(prefix)).into_stream();
 
@@ -99,7 +99,7 @@ fn intersection_small() {
 fn union_small() {
     let keys = vec!["fab", "fob", "focus", "foo", "food", "goo"];
     let set = Set::from_iter(keys).unwrap();
-    let lev = Levenshtein::new("foo", 1).unwrap();
+    let lev = Levenshtein::new("foo", 1, 0, 0,).unwrap();
     let prefix = Str::new("fo").starts_with();
     let stream = set.search(lev.union(prefix)).into_stream();
 
@@ -113,7 +113,7 @@ fn intersection_large() {
     use fst::set::OpBuilder;
 
     let set = get_set();
-    let lev = Levenshtein::new("foo", 3).unwrap();
+    let lev = Levenshtein::new("foo", 3, 0, 0, ).unwrap();
     let prefix = Str::new("fa").starts_with();
     let mut stream1 = set.search((&lev).intersection(&prefix)).into_stream();
     let mut stream2 = OpBuilder::new()
@@ -132,7 +132,7 @@ fn union_large() {
     use fst::set::OpBuilder;
 
     let set = get_set();
-    let lev = Levenshtein::new("foo", 3).unwrap();
+    let lev = Levenshtein::new("foo", 3, 0, 0,).unwrap();
     let prefix = Str::new("fa").starts_with();
     let mut stream1 = set.search((&lev).union(&prefix)).into_stream();
     let mut stream2 = OpBuilder::new()

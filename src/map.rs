@@ -37,7 +37,7 @@ use crate::Result;
 /// finite state transducer. The principal difference between them is that
 /// sets always have their output values set to `0`. This has an impact on the
 /// representation size and is reflected in the type system for convenience.
-/// A secondary but subtle difference is that duplicate values can be added
+/// A secondary but subtle difference is that duplicate keys can be added
 /// to a set, but it is an error to do so with maps. That is, a set can have
 /// the same key added sequentially, but a map can't.
 ///

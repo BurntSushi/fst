@@ -8,7 +8,7 @@ sets or maps of many strings (> 1 billion is possible). The command line tool
 exposes functionality to search FSTs using regular expressions, Levenshtein
 automata and range queries.
 """
-documentation = "http://burntsushi.net/rustdoc/fst/"
+documentation = "https://docs.rs/fst"
 homepage = "https://github.com/BurntSushi/fst"
 repository = "https://github.com/BurntSushi/fst"
 keywords = ["search", "information", "retrieval", "dictionary", "map"]

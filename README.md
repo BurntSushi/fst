@@ -9,13 +9,13 @@ very fast.
 
 Check out my blog post
 [Index 1,600,000,000 Keys with Automata and
-Rust](http://blog.burntsushi.net/transducers/)
+Rust](https://blog.burntsushi.net/transducers/)
 for extensive background, examples and experiments.
 
 [![Build status](https://github.com/BurntSushi/fst/workflows/ci/badge.svg)](https://github.com/BurntSushi/fst/actions)
-[![](http://meritbadge.herokuapp.com/fst)](https://crates.io/crates/fst)
+[![](https://meritbadge.herokuapp.com/fst)](https://crates.io/crates/fst)
 
-Dual-licensed under MIT or the [UNLICENSE](http://unlicense.org).
+Dual-licensed under MIT or the [UNLICENSE](https://unlicense.org/).
 
 
 ### Documentation

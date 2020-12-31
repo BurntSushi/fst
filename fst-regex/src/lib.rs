@@ -38,7 +38,7 @@ mod sparse;
 ///    as useful when searching dictionaries.
 ///
 /// Otherwise, the [full syntax of the `regex`
-/// crate](http://doc.rust-lang.org/regex/regex/index.html#syntax)
+/// crate](https://docs.rs/regex/*/regex/#syntax)
 /// is supported. This includes all Unicode support and relevant flags.
 /// (The `U` and `m` flags are no-ops because of (1) and (3) above,
 /// respectively.)

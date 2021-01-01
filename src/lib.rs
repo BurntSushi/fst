@@ -333,7 +333,7 @@ pub mod automaton {
 ///
 /// This API provided by this sub-module is close in spirit to the API
 /// provided by
-/// [`std::collections::BTreeMap`](http://doc.rust-lang.org/stable/std/collections/struct.BTreeMap.html).
+/// [`std::collections::BTreeMap`](https://doc.rust-lang.org/stable/std/collections/struct.BTreeMap.html).
 ///
 /// # Overview of types
 ///
@@ -352,7 +352,7 @@ pub mod map {
 ///
 /// This API provided by this sub-module is close in spirit to the API
 /// provided by
-/// [`std::collections::BTreeSet`](http://doc.rust-lang.org/stable/std/collections/struct.BTreeSet.html).
+/// [`std::collections::BTreeSet`](https://doc.rust-lang.org/stable/std/collections/struct.BTreeSet.html).
 /// The principle difference, as with everything else in this crate, is that
 /// operations are performed on streams of byte strings instead of generic
 /// iterators. Another difference is that most of the set operations (union,

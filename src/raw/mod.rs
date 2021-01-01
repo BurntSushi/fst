@@ -111,7 +111,6 @@ pub type CompiledAddr = usize;
 /// jan
 /// feb
 /// mar
-/// apr
 /// may
 /// jun
 /// jul
@@ -155,7 +154,6 @@ pub type CompiledAddr = usize;
 /// jan,1
 /// feb,2
 /// mar,3
-/// apr,4
 /// may,5
 /// jun,6
 /// jul,7

@@ -201,6 +201,11 @@ pub fn app() -> clap::App<'static, 'static> {
              to a single Unicode codepoint.",
         ))
         .arg(
+            flag("prefix")
+                .short("p")
+                .help("When set, accepts prefixes of the fuzzy query."),
+        )
+        .arg(
             flag("outputs")
                 .short("o")
                 .help("When set, output values are shown as CSV data."),

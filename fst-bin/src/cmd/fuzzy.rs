@@ -2,7 +2,7 @@ use std::io;
 use std::path::PathBuf;
 
 use bstr::{BString, ByteVec};
-use fst::automaton::Levenshtein;
+use fst::automaton::{Automaton, Levenshtein};
 
 use crate::{util, Error};
 
@@ -15,6 +15,7 @@ struct Args {
     input: PathBuf,
     query: String,
     distance: u32,
+    prefix: bool,
     outputs: bool,
     start: Option<BString>,
     end: Option<BString>,
@@ -29,6 +30,7 @@ impl Args {
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap(),
             distance: m.value_of_lossy("distance").unwrap().parse()?,
+            prefix: m.is_present("prefix"),
             outputs: m.is_present("outputs"),
             start: m
                 .value_of_os("start")
@@ -42,13 +44,26 @@ impl Args {
     fn run(&self) -> Result<(), Error> {
         let fst = unsafe { util::mmap_fst(&self.input)? };
         let lev = Levenshtein::new(&self.query, self.distance)?;
-        let mut q = fst.search(&lev);
-        if let Some(ref start) = self.start {
-            q = q.ge(start);
+        let stdout = io::BufWriter::new(io::stdout());
+
+        if self.prefix {
+            let mut q = fst.search(lev.starts_with());
+            if let Some(ref start) = self.start {
+                q = q.ge(start);
+            }
+            if let Some(ref end) = self.end {
+                q = q.le(end);
+            }
+            util::print_stream(stdout, self.outputs, q)
+        } else {
+            let mut q = fst.search(lev);
+            if let Some(ref start) = self.start {
+                q = q.ge(start);
+            }
+            if let Some(ref end) = self.end {
+                q = q.le(end);
+            }
+            util::print_stream(stdout, self.outputs, q)
         }
-        if let Some(ref end) = self.end {
-            q = q.le(end);
-        }
-        util::print_stream(io::BufWriter::new(io::stdout()), self.outputs, q)
     }
 }

@@ -1314,7 +1314,7 @@ impl Output {
 
     /// Returns the subtraction of `o` from this output.
     ///
-    /// This function panics if `self > o`.
+    /// This function panics if `self < o`.
     #[inline]
     pub fn sub(self, o: Output) -> Output {
         Output(

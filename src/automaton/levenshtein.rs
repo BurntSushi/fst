@@ -7,7 +7,7 @@ use utf8_ranges::{Utf8Range, Utf8Sequences};
 
 use crate::automaton::Automaton;
 
-const STATE_LIMIT: usize = 10_000; // currently at least 20MB >_<
+const DEFAULT_STATE_LIMIT: usize = 10_000; // currently at least 20MB >_<
 
 /// An error that occurred while building a Levenshtein automaton.
 ///
@@ -105,6 +105,7 @@ impl Levenshtein {
     /// a deletion or a substitution.)
     ///
     /// If the underlying automaton becomes too big, then an error is returned.
+    /// Use `new_with_limit` to raise the limit dynamically.
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
@@ -118,6 +119,32 @@ impl Levenshtein {
             dist: distance as usize,
         };
         let dfa = DfaBuilder::new(lev.clone()).build()?;
+        Ok(Levenshtein { prog: lev, dfa })
+    }
+
+    /// Create a new Levenshtein query, but pass the state limit yourself.
+    ///
+    /// The query finds all matching terms that are at most `distance`
+    /// edit operations from `query`. (An edit operation may be an insertion,
+    /// a deletion or a substitution.)
+    ///
+    /// If the underlying automaton becomes too big, then an error is returned.
+    /// This limit can be configured with `state_limit`.
+    ///
+    /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
+    /// can be used with the `search` method of any finite state transducer.
+    #[inline]
+    pub fn new_with_limit(
+        query: &str,
+        distance: u32,
+        state_limit: usize,
+    ) -> Result<Levenshtein, LevenshteinError> {
+        let lev = DynamicLevenshtein {
+            query: query.to_owned(),
+            dist: distance as usize,
+        };
+        let dfa =
+            DfaBuilder::new(lev.clone()).build_with_limit(state_limit)?;
         Ok(Levenshtein { prog: lev, dfa })
     }
 }
@@ -227,7 +254,10 @@ impl DfaBuilder {
         }
     }
 
-    fn build(mut self) -> Result<Dfa, LevenshteinError> {
+    fn build_with_limit(
+        mut self,
+        state_limit: usize,
+    ) -> Result<Dfa, LevenshteinError> {
         let mut stack = vec![self.lev.start()];
         let mut seen = HashSet::new();
         let query = self.lev.query.clone(); // temp work around of borrowck
@@ -254,11 +284,15 @@ impl DfaBuilder {
                     }
                 }
             }
-            if self.dfa.states.len() > STATE_LIMIT {
-                return Err(LevenshteinError::TooManyStates(STATE_LIMIT));
+            if self.dfa.states.len() > state_limit {
+                return Err(LevenshteinError::TooManyStates(state_limit));
             }
         }
         Ok(self.dfa)
+    }
+
+    fn build(mut self) -> Result<Dfa, LevenshteinError> {
+        self.build_with_limit(DEFAULT_STATE_LIMIT)
     }
 
     fn cached_state(&mut self, lev_state: &[usize]) -> Option<usize> {

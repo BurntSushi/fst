@@ -109,7 +109,6 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
-    #[inline]
     pub fn new(
         query: &str,
         distance: u32,
@@ -133,7 +132,6 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
-    #[inline]
     pub fn new_with_limit(
         query: &str,
         distance: u32,

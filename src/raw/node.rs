@@ -256,10 +256,7 @@ impl<'f> Node<'f> {
         } else if node.trans.len() != 1 || node.is_final {
             StateAnyTrans::compile(wtr, addr, node)
         } else {
-            if !node.is_final
-                && node.trans[0].addr == last_addr
-                && node.trans[0].out.is_zero()
-            {
+            if node.trans[0].addr == last_addr && node.trans[0].out.is_zero() {
                 StateOneTransNext::compile(wtr, addr, node.trans[0].inp)
             } else {
                 StateOneTrans::compile(wtr, addr, node.trans[0])

@@ -18,6 +18,7 @@ edition = "2018"
 [[bin]]
 name = "fst"
 path = "src/main.rs"
+doc = false
 
 [dependencies]
 anyhow = "1.0.26"

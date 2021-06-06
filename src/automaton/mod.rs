@@ -1,5 +1,5 @@
 #[cfg(feature = "levenshtein")]
-pub use self::levenshtein::{Levenshtein, LevenshteinError};
+pub use self::levenshtein::{Levenshtein, LevenshteinError, LevenshteinState};
 
 #[cfg(feature = "levenshtein")]
 mod levenshtein;

@@ -22,6 +22,9 @@ exclude = ["fst-levenshtein", "fst-regex"]
 default = []
 levenshtein = ["utf8-ranges"]
 
+[patch.crates-io]
+fst = { path = "." }
+
 [dependencies]
 utf8-ranges = { version = "1.0.4", optional = true }
 

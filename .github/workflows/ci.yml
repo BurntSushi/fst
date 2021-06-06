@@ -89,7 +89,7 @@ jobs:
       run: ${{ env.CARGO }} build --verbose --all ${{ env.TARGET }}
 
     - name: Build docs
-      run: ${{ env.CARGO }} doc --verbose --all ${{ env.TARGET }}
+      run: ${{ env.CARGO }} doc --verbose --all --no-deps ${{ env.TARGET }}
 
     - name: Run tests
       run: ${{ env.CARGO }} test --verbose --all ${{ env.TARGET }}

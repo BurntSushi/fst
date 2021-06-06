@@ -289,7 +289,7 @@ impl DfaBuilder {
         Ok(self.dfa)
     }
 
-    fn build(mut self) -> Result<Dfa, LevenshteinError> {
+    fn build(self) -> Result<Dfa, LevenshteinError> {
         self.build_with_limit(DEFAULT_STATE_LIMIT)
     }
 

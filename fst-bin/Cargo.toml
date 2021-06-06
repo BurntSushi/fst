@@ -27,7 +27,7 @@ bstr = "0.2.11"
 clap = { version = "2.33.0", default-features = false }
 crossbeam-channel = "0.4.2"
 csv = "1.1.3"
-fst = { version = "0.4.0", features = ["levenshtein"] }
+fst = { path = "..", features = ["levenshtein"] }
 memmap = "0.7"
 num_cpus = "1.5"
 regex-automata = { version = "0.1.9", features = ["transducer"] }

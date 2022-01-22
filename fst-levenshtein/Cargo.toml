@@ -13,5 +13,5 @@ license = "Unlicense/MIT"
 edition = "2018"
 
 [dependencies]
-fst = "0.3.1"
+fst = "0.4.7"
 utf8-ranges = "1"

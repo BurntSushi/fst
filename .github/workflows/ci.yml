@@ -96,6 +96,7 @@ jobs:
       run: ${{ env.CARGO }} build --verbose --all ${{ env.TARGET }}
 
     - name: Build docs
+      if: matrix.build != 'pinned'
       run: ${{ env.CARGO }} doc --verbose --all ${{ env.TARGET }}
 
     - name: Run tests

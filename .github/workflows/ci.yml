@@ -87,22 +87,31 @@ jobs:
         echo "cargo command is: ${{ env.CARGO }}"
         echo "target flag is: ${{ env.TARGET }}"
 
+    - name: Build (just fst crate)
+      if: matrix.build == 'pinned'
+      run: ${{ env.CARGO }} build --verbose ${{ env.TARGET }}
+
     - name: Build
+      if: matrix.build != 'pinned'
       run: ${{ env.CARGO }} build --verbose --all ${{ env.TARGET }}
 
     - name: Build docs
       run: ${{ env.CARGO }} doc --verbose --all ${{ env.TARGET }}
 
     - name: Run tests
+      if: matrix.build != 'pinned'
       run: ${{ env.CARGO }} test --verbose --all ${{ env.TARGET }}
 
     - name: Run tests without default features
+      if: matrix.build != 'pinned'
       run: ${{ env.CARGO }} test --verbose --lib --no-default-features ${{ env.TARGET }}
 
     - name: Build fst CLI tool
+      if: matrix.build != 'pinned'
       run: ${{ env.CARGO }} build --verbose --manifest-path fst-bin/Cargo.toml ${{ env.TARGET }}
 
     - name: Compile benchmarks
+      if: matrix.build != 'pinned'
       run: ${{ env.CARGO }} bench --manifest-path bench/Cargo.toml --verbose ${{ env.TARGET }} -- --test
 
   rustfmt:

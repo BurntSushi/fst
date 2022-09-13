@@ -135,15 +135,16 @@ impl Iterator for ConcatLines {
 pub struct ConcatCsv {
     inputs: Vec<PathBuf>,
     cur: Option<Rows>,
+    delimiter: u8,
 }
 
 type Reader = Box<dyn io::Read + Send + Sync + 'static>;
 type Rows = csv::DeserializeRecordsIntoIter<Reader, (BString, u64)>;
 
 impl ConcatCsv {
-    pub fn new(mut inputs: Vec<PathBuf>) -> ConcatCsv {
+    pub fn new(mut inputs: Vec<PathBuf>, delimiter: u8) -> ConcatCsv {
         inputs.reverse(); // treat it as a stack
-        ConcatCsv { inputs, cur: None }
+        ConcatCsv { inputs, cur: None, delimiter }
     }
 
     fn read_row(&mut self) -> Option<Result<(BString, u64), Error>> {
@@ -173,6 +174,7 @@ impl Iterator for ConcatCsv {
                             Ok(rdr) => rdr,
                         };
                         let csvrdr = csv::ReaderBuilder::new()
+                            .delimiter(self.delimiter)
                             .has_headers(false)
                             .from_reader(rdr);
                         self.cur = Some(csvrdr.into_deserialize());

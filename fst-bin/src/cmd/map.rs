@@ -26,6 +26,17 @@ struct Args {
     keep_tmp_dir: bool,
     max: bool,
     min: bool,
+    delimiter: Option<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DelimiterInvalidError;
+
+impl std::error::Error for DelimiterInvalidError {}
+impl std::fmt::Display for DelimiterInvalidError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "The provided value is no valid delimiter")
+    }
 }
 
 impl Args {
@@ -47,6 +58,15 @@ impl Args {
             keep_tmp_dir: m.is_present("keep-tmp-dir"),
             max: m.is_present("max"),
             min: m.is_present("min"),
+            delimiter: m
+                .value_of_lossy("delimiter")
+                .map(|x| {
+                    x.as_bytes()
+                        .get(0)
+                        .map(|y| *y)
+                        .ok_or(DelimiterInvalidError)
+                })
+                .transpose()?,
         })
     }
 
@@ -66,6 +86,7 @@ impl Args {
         let mut map = MapBuilder::new(wtr)?;
         for input in &self.input {
             let mut rdr = csv::ReaderBuilder::new()
+                .delimiter(self.delimiter.unwrap_or(b','))
                 .has_headers(false)
                 .from_reader(util::get_reader(Some(input))?);
             for row in rdr.deserialize() {
@@ -82,7 +103,8 @@ impl Args {
             .iter()
             .map(|inp| Path::new(inp).to_path_buf())
             .collect();
-        let keys = util::ConcatCsv::new(inputs);
+        let keys =
+            util::ConcatCsv::new(inputs, self.delimiter.unwrap_or(b','));
 
         let mut merger = Merger::new(keys, &self.output);
         merger = merger.fd_limit(self.fd_limit);

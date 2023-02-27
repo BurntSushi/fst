@@ -61,7 +61,7 @@ impl Args {
         let wtr = util::get_buf_writer(Some(&self.output))?;
         let mut set = SetBuilder::new(wtr)?;
         for input in &self.input {
-            let rdr = util::get_buf_reader(Some(input))?;
+            let mut rdr = util::get_buf_reader(Some(input))?;
             rdr.for_byte_line(|line| {
                 if line.is_empty() {
                     return Ok(false);

@@ -9,7 +9,6 @@ use std::thread;
 use bstr::BString;
 use crossbeam_channel as chan;
 use fst::{self, raw, Streamer};
-use num_cpus;
 use tempfile;
 
 use crate::util;
@@ -43,7 +42,8 @@ where
             value_merger: None,
             fd_limit: 5,
             batch_size: 100_000,
-            threads: num_cpus::get() as u32,
+            threads: std::thread::available_parallelism()
+                .map_or(1, |x| x.get() as u32),
             tmp_dir: env::temp_dir(),
             keep_tmp_dir: false,
         }

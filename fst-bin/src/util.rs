@@ -7,7 +7,7 @@ use bstr::{io::BufReadExt, BString};
 use csv;
 use fst::raw::{Fst, Output};
 use fst::{IntoStreamer, Streamer};
-use memmap::Mmap;
+use memmap2::Mmap;
 
 use crate::Error;
 

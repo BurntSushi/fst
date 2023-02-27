@@ -92,7 +92,7 @@ map to a file. Notably, this will never store the entire transducer in memory.
 Instead, only constant memory is required during construction.
 
 For the search phase, we use the
-[`memmap`](https://crates.io/memmap)
+[`memmap2`](https://crates.io/memmap2)
 crate to make the file available as a `&[u8]` without necessarily reading it
 all into memory (the operating system will automatically handle that for you).
 
@@ -102,7 +102,7 @@ use std::fs::File;
 use std::io;
 
 use fst::{IntoStreamer, Streamer, Map, MapBuilder};
-use memmap::Mmap;
+use memmap2::Mmap;
 
 // This is where we'll write our map to.
 let mut wtr = io::BufWriter::new(File::create("map.fst")?);

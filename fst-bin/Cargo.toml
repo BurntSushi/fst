@@ -23,7 +23,7 @@ doc = false
 [dependencies]
 anyhow = "1.0.26"
 bit-set = "0.5.1"
-bstr = "0.2.11"
+bstr = { version = "0.2.11", features = ["serde1"] }
 clap = { version = "2.33.0", default-features = false }
 crossbeam-channel = "0.4.2"
 csv = "1.1.3"

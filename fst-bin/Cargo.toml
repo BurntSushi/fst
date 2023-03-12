@@ -1,6 +1,6 @@
 [package]
 name = "fst-bin"
-version = "0.4.2"  #:version
+version = "0.4.3"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = """
 A command line tool for using finite state transducers to compactly represents

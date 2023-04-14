@@ -666,6 +666,11 @@ impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
     fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 /// A lexicographically ordered stream of key-state pairs from a set and
@@ -689,6 +694,11 @@ where
 
     fn next(&'a mut self) -> Option<(&'a [u8], A::State)> {
         self.0.next().map(|(key, _, state)| (key, state))
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }
 
@@ -1000,6 +1010,11 @@ impl<'a, 's> Streamer<'a> for Union<'s> {
     fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 /// A stream of set intersection over multiple streams in lexicographic order.
@@ -1013,6 +1028,11 @@ impl<'a, 's> Streamer<'a> for Intersection<'s> {
     #[inline]
     fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }
 
@@ -1032,6 +1052,11 @@ impl<'a, 's> Streamer<'a> for Difference<'s> {
     fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 /// A stream of set symmetric difference over multiple streams in lexicographic
@@ -1046,6 +1071,11 @@ impl<'a, 's> Streamer<'a> for SymmetricDifference<'s> {
     #[inline]
     fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }
 
@@ -1062,12 +1092,17 @@ impl<'a, S: Streamer<'a>> Streamer<'a> for StreamZeroOutput<S> {
     fn next(&'a mut self) -> Option<(S::Item, raw::Output)> {
         self.0.next().map(|key| (key, raw::Output::zero()))
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::OpBuilder;
-    use crate::Streamer;
+    use crate::{raw, Streamer};
 
     #[test]
     fn no_fsts() {
@@ -1092,6 +1127,11 @@ mod tests {
                     self.i += 1;
                     Some(self.xs[i])
                 }
+            }
+
+            #[inline]
+            fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+                None
             }
         }
 

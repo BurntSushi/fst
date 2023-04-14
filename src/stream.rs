@@ -1,3 +1,5 @@
+use crate::raw::Node;
+
 /// Streamer describes a "streaming iterator."
 ///
 /// It provides a mechanism for writing code that is generic over streams
@@ -104,6 +106,9 @@ pub trait Streamer<'a> {
     /// It is not specified what a stream does after `None` is emitted. In most
     /// cases, `None` should be emitted on every subsequent call.
     fn next(&'a mut self) -> Option<Self::Item>;
+
+    /// Returns the node that the next call to `Self::next` will start from.
+    fn next_start_node(&'a self) -> Option<Node<'_>>;
 }
 
 /// IntoStreamer describes types that can be converted to streams.

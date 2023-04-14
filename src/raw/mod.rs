@@ -1050,6 +1050,10 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
     fn next(&'a mut self) -> Option<(&'a [u8], Output)> {
         self.0.next_with(|_| ()).map(|(key, out, _)| (key, out))
     }
+
+    fn next_start_node(&'a self) -> Option<Node<'_>> {
+        self.0.stack.last().map(|f| f.node)
+    }
 }
 
 /// A lexicographically ordered stream of key-value-state triples from an fst
@@ -1256,6 +1260,10 @@ where
 
     fn next(&'a mut self) -> Option<(&'a [u8], Output, A::State)> {
         self.next_with(|state| state.clone())
+    }
+
+    fn next_start_node(&'a self) -> Option<Node<'f>> {
+        self.stack.last().map(|f| f.node)
     }
 }
 

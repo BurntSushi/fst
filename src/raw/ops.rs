@@ -229,6 +229,16 @@ impl<'a, 'f> Streamer<'a> for Union<'f> {
         }
         Some((slot.input(), &self.outs))
     }
+
+    fn next_start_node(&'a self) -> Option<super::Node<'_>> {
+        if let Some(ref slot) = self.cur_slot {
+            self.heap.next_start_node(slot)
+        } else if let Some(ref slot) = self.heap.heap.peek() {
+            self.heap.next_start_node(slot)
+        } else {
+            None
+        }
+    }
 }
 
 /// A stream of set intersection over multiple fst streams in lexicographic
@@ -268,6 +278,16 @@ impl<'a, 'f> Streamer<'a> for Intersection<'f> {
                 let key = self.cur_slot.as_ref().unwrap().input();
                 return Some((key, &self.outs));
             }
+        }
+    }
+
+    fn next_start_node(&'a self) -> Option<super::Node<'_>> {
+        if let Some(ref slot) = self.cur_slot {
+            self.heap.next_start_node(slot)
+        } else if let Some(ref slot) = self.heap.heap.peek() {
+            self.heap.next_start_node(slot)
+        } else {
+            None
         }
     }
 }
@@ -314,6 +334,10 @@ impl<'a, 'f> Streamer<'a> for Difference<'f> {
             }
         }
     }
+
+    fn next_start_node(&'a self) -> Option<super::Node<'_>> {
+        self.set.next_start_node()
+    }
 }
 
 /// A stream of set symmetric difference over multiple fst streams in
@@ -357,6 +381,16 @@ impl<'a, 'f> Streamer<'a> for SymmetricDifference<'f> {
             }
         }
     }
+
+    fn next_start_node(&'a self) -> Option<super::Node<'_>> {
+        if let Some(ref slot) = self.cur_slot {
+            self.heap.next_start_node(slot)
+        } else if let Some(ref slot) = self.heap.heap.peek() {
+            self.heap.next_start_node(slot)
+        } else {
+            None
+        }
+    }
 }
 
 struct StreamHeap<'f> {
@@ -375,6 +409,10 @@ impl<'f> StreamHeap<'f> {
 
     fn pop(&mut self) -> Option<Slot> {
         self.heap.pop()
+    }
+
+    fn next_start_node(&'f self, slot: &Slot) -> Option<super::Node<'f>> {
+        self.rdrs.get(slot.idx).and_then(|f| f.next_start_node())
     }
 
     fn peek_is_duplicate(&self, key: &[u8]) -> bool {

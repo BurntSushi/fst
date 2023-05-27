@@ -30,33 +30,33 @@ jobs:
         - win-gnu
         include:
         - build: pinned
-          os: ubuntu-18.04
+          os: ubuntu-latest
           rust: 1.60.0
         - build: stable
-          os: ubuntu-18.04
+          os: ubuntu-latest
           rust: stable
         - build: stable-32
-          os: ubuntu-18.04
+          os: ubuntu-latest
           rust: stable
           target: i686-unknown-linux-gnu
         - build: stable-mips
-          os: ubuntu-18.04
+          os: ubuntu-latest
           rust: stable
           target: mips64-unknown-linux-gnuabi64
         - build: beta
-          os: ubuntu-18.04
+          os: ubuntu-latest
           rust: beta
         - build: nightly
-          os: ubuntu-18.04
+          os: ubuntu-latest
           rust: nightly
         - build: macos
           os: macos-latest
           rust: stable
         - build: win-msvc
-          os: windows-2019
+          os: windows-latest
           rust: stable
         - build: win-gnu
-          os: windows-2019
+          os: windows-latest
           rust: stable-x86_64-gnu
     steps:
     - name: Checkout repository
@@ -115,7 +115,7 @@ jobs:
 
   rustfmt:
     name: rustfmt
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2

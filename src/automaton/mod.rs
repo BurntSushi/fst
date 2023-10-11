@@ -321,11 +321,37 @@ impl Automaton for AlwaysMatch {
 pub struct StartsWith<A>(A);
 
 /// The `Automaton` state for `StartsWith<A>`.
-pub struct StartsWithState<A: Automaton>(StartsWithStateKind<A>);
+pub struct StartsWithState<A: Automaton>(pub StartsWithStateKind<A>);
 
-enum StartsWithStateKind<A: Automaton> {
+impl<A: Automaton> Clone for StartsWithState<A>
+where
+    A::State: Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+/// The inner state of a `StartsWithState<A>`.
+pub enum StartsWithStateKind<A: Automaton> {
+    /// Sink state that is reached when the automaton has matched the prefix.
     Done,
+    /// State in which the automaton is while it hasn't matched the prefix.
     Running(A::State),
+}
+
+impl<A: Automaton> Clone for StartsWithStateKind<A>
+where
+    A::State: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            StartsWithStateKind::Done => StartsWithStateKind::Done,
+            StartsWithStateKind::Running(inner) => {
+                StartsWithStateKind::Running(inner.clone())
+            }
+        }
+    }
 }
 
 impl<A: Automaton> Automaton for StartsWith<A> {
@@ -387,7 +413,17 @@ impl<A: Automaton> Automaton for StartsWith<A> {
 pub struct Union<A, B>(A, B);
 
 /// The `Automaton` state for `Union<A, B>`.
-pub struct UnionState<A: Automaton, B: Automaton>(A::State, B::State);
+pub struct UnionState<A: Automaton, B: Automaton>(pub A::State, pub B::State);
+
+impl<A: Automaton, B: Automaton> Clone for UnionState<A, B>
+where
+    A::State: Clone,
+    B::State: Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), self.1.clone())
+    }
+}
 
 impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
     type State = UnionState<A, B>;
@@ -422,7 +458,20 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
 pub struct Intersection<A, B>(A, B);
 
 /// The `Automaton` state for `Intersection<A, B>`.
-pub struct IntersectionState<A: Automaton, B: Automaton>(A::State, B::State);
+pub struct IntersectionState<A: Automaton, B: Automaton>(
+    pub A::State,
+    pub B::State,
+);
+
+impl<A: Automaton, B: Automaton> Clone for IntersectionState<A, B>
+where
+    A::State: Clone,
+    B::State: Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), self.1.clone())
+    }
+}
 
 impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
     type State = IntersectionState<A, B>;
@@ -461,7 +510,16 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
 pub struct Complement<A>(A);
 
 /// The `Automaton` state for `Complement<A>`.
-pub struct ComplementState<A: Automaton>(A::State);
+pub struct ComplementState<A: Automaton>(pub A::State);
+
+impl<A: Automaton> Clone for ComplementState<A>
+where
+    A::State: Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
 
 impl<A: Automaton> Automaton for Complement<A> {
     type State = ComplementState<A>;

@@ -166,19 +166,19 @@ impl<'a, T: Automaton> Automaton for &'a T {
 /// }
 /// ```
 #[derive(Clone, Debug)]
-pub struct Str<'a> {
-    string: &'a [u8],
+pub struct Str<S: AsRef<[u8]>> {
+    string: S,
 }
 
-impl<'a> Str<'a> {
+impl<S: AsRef<[u8]>> Str<S> {
     /// Constructs automaton that matches an exact string.
     #[inline]
-    pub fn new(string: &'a str) -> Str<'a> {
-        Str { string: string.as_bytes() }
+    pub fn new(string: S) -> Self {
+        Self { string }
     }
 }
 
-impl<'a> Automaton for Str<'a> {
+impl<S: AsRef<[u8]>> Automaton for Str<S> {
     type State = Option<usize>;
 
     #[inline]
@@ -188,7 +188,7 @@ impl<'a> Automaton for Str<'a> {
 
     #[inline]
     fn is_match(&self, pos: &Option<usize>) -> bool {
-        *pos == Some(self.string.len())
+        *pos == Some(self.string.as_ref().len())
     }
 
     #[inline]
@@ -201,7 +201,7 @@ impl<'a> Automaton for Str<'a> {
         // if we aren't already past the end...
         if let Some(pos) = *pos {
             // and there is still a matching byte at the current position...
-            if self.string.get(pos).cloned() == Some(byte) {
+            if self.string.as_ref().get(pos).cloned() == Some(byte) {
                 // then move forward
                 return Some(pos + 1);
             }
@@ -238,20 +238,20 @@ impl<'a> Automaton for Str<'a> {
 /// }
 /// ```
 #[derive(Clone, Debug)]
-pub struct Subsequence<'a> {
-    subseq: &'a [u8],
+pub struct Subsequence<S: AsRef<[u8]>> {
+    subseq: S,
 }
 
-impl<'a> Subsequence<'a> {
+impl<S: AsRef<[u8]>> Subsequence<S> {
     /// Constructs automaton that matches input containing the
     /// specified subsequence.
     #[inline]
-    pub fn new(subsequence: &'a str) -> Subsequence<'a> {
-        Subsequence { subseq: subsequence.as_bytes() }
+    pub fn new(subsequence: S) -> Self {
+        Self { subseq: subsequence }
     }
 }
 
-impl<'a> Automaton for Subsequence<'a> {
+impl<S: AsRef<[u8]>> Automaton for Subsequence<S> {
     type State = usize;
 
     #[inline]
@@ -261,7 +261,7 @@ impl<'a> Automaton for Subsequence<'a> {
 
     #[inline]
     fn is_match(&self, &state: &usize) -> bool {
-        state == self.subseq.len()
+        state == self.subseq.as_ref().len()
     }
 
     #[inline]
@@ -271,15 +271,15 @@ impl<'a> Automaton for Subsequence<'a> {
 
     #[inline]
     fn will_always_match(&self, &state: &usize) -> bool {
-        state == self.subseq.len()
+        state == self.subseq.as_ref().len()
     }
 
     #[inline]
     fn accept(&self, &state: &usize, byte: u8) -> usize {
-        if state == self.subseq.len() {
+        if state == self.subseq.as_ref().len() {
             return state;
         }
-        state + (byte == self.subseq[state]) as usize
+        state + (byte == self.subseq.as_ref()[state]) as usize
     }
 }
 

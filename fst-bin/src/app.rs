@@ -288,7 +288,10 @@ pub fn app() -> clap::App<'static, 'static> {
         ))
         .arg(flag("keep-tmp-dir").help(
             "Does not delete the temporary directory. Useful for debugging.",
-        ));
+        ))
+        .arg(flag("delimiter").help(
+            "The delimiter used in the CSV file to separate key and value in each line. \
+             This defaults to ','.",));
 
     let node = cmd("node", ABOUT_NODE)
         .arg(pos("input").required(true).help("The FST to inspect."))

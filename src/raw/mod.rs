@@ -1055,13 +1055,13 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
 /// A lexicographically ordered stream of key-value-state triples from an fst
 /// and an automaton.
 ///
-/// The key-values are from the underyling FSTP while the states are from the
+/// The key-values are from the underyling fst while the states are from the
 /// automaton.
 ///
 /// The `A` type parameter corresponds to an optional automaton to filter
 /// the stream. By default, no filtering is done.
 ///
-/// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+/// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
 pub struct StreamWithState<'f, A = AlwaysMatch>
 where
     A: Automaton,

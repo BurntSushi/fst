@@ -716,6 +716,11 @@ impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     fn next(&'a mut self) -> Option<(&'a [u8], u64)> {
         self.0.next().map(|(key, out)| (key, out.value()))
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 impl<'m, A: Automaton> Stream<'m, A> {
@@ -781,6 +786,11 @@ where
     fn next(&'a mut self) -> Option<(&'a [u8], u64, A::State)> {
         self.0.next().map(|(key, out, state)| (key, out.value(), state))
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 /// A lexicographically ordered stream of keys from a map.
@@ -794,6 +804,11 @@ impl<'a, 'm> Streamer<'a> for Keys<'m> {
     #[inline]
     fn next(&'a mut self) -> Option<&'a [u8]> {
         self.0.next().map(|(key, _)| key)
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }
 
@@ -809,6 +824,11 @@ impl<'a, 'm> Streamer<'a> for Values<'m> {
     #[inline]
     fn next(&'a mut self) -> Option<u64> {
         self.0.next().map(|(_, out)| out.value())
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }
 
@@ -1201,6 +1221,11 @@ impl<'a, 'm> Streamer<'a> for Union<'m> {
     fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         self.0.next()
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 /// A stream of set intersection over multiple map streams in lexicographic
@@ -1215,6 +1240,11 @@ impl<'a, 'm> Streamer<'a> for Intersection<'m> {
     #[inline]
     fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         self.0.next()
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }
 
@@ -1235,6 +1265,11 @@ impl<'a, 'm> Streamer<'a> for Difference<'m> {
     fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         self.0.next()
     }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
+    }
 }
 
 /// A stream of set symmetric difference over multiple map streams in
@@ -1249,6 +1284,11 @@ impl<'a, 'm> Streamer<'a> for SymmetricDifference<'m> {
     #[inline]
     fn next(&'a mut self) -> Option<(&'a [u8], &'a [IndexedValue])> {
         self.0.next()
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }
 
@@ -1267,5 +1307,10 @@ where
 
     fn next(&'a mut self) -> Option<(&'a [u8], raw::Output)> {
         self.0.next().map(|(k, v)| (k, raw::Output::new(v)))
+    }
+
+    #[inline]
+    fn next_start_node(&'a self) -> Option<raw::Node<'_>> {
+        self.0.next_start_node()
     }
 }

@@ -323,7 +323,7 @@ An implementation of fuzzy search using Levenshtein automata can be used
 to search maps:
 
 ```rust
-use fst::automaton::Levenshtein;
+use fst::automaton::{Levenshtein, LevenshteinState};
 use fst::{IntoStreamer, Streamer, Map};
 
 # fn main() { example().unwrap(); }
@@ -342,11 +342,17 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     while let Some((k, v, s)) = stream.next() {
         kvs.push((String::from_utf8(k.to_vec())?, v, s));
     }
-    // Currently, there isn't much interesting that you can do with the states.
+
     assert_eq!(kvs, vec![
-        ("foo".to_string(), 1, Some(183)),
-        ("foob".to_string(), 2, Some(123)),
-        ("fozb".to_string(), 4, Some(83)),
+        ("foo".to_string(), 1, Some(LevenshteinState {
+            state_idx: 183, distance: Some(0)
+        })),
+        ("foob".to_string(), 2, Some(LevenshteinState {
+            state_idx: 123, distance: Some(1)
+        })),
+        ("fozb".to_string(), 4, Some(LevenshteinState {
+            state_idx: 83, distance: Some(2)
+        })),
     ]);
 
     Ok(())

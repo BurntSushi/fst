@@ -1,11 +1,15 @@
-use std::cmp;
-use std::collections::BinaryHeap;
-use std::iter::FromIterator;
+use core::cmp;
+#[cfg(feature = "alloc")]
+use alloc::{collections::BinaryHeap, boxed::Box};
+#[cfg(feature = "alloc")]
+use alloc::{vec, vec::Vec};
+use core::iter::FromIterator;
 
 use crate::raw::Output;
 use crate::stream::{IntoStreamer, Streamer};
 
 /// Permits stream operations to be hetergeneous with respect to streams.
+#[cfg(feature = "alloc")]
 type BoxedStream<'f> =
     Box<dyn for<'a> Streamer<'a, Item = (&'a [u8], Output)> + 'f>;
 
@@ -41,10 +45,12 @@ pub struct IndexedValue {
 /// stream.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct OpBuilder<'f> {
     streams: Vec<BoxedStream<'f>>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'f> OpBuilder<'f> {
     /// Create a new set operation builder.
     #[inline]
@@ -168,6 +174,7 @@ impl<'f> OpBuilder<'f> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> Extend<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -183,6 +190,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -201,12 +209,14 @@ where
 /// A stream of set union over multiple fst streams in lexicographic order.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Union<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for Union<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -235,12 +245,14 @@ impl<'a, 'f> Streamer<'a> for Union<'f> {
 /// order.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct Intersection<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for Intersection<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -280,6 +292,7 @@ impl<'a, 'f> Streamer<'a> for Intersection<'f> {
 /// appear in any other streams.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct Difference<'f> {
     set: BoxedStream<'f>,
     key: Vec<u8>,
@@ -287,6 +300,7 @@ pub struct Difference<'f> {
     outs: Vec<IndexedValue>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for Difference<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -320,12 +334,14 @@ impl<'a, 'f> Streamer<'a> for Difference<'f> {
 /// lexicographic order.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct SymmetricDifference<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for SymmetricDifference<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -359,11 +375,13 @@ impl<'a, 'f> Streamer<'a> for SymmetricDifference<'f> {
     }
 }
 
+#[cfg(feature = "alloc")]
 struct StreamHeap<'f> {
     rdrs: Vec<BoxedStream<'f>>,
     heap: BinaryHeap<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'f> StreamHeap<'f> {
     fn new(streams: Vec<BoxedStream<'f>>) -> StreamHeap<'f> {
         let mut u = StreamHeap { rdrs: streams, heap: BinaryHeap::new() };
@@ -410,6 +428,7 @@ impl<'f> StreamHeap<'f> {
     }
 }
 
+#[cfg(feature = "alloc")]
 #[derive(Debug, Eq, PartialEq)]
 struct Slot {
     idx: usize,
@@ -417,6 +436,7 @@ struct Slot {
     output: Output,
 }
 
+#[cfg(feature = "alloc")]
 impl Slot {
     fn new(rdr_idx: usize) -> Slot {
         Slot {
@@ -444,6 +464,7 @@ impl Slot {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl PartialOrd for Slot {
     fn partial_cmp(&self, other: &Slot) -> Option<cmp::Ordering> {
         (&self.input, self.output)
@@ -452,6 +473,7 @@ impl PartialOrd for Slot {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Ord for Slot {
     fn cmp(&self, other: &Slot) -> cmp::Ordering {
         self.partial_cmp(other).unwrap()

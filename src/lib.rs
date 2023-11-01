@@ -299,15 +299,24 @@ data structures found in the standard library, such as `BTreeSet` and
    `fst-bin/src/merge.rs` from the root of this crate's repository.
 */
 
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), feature(error_in_core))]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 #[cfg(all(feature = "levenshtein", doctest))]
 doc_comment::doctest!("../README.md");
 
 pub use crate::automaton::Automaton;
 pub use crate::error::{Error, Result};
-pub use crate::map::{Map, MapBuilder};
-pub use crate::set::{Set, SetBuilder};
+pub use crate::map::Map;
+#[cfg(feature = "alloc")]
+pub use crate::map::MapBuilder;
+pub use crate::set::Set;
+#[cfg(feature = "alloc")]
+pub use crate::set::SetBuilder;
 pub use crate::stream::{IntoStreamer, Streamer};
 
 mod bytes;

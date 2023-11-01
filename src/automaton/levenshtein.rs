@@ -1,7 +1,9 @@
-use std::cmp;
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
-use std::fmt;
+use core::cmp;
+use core::fmt;
+#[cfg(feature = "alloc")]
+use alloc::collections::hash_map::Entry;
+#[cfg(feature = "alloc")]
+use alloc::collections::{HashMap, HashSet};
 
 use utf8_ranges::{Utf8Range, Utf8Sequences};
 
@@ -34,7 +36,7 @@ impl fmt::Display for LevenshteinError {
     }
 }
 
-impl std::error::Error for LevenshteinError {}
+impl core::error::Error for LevenshteinError {}
 
 /// A Unicode aware Levenshtein automaton for running efficient fuzzy queries.
 ///
@@ -92,11 +94,13 @@ impl std::error::Error for LevenshteinError {}
 ///
 /// This is important functionality, so one should count on this implementation
 /// being vastly improved in the future.
+#[cfg(feature = "alloc")]
 pub struct Levenshtein {
     prog: DynamicLevenshtein,
     dfa: Dfa,
 }
 
+#[cfg(feature = "alloc")]
 impl Levenshtein {
     /// Create a new Levenshtein query.
     ///
@@ -109,6 +113,7 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
+    #[cfg(feature = "alloc")]
     pub fn new(
         query: &str,
         distance: u32,
@@ -132,6 +137,7 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
+    #[cfg(feature = "alloc")]
     pub fn new_with_limit(
         query: &str,
         distance: u32,
@@ -147,6 +153,7 @@ impl Levenshtein {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl fmt::Debug for Levenshtein {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -158,11 +165,13 @@ impl fmt::Debug for Levenshtein {
 }
 
 #[derive(Clone)]
+#[cfg(feature = "alloc")]
 struct DynamicLevenshtein {
     query: String,
     dist: usize,
 }
 
+#[cfg(feature = "alloc")]
 impl DynamicLevenshtein {
     fn start(&self) -> Vec<usize> {
         (0..self.query.chars().count() + 1).collect()
@@ -190,6 +199,7 @@ impl DynamicLevenshtein {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Automaton for Levenshtein {
     type State = Option<usize>;
 
@@ -215,6 +225,7 @@ impl Automaton for Levenshtein {
 }
 
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 struct Dfa {
     states: Vec<State>,
 }
@@ -237,12 +248,14 @@ impl fmt::Debug for State {
     }
 }
 
+#[cfg(feature = "alloc")]
 struct DfaBuilder {
     dfa: Dfa,
     lev: DynamicLevenshtein,
     cache: HashMap<Vec<usize>, usize>,
 }
 
+#[cfg(feature = "alloc")]
 impl DfaBuilder {
     fn new(lev: DynamicLevenshtein) -> DfaBuilder {
         DfaBuilder {

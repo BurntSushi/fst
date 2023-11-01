@@ -19,8 +19,10 @@ members = ["bench", "fst-bin"]
 exclude = ["fst-levenshtein", "fst-regex"]
 
 [features]
-default = []
+default = ["std"]
 levenshtein = ["utf8-ranges"]
+std = ["alloc"]
+alloc = []
 
 [patch.crates-io]
 fst = { path = "." }

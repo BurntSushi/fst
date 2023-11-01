@@ -1,6 +1,9 @@
-use std::fmt;
-use std::str;
-use std::string::FromUtf8Error;
+use core::fmt;
+use core::str;
+#[cfg(feature = "alloc")]
+use alloc::string::FromUtf8Error;
+#[cfg(feature = "alloc")]
+use alloc::{vec::Vec, string::String, borrow::ToOwned, format};
 
 use crate::raw::FstType;
 
@@ -47,6 +50,7 @@ pub enum Error {
     ChecksumMissing,
     /// A duplicate key was inserted into a finite state transducer, which is
     /// not allowed.
+    #[cfg(feature = "alloc")]
     DuplicateKey {
         /// The duplicate key.
         got: Vec<u8>,
@@ -54,6 +58,7 @@ pub enum Error {
     /// A key was inserted out of order into a finite state transducer.
     ///
     /// Keys must always be inserted in lexicographic order.
+    #[cfg(feature = "alloc")]
     OutOfOrder {
         /// The last key successfully inserted.
         previous: Vec<u8>,
@@ -72,6 +77,7 @@ pub enum Error {
         got: FstType,
     },
     /// An error that occurred when trying to decode a UTF-8 byte key.
+    #[cfg(feature = "alloc")]
     FromUtf8(FromUtf8Error),
     /// Hints that destructuring should not be exhaustive.
     ///
@@ -85,6 +91,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
+            #[cfg(feature = "alloc")]
             Error::FromUtf8(ref err) => err.fmt(f),
             Error::Version { expected, got } => write!(
                 f,
@@ -112,11 +119,13 @@ usually means you're trying to read data that isn't actually an encoded FST.",
                 f,
                 "FST verification failed: FST does not contain a checksum",
             ),
+            #[cfg(feature = "alloc")]
             Error::DuplicateKey { ref got } => write!(
                 f,
                 "Error inserting duplicate key: '{}'.",
                 format_bytes(&*got)
             ),
+            #[cfg(feature = "alloc")]
             Error::OutOfOrder { ref previous, ref got } => write!(
                 f,
                 "\
@@ -142,15 +151,29 @@ impl fmt::Debug for Error {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
+            #[cfg(feature = "alloc")]
             Error::FromUtf8(ref err) => Some(err),
             _ => None,
         }
     }
 }
 
+#[cfg(not(feature = "std"))]
+impl core::error::Error for Error {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        match *self {
+            #[cfg(feature = "alloc")]
+            Error::FromUtf8(ref err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
 impl From<FromUtf8Error> for Error {
     #[inline]
     fn from(err: FromUtf8Error) -> Error {
@@ -163,6 +186,7 @@ impl From<FromUtf8Error> for Error {
 ///
 /// Essentially, try to decode the bytes as UTF-8 and show that. Failing that,
 /// just show the sequence of bytes.
+#[cfg(feature = "alloc")]
 fn format_bytes(bytes: &[u8]) -> String {
     match str::from_utf8(bytes) {
         Ok(s) => s.to_owned(),

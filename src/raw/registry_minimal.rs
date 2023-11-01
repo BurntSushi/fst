@@ -10,13 +10,14 @@
 // expensive SipHasher.
 
 #![allow(dead_code)]
-
+#[cfg(feature = "std")]
 use std::collections::hash_map::{Entry, HashMap};
-
+#[cfg(feature = "std")]
 use crate::raw::build::BuilderNode;
 use crate::raw::CompiledAddr;
 
 #[derive(Debug)]
+#[cfg(feature = "std")]
 pub struct Registry {
     table: HashMap<BuilderNode, RegistryCell>,
 }
@@ -31,6 +32,7 @@ pub enum RegistryEntry<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct RegistryCell(CompiledAddr);
 
+#[cfg(feature = "std")]
 impl Registry {
     pub fn new(table_size: usize, _lru_size: usize) -> Registry {
         Registry { table: HashMap::with_capacity(table_size) }

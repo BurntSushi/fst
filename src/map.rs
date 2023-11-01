@@ -1,12 +1,20 @@
-use std::fmt;
+#[cfg(feature = "alloc")]
+use core::fmt;
+#[cfg(feature = "std")]
 use std::io;
-use std::iter::{self, FromIterator};
+#[cfg(feature = "alloc")]
+use core::iter::{self, FromIterator};
 
+#[cfg(feature = "alloc")]
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::raw;
 pub use crate::raw::IndexedValue;
-use crate::stream::{IntoStreamer, Streamer};
+#[cfg(feature = "alloc")]
+use crate::stream::IntoStreamer;
+use crate::stream::Streamer;
 use crate::Result;
+#[cfg(feature = "alloc")]
+use alloc::{vec::Vec, string::String};
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///
@@ -54,6 +62,7 @@ use crate::Result;
 #[derive(Clone)]
 pub struct Map<D>(raw::Fst<D>);
 
+#[cfg(feature = "alloc")]
 impl Map<Vec<u8>> {
     /// Create a `Map` from an iterator of lexicographically ordered byte
     /// strings and associated values.
@@ -64,6 +73,7 @@ impl Map<Vec<u8>> {
     /// Note that this is a convenience function to build a map in memory.
     /// To build a map that streams to an arbitrary `io::Write`, use
     /// `MapBuilder`.
+    #[cfg(feature = "std")]
     pub fn from_iter<K, I>(iter: I) -> Result<Map<Vec<u8>>>
     where
         K: AsRef<[u8]>,
@@ -167,6 +177,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// ]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn stream(&self) -> Stream<'_> {
         Stream(self.0.stream())
     }
@@ -190,6 +201,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// assert_eq!(keys, vec![b"a", b"b", b"c"]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn keys(&self) -> Keys<'_> {
         Keys(self.0.stream())
     }
@@ -214,6 +226,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// assert_eq!(values, vec![1, 2, 3]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn values(&self) -> Values<'_> {
         Values(self.0.stream())
     }
@@ -250,6 +263,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// ]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn range(&self) -> StreamBuilder<'_> {
         StreamBuilder(self.0.range())
     }
@@ -301,6 +315,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
         StreamBuilder(self.0.search(aut))
     }
@@ -354,6 +369,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
 ```
 "##
     )]
+    #[cfg(feature = "alloc")]
     pub fn search_with_state<A: Automaton>(
         &self,
         aut: A,
@@ -417,6 +433,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// ]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn op(&self) -> OpBuilder<'_> {
         OpBuilder::new().add(self)
     }
@@ -462,6 +479,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+#[cfg(feature = "std")]
 impl Default for Map<Vec<u8>> {
     #[inline]
     fn default() -> Map<Vec<u8>> {
@@ -469,6 +487,7 @@ impl Default for Map<Vec<u8>> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<D: AsRef<[u8]>> fmt::Debug for Map<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Map([")?;
@@ -501,6 +520,7 @@ impl<D: AsRef<[u8]>> AsRef<raw::Fst<D>> for Map<D> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'m, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'m Map<D> {
     type Item = (&'a [u8], u64);
     type Into = Stream<'m>;
@@ -606,8 +626,10 @@ impl<'m, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'m Map<D> {
 ///     (b"stevie".to_vec(), 3),
 /// ]);
 /// ```
+#[cfg(feature = "alloc")]
 pub struct MapBuilder<W>(raw::Builder<W>);
 
+#[cfg(feature = "std")]
 impl MapBuilder<Vec<u8>> {
     /// Create a builder that builds a map in memory.
     #[inline]
@@ -622,6 +644,7 @@ impl MapBuilder<Vec<u8>> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> MapBuilder<W> {
     /// Create a builder that builds a map by writing it to `wtr` in a
     /// streaming fashion.
@@ -706,10 +729,12 @@ impl<W: io::Write> MapBuilder<W> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Stream<'m, A = AlwaysMatch>(raw::Stream<'m, A>)
 where
     A: Automaton;
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     type Item = (&'a [u8], u64);
 
@@ -718,6 +743,7 @@ impl<'a, 'm, A: Automaton> Streamer<'a> for Stream<'m, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'m, A: Automaton> Stream<'m, A> {
     /// Convert this stream into a vector of byte strings and outputs.
     ///
@@ -768,10 +794,12 @@ impl<'m, A: Automaton> Stream<'m, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct StreamWithState<'m, A = AlwaysMatch>(raw::StreamWithState<'m, A>)
 where
     A: Automaton;
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm, A: 'a + Automaton> Streamer<'a> for StreamWithState<'m, A>
 where
     A::State: Clone,
@@ -786,8 +814,10 @@ where
 /// A lexicographically ordered stream of keys from a map.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Keys<'m>(raw::Stream<'m>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm> Streamer<'a> for Keys<'m> {
     type Item = &'a [u8];
 
@@ -801,8 +831,10 @@ impl<'a, 'm> Streamer<'a> for Keys<'m> {
 /// corresponding key.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Values<'m>(raw::Stream<'m>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm> Streamer<'a> for Values<'m> {
     type Item = u64;
 
@@ -824,8 +856,10 @@ impl<'a, 'm> Streamer<'a> for Values<'m> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct StreamBuilder<'m, A = AlwaysMatch>(raw::StreamBuilder<'m, A>);
 
+#[cfg(feature = "alloc")]
 impl<'m, A: Automaton> StreamBuilder<'m, A> {
     /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> StreamBuilder<'m, A> {
@@ -847,6 +881,8 @@ impl<'m, A: Automaton> StreamBuilder<'m, A> {
         StreamBuilder(self.0.lt(bound))
     }
 }
+
+#[cfg(feature = "alloc")]
 
 impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
     type Item = (&'a [u8], u64);
@@ -874,10 +910,12 @@ impl<'m, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'m, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct StreamWithStateBuilder<'m, A = AlwaysMatch>(
     raw::StreamWithStateBuilder<'m, A>,
 );
 
+#[cfg(feature = "alloc")]
 impl<'m, A: Automaton> StreamWithStateBuilder<'m, A> {
     /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(
@@ -912,6 +950,7 @@ impl<'m, A: Automaton> StreamWithStateBuilder<'m, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'m, 'a, A: 'a + Automaton> IntoStreamer<'a>
     for StreamWithStateBuilder<'m, A>
 where
@@ -942,8 +981,10 @@ where
 /// stream.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct OpBuilder<'m>(raw::OpBuilder<'m>);
 
+#[cfg(feature = "alloc")]
 impl<'m> OpBuilder<'m> {
     /// Create a new set operation builder.
     #[inline]
@@ -1159,6 +1200,7 @@ impl<'m> OpBuilder<'m> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> Extend<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], u64)>,
@@ -1174,6 +1216,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], u64)>,
@@ -1192,8 +1235,10 @@ where
 /// A stream of set union over multiple map streams in lexicographic order.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Union<'m>(raw::Union<'m>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm> Streamer<'a> for Union<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -1207,8 +1252,10 @@ impl<'a, 'm> Streamer<'a> for Union<'m> {
 /// order.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Intersection<'m>(raw::Intersection<'m>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm> Streamer<'a> for Intersection<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -1226,8 +1273,10 @@ impl<'a, 'm> Streamer<'a> for Intersection<'m> {
 /// appear in any other streams.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Difference<'m>(raw::Difference<'m>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm> Streamer<'a> for Difference<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -1241,8 +1290,10 @@ impl<'a, 'm> Streamer<'a> for Difference<'m> {
 /// lexicographic order.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct SymmetricDifference<'m>(raw::SymmetricDifference<'m>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm> Streamer<'a> for SymmetricDifference<'m> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 

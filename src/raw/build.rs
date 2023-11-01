@@ -1,16 +1,29 @@
+#[cfg(feature = "std")]
 use std::io;
-
+#[cfg(feature = "std")]
 use crate::bytes;
+#[cfg(feature = "std")]
 use crate::error::Result;
+#[cfg(feature = "alloc")]
 use crate::raw::counting_writer::CountingWriter;
+#[cfg(feature = "std")]
 use crate::raw::error::Error;
-use crate::raw::registry::{Registry, RegistryEntry};
+#[cfg(feature = "alloc")]
+use crate::raw::registry::Registry;
+#[cfg(feature = "std")]
+use crate::raw::registry::RegistryEntry;
+use crate::raw::Output;
+#[cfg(feature = "alloc")]
+use crate::raw::{CompiledAddr, Fst, Transition};
+#[cfg(feature = "std")]
 use crate::raw::{
-    CompiledAddr, Fst, FstType, Output, Transition, EMPTY_ADDRESS,
+     FstType, EMPTY_ADDRESS,
     NONE_ADDRESS, VERSION,
 };
-// use raw::registry_minimal::{Registry, RegistryEntry};
+#[cfg(feature = "std")]
 use crate::stream::{IntoStreamer, Streamer};
+#[cfg(feature = "alloc")]
+use alloc::{vec::Vec, vec};
 
 /// A builder for creating a finite state transducer.
 ///
@@ -40,6 +53,7 @@ use crate::stream::{IntoStreamer, Streamer};
 ///
 /// The algorithmic complexity of fst construction is `O(n)` where `n` is the
 /// number of elements added to the fst.
+#[cfg(feature = "alloc")]
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
     ///
@@ -73,17 +87,20 @@ pub struct Builder<W> {
 }
 
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 struct UnfinishedNodes {
     stack: Vec<BuilderNodeUnfinished>,
 }
 
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 struct BuilderNodeUnfinished {
     node: BuilderNode,
     last: Option<LastTransition>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq)]
+#[cfg(feature = "alloc")]
 pub struct BuilderNode {
     pub is_final: bool,
     pub final_output: Output,
@@ -96,6 +113,7 @@ struct LastTransition {
     out: Output,
 }
 
+#[cfg(feature = "std")]
 impl Builder<Vec<u8>> {
     /// Create a builder that builds an fst in memory.
     #[inline]
@@ -110,6 +128,7 @@ impl Builder<Vec<u8>> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Builder<W> {
     /// Create a builder that builds an fst by writing it to `wtr` in a
     /// streaming fashion.
@@ -325,6 +344,7 @@ impl<W: io::Write> Builder<W> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl UnfinishedNodes {
     fn new() -> UnfinishedNodes {
         let mut unfinished = UnfinishedNodes { stack: Vec::with_capacity(64) };
@@ -422,6 +442,7 @@ impl UnfinishedNodes {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl BuilderNodeUnfinished {
     fn last_compiled(&mut self, addr: CompiledAddr) {
         if let Some(trans) = self.last.take() {
@@ -446,6 +467,7 @@ impl BuilderNodeUnfinished {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Clone for BuilderNode {
     fn clone(&self) -> BuilderNode {
         BuilderNode {
@@ -463,6 +485,7 @@ impl Clone for BuilderNode {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Default for BuilderNode {
     fn default() -> BuilderNode {
         BuilderNode {

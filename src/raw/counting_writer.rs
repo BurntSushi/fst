@@ -1,3 +1,4 @@
+#[cfg(feature = "std")]
 use std::io;
 
 use crate::raw::crc32::CheckSummer;
@@ -9,6 +10,7 @@ pub struct CountingWriter<W> {
     summer: CheckSummer,
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> CountingWriter<W> {
     /// Wrap the given writer with a counter.
     pub fn new(wtr: W) -> CountingWriter<W> {
@@ -43,6 +45,7 @@ impl<W: io::Write> CountingWriter<W> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> io::Write for CountingWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.summer.update(buf);

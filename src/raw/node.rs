@@ -1,9 +1,12 @@
-use std::cmp;
-use std::fmt;
+#[cfg(feature = "std")]
+use core::cmp;
+use core::fmt;
+#[cfg(feature = "std")]
 use std::io;
-use std::ops::Range;
+use core::ops::Range;
 
 use crate::bytes;
+#[cfg(feature = "std")]
 use crate::raw::build::BuilderNode;
 use crate::raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
 use crate::raw::{
@@ -241,6 +244,7 @@ impl<'f> Node<'f> {
         }
     }
 
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         wtr: W,
         last_addr: CompiledAddr,
@@ -265,6 +269,7 @@ impl<'f> Node<'f> {
     }
 }
 
+#[cfg(feature = "std")]
 impl BuilderNode {
     pub fn compile_to<W: io::Write>(
         &self,
@@ -309,6 +314,7 @@ impl State {
 }
 
 impl StateOneTransNext {
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         mut wtr: W,
         _: CompiledAddr,
@@ -368,6 +374,7 @@ impl StateOneTransNext {
 }
 
 impl StateOneTrans {
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         mut wtr: W,
         addr: CompiledAddr,
@@ -466,6 +473,7 @@ impl StateOneTrans {
 }
 
 impl StateAnyTrans {
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         mut wtr: W,
         addr: CompiledAddr,
@@ -824,6 +832,7 @@ fn common_input(idx: u8) -> Option<u8> {
 }
 
 #[inline]
+#[cfg(feature = "std")]
 fn pack_delta<W: io::Write>(
     wtr: W,
     node_addr: CompiledAddr,
@@ -835,6 +844,7 @@ fn pack_delta<W: io::Write>(
 }
 
 #[inline]
+#[cfg(feature = "std")]
 fn pack_delta_in<W: io::Write>(
     wtr: W,
     node_addr: CompiledAddr,

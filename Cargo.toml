@@ -24,9 +24,6 @@ levenshtein = ["utf8-ranges"]
 std = ["alloc"]
 alloc = []
 
-[patch.crates-io]
-fst = { path = "." }
-
 [dependencies]
 utf8-ranges = { version = "1.0.4", optional = true }
 

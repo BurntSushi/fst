@@ -16,7 +16,6 @@ edition = "2018"
 
 [workspace]
 members = ["bench"]
-exclude = ["fst-levenshtein", "fst-regex"]
 
 [features]
 default = ["std"]

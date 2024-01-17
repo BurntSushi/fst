@@ -43,9 +43,9 @@ jobs:
         with:
           toolchain: ${{matrix.rust}}
       - uses: Swatinem/rust-cache@v2
-      - run: cargo test --workspace
+      - run: cargo test --workspace ${{matrix.features}}
         env:
-          RUSTFLAGS: ${{matrix.rustflags}} ${{env.RUSTFLAGS}} ${{matrix.features}}
+          RUSTFLAGS: ${{matrix.rustflags}} ${{env.RUSTFLAGS}}
 
   msrv:
     name: Rust MSRV

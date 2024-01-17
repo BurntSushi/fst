@@ -65,3 +65,9 @@ fst-no-std = { version = "0.4", default-features = false }
 ```
 
 This way `fst-no-std` will not depend on the standard library and not even allocate (!) at the cost of being rather kneecaped: You can not construct FSTs and the evailable querying features are limited to simple lookups. You can optionally enable the `alloc` feature which adds a dependency on the `alloc` crate (i.e. you will need a global allocator) but it enables all querying features.
+
+#### License
+
+<sup>
+Licensed under the <a href="LICENSE-MIT">MIT license</a>.
+</sup>

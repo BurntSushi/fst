@@ -1,14 +1,14 @@
 [package]
 name = "fst-no-std"
 version = "0.4.7"  #:version
-authors = ["Andrew Gallant <jamslam@gmail.com>"]
+authors = ["Andrew Gallant <jamslam@gmail.com>", "Jonas Kruckenberg <jonas@crabnebula.dev>"]
 description = """
 Use finite state transducers to compactly represents sets or maps of many
 strings (> 1 billion is possible).
 """
-documentation = "https://docs.rs/fst"
-homepage = "https://github.com/BurntSushi/fst"
-repository = "https://github.com/BurntSushi/fst"
+documentation = "https://docs.rs/fst-no-std"
+homepage = "https://github.com/CrabNejonas/fst"
+repository = "https://github.com/CrabNejonas/fst"
 readme = "README.md"
 keywords = ["search", "information", "retrieval", "dictionary", "map"]
 license = "Unlicense/MIT"

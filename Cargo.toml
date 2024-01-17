@@ -1,5 +1,5 @@
 [package]
-name = "fst"
+name = "fst-no-std"
 version = "0.4.7"  #:version
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
 description = """
@@ -15,7 +15,7 @@ license = "Unlicense/MIT"
 edition = "2018"
 
 [workspace]
-members = ["bench", "fst-bin"]
+members = ["bench"]
 exclude = ["fst-levenshtein", "fst-regex"]
 
 [features]

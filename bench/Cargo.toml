@@ -20,4 +20,4 @@ path = "src/bench.rs"
 [dependencies]
 criterion = "0.3.1"
 fnv = "1.0.6"
-fst = { path = "..", features = ["levenshtein"] }
+fst-no-std = { path = "..", features = ["levenshtein"] }

@@ -1,29 +1,15 @@
-#[cfg(feature = "std")]
-use std::io;
-#[cfg(feature = "std")]
 use crate::bytes;
-#[cfg(feature = "std")]
 use crate::error::Result;
-#[cfg(feature = "alloc")]
 use crate::raw::counting_writer::CountingWriter;
-#[cfg(feature = "std")]
 use crate::raw::error::Error;
-#[cfg(feature = "alloc")]
 use crate::raw::registry::Registry;
-#[cfg(feature = "std")]
 use crate::raw::registry::RegistryEntry;
 use crate::raw::Output;
-#[cfg(feature = "alloc")]
-use crate::raw::{CompiledAddr, Fst, Transition};
-#[cfg(feature = "std")]
-use crate::raw::{
-     FstType, EMPTY_ADDRESS,
-    NONE_ADDRESS, VERSION,
-};
-#[cfg(feature = "std")]
+use crate::raw::{CompiledAddr, Transition};
+use crate::raw::{Fst, FstType, EMPTY_ADDRESS, NONE_ADDRESS, VERSION};
 use crate::stream::{IntoStreamer, Streamer};
-#[cfg(feature = "alloc")]
-use alloc::{vec::Vec, vec};
+use alloc::{vec, vec::Vec};
+use std::io;
 
 /// A builder for creating a finite state transducer.
 ///
@@ -53,7 +39,7 @@ use alloc::{vec::Vec, vec};
 ///
 /// The algorithmic complexity of fst construction is `O(n)` where `n` is the
 /// number of elements added to the fst.
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
     ///
@@ -344,7 +330,7 @@ impl<W: io::Write> Builder<W> {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl UnfinishedNodes {
     fn new() -> UnfinishedNodes {
         let mut unfinished = UnfinishedNodes { stack: Vec::with_capacity(64) };
@@ -442,7 +428,7 @@ impl UnfinishedNodes {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl BuilderNodeUnfinished {
     fn last_compiled(&mut self, addr: CompiledAddr) {
         if let Some(trans) = self.last.take() {

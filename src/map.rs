@@ -1,9 +1,11 @@
 #[cfg(feature = "alloc")]
 use core::fmt;
 #[cfg(feature = "std")]
-use std::io;
+use core::iter;
 #[cfg(feature = "alloc")]
-use core::iter::{self, FromIterator};
+use core::iter::FromIterator;
+#[cfg(feature = "std")]
+use std::io;
 
 #[cfg(feature = "alloc")]
 use crate::automaton::{AlwaysMatch, Automaton};
@@ -14,7 +16,7 @@ use crate::stream::IntoStreamer;
 use crate::stream::Streamer;
 use crate::Result;
 #[cfg(feature = "alloc")]
-use alloc::{vec::Vec, string::String};
+use alloc::{string::String, vec::Vec};
 
 /// Map is a lexicographically ordered map from byte strings to integers.
 ///
@@ -96,7 +98,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// # Example
     ///
     /// ```no_run
-    /// use fst::Map;
+    /// use fst_no_std::Map;
     ///
     /// // File written from a build script using MapBuilder.
     /// # const IGNORE: &str = stringify! {
@@ -115,7 +117,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Map;
+    /// use fst_no_std::Map;
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
     ///
@@ -133,7 +135,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Map;
+    /// use fst_no_std::Map;
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
     ///
@@ -161,7 +163,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// used. `while let` is useful instead:
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
     /// let mut stream = map.stream();
@@ -189,7 +191,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
     /// let mut stream = map.keys();
@@ -214,7 +216,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
     ///
     /// let map = Map::from_iter(vec![("a", 1), ("b", 2), ("c", 3)]).unwrap();
     /// let mut stream = map.values();
@@ -245,7 +247,7 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// Returns only the key-value pairs in the range given.
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
     ///
     /// let map = Map::from_iter(vec![
     ///     ("a", 1), ("b", 2), ("c", 3), ("d", 4), ("e", 5),
@@ -287,8 +289,8 @@ impl<D: AsRef<[u8]>> Map<D> {
     /// to search maps:
     ///
     /// ```rust
-    /// use fst::automaton::Subsequence;
-    /// use fst::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::automaton::Subsequence;
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
     ///
     /// # fn main() { example().unwrap(); }
     /// fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -338,8 +340,8 @@ An implementation of fuzzy search using Levenshtein automata can be used
 to search maps:
 
 ```rust
-use fst::automaton::Levenshtein;
-use fst::{IntoStreamer, Streamer, Map};
+use fst_no_std::automaton::Levenshtein;
+use fst_no_std::{IntoStreamer, Streamer, Map};
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -405,8 +407,8 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// that same key in the all of the streams.
     ///
     /// ```rust
-    /// use fst::{Streamer, Map};
-    /// use fst::map::IndexedValue;
+    /// use fst_no_std::{Streamer, Map};
+    /// use fst_no_std::map::IndexedValue;
     ///
     /// let map1 = Map::from_iter(vec![
     ///     ("a", 1), ("b", 2), ("c", 3),
@@ -461,7 +463,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// ```
     /// use std::borrow::Cow;
     ///
-    /// use fst::Map;
+    /// use fst_no_std::Map;
     ///
     /// let map: Map<Vec<u8>> = Map::from_iter(
     ///     [("hello", 12), ("world", 42)].iter().cloned(),
@@ -566,7 +568,7 @@ impl<'m, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'m Map<D> {
 /// goal without needing to explicitly use `MapBuilder`.
 ///
 /// ```rust
-/// use fst::{IntoStreamer, Streamer, Map, MapBuilder};
+/// use fst_no_std::{IntoStreamer, Streamer, Map, MapBuilder};
 ///
 /// let mut build = MapBuilder::memory();
 /// build.insert("bruce", 1).unwrap();
@@ -599,7 +601,7 @@ impl<'m, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'m Map<D> {
 /// use std::fs::File;
 /// use std::io;
 ///
-/// use fst::{IntoStreamer, Streamer, Map, MapBuilder};
+/// use fst_no_std::{IntoStreamer, Streamer, Map, MapBuilder};
 ///
 /// let mut wtr = io::BufWriter::new(File::create("map.fst").unwrap());
 /// let mut build = MapBuilder::new(wtr).unwrap();
@@ -626,7 +628,7 @@ impl<'m, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'m Map<D> {
 ///     (b"stevie".to_vec(), 3),
 /// ]);
 /// ```
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub struct MapBuilder<W>(raw::Builder<W>);
 
 #[cfg(feature = "std")]
@@ -1033,8 +1035,8 @@ impl<'m> OpBuilder<'m> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Map};
-    /// use fst::map::IndexedValue;
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::map::IndexedValue;
     ///
     /// let map1 = Map::from_iter(vec![
     ///     ("a", 1), ("b", 2), ("c", 3),
@@ -1078,8 +1080,8 @@ impl<'m> OpBuilder<'m> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Map};
-    /// use fst::map::IndexedValue;
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::map::IndexedValue;
     ///
     /// let map1 = Map::from_iter(vec![
     ///     ("a", 1), ("b", 2), ("c", 3),
@@ -1125,8 +1127,8 @@ impl<'m> OpBuilder<'m> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{Streamer, Map};
-    /// use fst::map::IndexedValue;
+    /// use fst_no_std::{Streamer, Map};
+    /// use fst_no_std::map::IndexedValue;
     ///
     /// let map1 = Map::from_iter(vec![
     ///     ("a", 1), ("b", 2), ("c", 3),
@@ -1171,8 +1173,8 @@ impl<'m> OpBuilder<'m> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Map};
-    /// use fst::map::IndexedValue;
+    /// use fst_no_std::{IntoStreamer, Streamer, Map};
+    /// use fst_no_std::map::IndexedValue;
     ///
     /// let map1 = Map::from_iter(vec![
     ///     ("a", 1), ("b", 2), ("c", 3),

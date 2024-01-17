@@ -19,6 +19,7 @@ pub fn read_u64_le(slice: &[u8]) -> u64 {
 /// Write a u32 in little endian format to the beginning of the given slice.
 /// This panics if the slice has length less than 4.
 #[inline]
+#[cfg(feature = "std")]
 pub fn write_u32_le(n: u32, slice: &mut [u8]) {
     assert!(slice.len() >= 4);
     let bytes = n.to_le_bytes();
@@ -41,6 +42,7 @@ pub fn io_write_u32_le<W: io::Write>(n: u32, mut wtr: W) -> io::Result<()> {
 /// Write a u64 in little endian format to the beginning of the given slice.
 /// This panics if the slice has length less than 8.
 #[inline]
+#[cfg(feature = "std")]
 pub fn write_u64_le(n: u64, slice: &mut [u8]) {
     assert!(slice.len() >= 8);
     let bytes = n.to_le_bytes();
@@ -113,6 +115,7 @@ pub fn unpack_uint(slice: &[u8], nbytes: u8) -> u64 {
 
 /// pack_size returns the smallest number of bytes that can encode `n`.
 #[inline]
+#[cfg(feature = "std")]
 pub fn pack_size(n: u64) -> u8 {
     if n < 1 << 8 {
         1

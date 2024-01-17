@@ -1,9 +1,9 @@
 use core::cmp;
 use core::fmt;
-#[cfg(feature = "alloc")]
-use alloc::collections::hash_map::Entry;
-#[cfg(feature = "alloc")]
-use alloc::collections::{HashMap, HashSet};
+#[cfg(feature = "std")]
+use std::collections::hash_map::Entry;
+#[cfg(feature = "std")]
+use std::collections::{HashMap, HashSet};
 
 use utf8_ranges::{Utf8Range, Utf8Sequences};
 
@@ -36,7 +36,11 @@ impl fmt::Display for LevenshteinError {
     }
 }
 
+#[cfg(not(feature = "std"))]
 impl core::error::Error for LevenshteinError {}
+
+#[cfg(feature = "std")]
+impl std::error::Error for LevenshteinError {}
 
 /// A Unicode aware Levenshtein automaton for running efficient fuzzy queries.
 ///

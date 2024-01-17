@@ -21,23 +21,29 @@ Most of the rest of the types are streams from set operations.
 use core::cmp;
 use core::fmt;
 
+#[cfg(feature = "alloc")]
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::bytes;
 use crate::error::Result;
+#[cfg(feature = "alloc")]
 use crate::stream::{IntoStreamer, Streamer};
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub use crate::raw::build::Builder;
 pub use crate::raw::error::Error;
 pub use crate::raw::node::{Node, Transitions};
 pub use crate::raw::ops::IndexedValue;
 #[cfg(feature = "alloc")]
-pub use crate::raw::ops::{Difference, Intersection, OpBuilder, SymmetricDifference, Union};
+pub use crate::raw::ops::{
+    Difference, Intersection, OpBuilder, SymmetricDifference, Union,
+};
 #[cfg(feature = "alloc")]
-use alloc::{vec::Vec, vec, borrow::ToOwned, string::String};
+use alloc::{borrow::ToOwned, string::String, vec, vec::Vec};
 
+#[cfg(feature = "std")]
 mod build;
 mod common_inputs;
+#[cfg(feature = "std")]
 mod counting_writer;
 mod crc32;
 mod crc32_table;
@@ -797,6 +803,7 @@ impl<'f> FstRef<'f> {
     }
 
     #[inline]
+    #[cfg(feature = "alloc")]
     fn empty_final_output(&self) -> Option<Output> {
         let root = self.root();
         if root.is_final() {
@@ -1111,6 +1118,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "alloc")]
 struct StreamState<'f, S> {
     node: Node<'f>,
     trans: usize,

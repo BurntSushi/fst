@@ -97,11 +97,11 @@ crate to make the file available as a `&[u8]` without necessarily reading it
 all into memory (the operating system will automatically handle that for you).
 
 ```rust,no_run
-# fn example() -> Result<(), fst::Error> {
+# fn example() -> Result<(), fst_no_std::Error> {
 use std::fs::File;
 use std::io;
 
-use fst::{IntoStreamer, Streamer, Map, MapBuilder};
+use fst_no_std::{IntoStreamer, Streamer, Map, MapBuilder};
 use memmap2::Mmap;
 
 // This is where we'll write our map to.
@@ -182,9 +182,9 @@ The example below shows how to find all keys that start with `B` or `G`. The
 example below uses sets, but the same operations are available on maps too.
 
 ```rust
-use fst::automaton::{Automaton, Str};
-use fst::set;
-use fst::{IntoStreamer, Set, Streamer};
+use fst_no_std::automaton::{Automaton, Str};
+use fst_no_std::set;
+use fst_no_std::{IntoStreamer, Set, Streamer};
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -312,10 +312,10 @@ doc_comment::doctest!("../README.md");
 pub use crate::automaton::Automaton;
 pub use crate::error::{Error, Result};
 pub use crate::map::Map;
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub use crate::map::MapBuilder;
 pub use crate::set::Set;
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub use crate::set::SetBuilder;
 pub use crate::stream::{IntoStreamer, Streamer};
 

@@ -1,12 +1,15 @@
-use core::cmp;
 #[cfg(feature = "alloc")]
-use alloc::{collections::BinaryHeap, boxed::Box};
+use crate::raw::Output;
+#[cfg(feature = "alloc")]
+use crate::stream::{IntoStreamer, Streamer};
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, collections::BinaryHeap};
 #[cfg(feature = "alloc")]
 use alloc::{vec, vec::Vec};
+#[cfg(feature = "alloc")]
+use core::cmp;
+#[cfg(feature = "alloc")]
 use core::iter::FromIterator;
-
-use crate::raw::Output;
-use crate::stream::{IntoStreamer, Streamer};
 
 /// Permits stream operations to be hetergeneous with respect to streams.
 #[cfg(feature = "alloc")]

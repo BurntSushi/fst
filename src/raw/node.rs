@@ -1,14 +1,16 @@
 #[cfg(feature = "std")]
 use core::cmp;
 use core::fmt;
+use core::ops::Range;
 #[cfg(feature = "std")]
 use std::io;
-use core::ops::Range;
 
 use crate::bytes;
 #[cfg(feature = "std")]
 use crate::raw::build::BuilderNode;
-use crate::raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
+#[cfg(feature = "std")]
+use crate::raw::common_inputs::COMMON_INPUTS;
+use crate::raw::common_inputs::COMMON_INPUTS_INV;
 use crate::raw::{
     u64_to_usize, CompiledAddr, Output, Transition, EMPTY_ADDRESS,
 };
@@ -330,11 +332,13 @@ impl StateOneTransNext {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn new() -> StateOneTransNext {
         StateOneTransNext(0b11_000000)
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_common_input(&mut self, input: u8) {
         self.0 = (self.0 & 0b11_000000) | common_idx(input, 0b111111);
     }
@@ -400,11 +404,13 @@ impl StateOneTrans {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn new() -> StateOneTrans {
         StateOneTrans(0b10_000000)
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_common_input(&mut self, input: u8) {
         self.0 = (self.0 & 0b10_000000) | common_idx(input, 0b111111);
     }
@@ -548,11 +554,13 @@ impl StateAnyTrans {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn new() -> StateAnyTrans {
         StateAnyTrans(0b00_000000)
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_final_state(&mut self, yes: bool) {
         if yes {
             self.0 |= 0b01_000000;
@@ -565,6 +573,7 @@ impl StateAnyTrans {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_state_ntrans(&mut self, n: u8) {
         if n <= 0b00_111111 {
             self.0 = (self.0 & 0b11_000000) | n;
@@ -755,11 +764,13 @@ impl PackSizes {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn encode(&self) -> u8 {
         self.0
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_transition_pack_size(&mut self, size: u8) {
         assert!(size <= 8);
         self.0 = (self.0 & 0b0000_1111) | (size << 4);
@@ -771,6 +782,7 @@ impl PackSizes {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_output_pack_size(&mut self, size: u8) {
         assert!(size <= 8);
         self.0 = (self.0 & 0b1111_0000) | size;
@@ -811,6 +823,7 @@ impl<'f, 'n> Iterator for Transitions<'f, 'n> {
 /// Nevertheless, the *caller* may have a priori knowledge that could be
 /// supplied to the builder manually, which could then be embedded in the FST.
 #[inline]
+#[cfg(feature = "std")]
 fn common_idx(input: u8, max: u8) -> u8 {
     let val = ((COMMON_INPUTS[input as usize] as u32 + 1) % 256) as u8;
     if val > max {
@@ -860,6 +873,7 @@ fn pack_delta_in<W: io::Write>(
 }
 
 #[inline]
+#[cfg(feature = "std")]
 fn pack_delta_size(node_addr: CompiledAddr, trans_addr: CompiledAddr) -> u8 {
     let delta_addr = if trans_addr == EMPTY_ADDRESS {
         EMPTY_ADDRESS

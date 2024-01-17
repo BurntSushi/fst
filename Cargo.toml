@@ -19,7 +19,7 @@ members = ["bench"]
 
 [features]
 default = ["std"]
-levenshtein = ["utf8-ranges"]
+levenshtein = ["utf8-ranges", "std"]
 std = ["alloc"]
 alloc = []
 

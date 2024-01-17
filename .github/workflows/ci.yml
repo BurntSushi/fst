@@ -34,8 +34,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly, stable]
-        features: ["", "--no-default-features", "--no-default-features --features alloc"]
+        include:
+          - rust: stable
+            features: ""
+          - rust: nightly
+            features: ""
+          - rust: nightly
+            features: "--no-default-features"
+          - rust: nightly
+            features: "--no-default-features --features alloc"
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v3

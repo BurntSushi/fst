@@ -1,10 +1,11 @@
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 use crate::raw::build::BuilderNode;
+#[cfg(feature = "std")]
 use crate::raw::{CompiledAddr, NONE_ADDRESS};
-#[cfg(feature = "alloc")]
-use alloc::{vec::Vec, vec};
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 #[derive(Debug)]
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub struct Registry {
     table: Vec<RegistryCell>,
     table_size: usize, // number of rows
@@ -12,27 +13,27 @@ pub struct Registry {
 }
 
 #[derive(Debug)]
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 struct RegistryCache<'a> {
     cells: &'a mut [RegistryCell],
 }
 
 #[derive(Clone, Debug)]
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub struct RegistryCell {
     addr: CompiledAddr,
     node: BuilderNode,
 }
 
 #[derive(Debug)]
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub enum RegistryEntry<'a> {
     Found(CompiledAddr),
     NotFound(&'a mut RegistryCell),
     Rejected,
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl Registry {
     pub fn new(table_size: usize, mru_size: usize) -> Registry {
         let empty_cell = RegistryCell::none();
@@ -69,7 +70,7 @@ impl Registry {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl<'a> RegistryCache<'a> {
     fn entry(mut self, node: &BuilderNode) -> RegistryEntry<'a> {
         if self.cells.len() == 1 {
@@ -120,7 +121,7 @@ impl<'a> RegistryCache<'a> {
     }
 }
 
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 impl RegistryCell {
     fn none() -> RegistryCell {
         RegistryCell { addr: NONE_ADDRESS, node: BuilderNode::default() }

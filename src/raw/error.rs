@@ -1,9 +1,10 @@
-use core::fmt;
-use core::str;
 #[cfg(feature = "alloc")]
 use alloc::string::FromUtf8Error;
 #[cfg(feature = "alloc")]
-use alloc::{vec::Vec, string::String, borrow::ToOwned, format};
+use alloc::{borrow::ToOwned, format, string::String, vec::Vec};
+use core::fmt;
+#[cfg(feature = "alloc")]
+use core::str;
 
 use crate::raw::FstType;
 

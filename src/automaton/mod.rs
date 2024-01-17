@@ -144,10 +144,10 @@ impl<'a, T: Automaton> Automaton for &'a T {
 /// starting with a given prefix.
 ///
 /// ```rust
-/// extern crate fst;
+/// extern crate fst_no_std;
 ///
-/// use fst::{Automaton, IntoStreamer, Streamer, Set};
-/// use fst::automaton::Str;
+/// use fst_no_std::{Automaton, IntoStreamer, Streamer, Set};
+/// use fst_no_std::automaton::Str;
 ///
 /// # fn main() { example().unwrap(); }
 /// fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -216,10 +216,10 @@ impl<'a> Automaton for Str<'a> {
 /// It can be used to build a simple fuzzy-finder.
 ///
 /// ```rust
-/// extern crate fst;
+/// extern crate fst_no_std;
 ///
-/// use fst::{IntoStreamer, Streamer, Set};
-/// use fst::automaton::Subsequence;
+/// use fst_no_std::{IntoStreamer, Streamer, Set};
+/// use fst_no_std::automaton::Subsequence;
 ///
 /// # fn main() { example().unwrap(); }
 /// fn example() -> Result<(), Box<dyn std::error::Error>> {

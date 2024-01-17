@@ -53,7 +53,7 @@ Check out the documentation for a lot more examples!
 * `alloc` - **Enabled** by default. Adds features that depend on `alloc`.
 * `levenshtein` - **Disabled** by default. This adds the `Levenshtein`
   automaton to the `automaton` sub-module. This includes an additional
-  dependency on `utf8-ranges`.
+  dependency on `utf8-ranges` and `std`.
 
 ### `no_std` Usage
 

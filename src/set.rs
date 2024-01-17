@@ -1,15 +1,20 @@
 #[cfg(feature = "alloc")]
-use core::fmt;
-#[cfg(feature = "std")]
-use std::io;
-use core::iter::{self, FromIterator};
-#[cfg(feature = "alloc")]
-use alloc::{vec::Vec, string::String};
-
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::raw;
-use crate::stream::{IntoStreamer, Streamer};
+#[cfg(feature = "alloc")]
+use crate::stream::IntoStreamer;
+use crate::stream::Streamer;
 use crate::Result;
+#[cfg(feature = "alloc")]
+use alloc::{string::String, vec::Vec};
+#[cfg(feature = "alloc")]
+use core::fmt;
+#[cfg(feature = "std")]
+use core::iter;
+#[cfg(feature = "alloc")]
+use core::iter::FromIterator;
+#[cfg(feature = "std")]
+use std::io;
 
 /// Set is a lexicographically ordered set of byte strings.
 ///
@@ -67,7 +72,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// # Example
     ///
     /// ```no_run
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// // File written from a build script using SetBuilder.
     /// # const IGNORE: &str = stringify! {
@@ -86,7 +91,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
     ///
@@ -113,7 +118,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// used. `while let` is useful instead:
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let mut stream = set.stream();
@@ -144,7 +149,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// Returns only the keys in the range given.
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set = Set::from_iter(&["a", "b", "c", "d", "e"]).unwrap();
     /// let mut stream = set.range().ge("b").lt("e").into_stream();
@@ -174,8 +179,8 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// to search sets:
     ///
     /// ```rust
-    /// use fst::automaton::Subsequence;
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::automaton::Subsequence;
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// # fn main() { example().unwrap(); }
     /// fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -220,8 +225,8 @@ An implementation of fuzzy search using Levenshtein automata can be used
 to search sets:
 
 ```rust
-use fst::automaton::Levenshtein;
-use fst::{IntoStreamer, Streamer, Set};
+use fst_no_std::automaton::Levenshtein;
+use fst_no_std::{IntoStreamer, Streamer, Set};
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -280,7 +285,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -307,7 +312,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
@@ -334,7 +339,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
@@ -362,7 +367,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
@@ -406,7 +411,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// ```
     /// use std::borrow::Cow;
     ///
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set: Set<Vec<u8>> = Set::from_iter(
     ///     &["hello", "world"],
@@ -509,7 +514,7 @@ impl<D: AsRef<[u8]>> From<raw::Fst<D>> for Set<D> {
 /// goal without needing to explicitly use `SetBuilder`.
 ///
 /// ```rust
-/// use fst::{IntoStreamer, Streamer, Set, SetBuilder};
+/// use fst_no_std::{IntoStreamer, Streamer, Set, SetBuilder};
 ///
 /// let mut build = SetBuilder::memory();
 /// build.insert("bruce").unwrap();
@@ -540,7 +545,7 @@ impl<D: AsRef<[u8]>> From<raw::Fst<D>> for Set<D> {
 /// use std::fs::File;
 /// use std::io;
 ///
-/// use fst::{IntoStreamer, Streamer, Set, SetBuilder};
+/// use fst_no_std::{IntoStreamer, Streamer, Set, SetBuilder};
 ///
 /// let mut wtr = io::BufWriter::new(File::create("set.fst").unwrap());
 /// let mut build = SetBuilder::new(wtr).unwrap();
@@ -565,7 +570,7 @@ impl<D: AsRef<[u8]>> From<raw::Fst<D>> for Set<D> {
 ///     "bruce".as_bytes(), "clarence".as_bytes(), "stevie".as_bytes(),
 /// ]);
 /// ```
-#[cfg(feature = "alloc")]
+#[cfg(feature = "std")]
 pub struct SetBuilder<W>(raw::Builder<W>);
 
 #[cfg(feature = "std")]
@@ -894,7 +899,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -917,7 +922,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -942,7 +947,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -972,7 +977,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();

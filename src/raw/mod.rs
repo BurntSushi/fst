@@ -1407,6 +1407,7 @@ impl fmt::Debug for Transition {
 
 #[inline]
 #[cfg(target_pointer_width = "64")]
+#[allow(clippy::cast_possible_truncation)]
 fn u64_to_usize(n: u64) -> usize {
     n as usize
 }

@@ -12,6 +12,7 @@ use crate::raw::FstType;
 ///
 /// This enum is non-exhaustive. New variants may be added to it in
 /// compatible releases.
+#[non_exhaustive]
 pub enum Error {
     /// A version mismatch occurred while reading a finite state transducer.
     ///
@@ -80,13 +81,6 @@ pub enum Error {
     /// An error that occurred when trying to decode a UTF-8 byte key.
     #[cfg(feature = "alloc")]
     FromUtf8(FromUtf8Error),
-    /// Hints that destructuring should not be exhaustive.
-    ///
-    /// This enum may grow additional variants, so this makes sure clients
-    /// don't count on exhaustive matching. (Otherwise, adding a new variant
-    /// could break existing code.)
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 impl fmt::Display for Error {
@@ -141,7 +135,6 @@ inserted in lexicographic order.",
 Error opening FST: expected type '{}', got type '{}'.",
                 expected, got
             ),
-            Error::__Nonexhaustive => unreachable!(),
         }
     }
 }

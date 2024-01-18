@@ -1,4 +1,8 @@
 /*!
+This is a fork of [fst](https://github.com/BurntSushi/fst) adding support for `no_std` targets (see [`no_std` usage](#no_std-usage) for details).
+
+If you're unsure whether to use this fork or the original one: Just use the original, chances are that's more up-to-date.
+
 Crate `fst` is a library for efficiently storing and searching ordered sets or
 maps where the keys are byte strings. A key design goal of this crate is to
 support storing and searching *very large* sets or maps (i.e., billions). This
@@ -20,7 +24,7 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
 ```plain
 [dependencies]
-fst = "0.4"
+fst-no-std = "0.4"
 ```
 
 The examples in this documentation will show the rest.

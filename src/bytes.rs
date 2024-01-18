@@ -29,7 +29,7 @@ pub fn write_u32_le(n: u32, slice: &mut [u8]) {
     slice[3] = bytes[3];
 }
 
-/// Like write_u32_le, but to an io::Write implementation. If every byte could
+/// Like `write_u32_le`, but to an `io::Write` implementation. If every byte could
 /// not be writen, then this returns an error.
 #[inline]
 #[cfg(feature = "std")]
@@ -56,7 +56,7 @@ pub fn write_u64_le(n: u64, slice: &mut [u8]) {
     slice[7] = bytes[7];
 }
 
-/// Like write_u64_le, but to an io::Write implementation. If every byte could
+/// Like `write_u64_le`, but to an `io::Write` implementation. If every byte could
 /// not be writen, then this returns an error.
 #[inline]
 #[cfg(feature = "std")]
@@ -66,20 +66,20 @@ pub fn io_write_u64_le<W: io::Write>(n: u64, mut wtr: W) -> io::Result<()> {
     wtr.write_all(&buf)
 }
 
-/// pack_uint packs the given integer in the smallest number of bytes possible,
+/// `pack_uint` packs the given integer in the smallest number of bytes possible,
 /// and writes it to the given writer. The number of bytes written is returned
 /// on success.
 #[inline]
 #[cfg(feature = "std")]
 pub fn pack_uint<W: io::Write>(wtr: W, n: u64) -> io::Result<u8> {
     let nbytes = pack_size(n);
-    pack_uint_in(wtr, n, nbytes).map(|_| nbytes)
+    pack_uint_in(wtr, n, nbytes).map(|()| nbytes)
 }
 
-/// pack_uint_in is like pack_uint, but always uses the number of bytes given
+/// `pack_uint_in` is like `pack_uint`, but always uses the number of bytes given
 /// to pack the number given.
 ///
-/// `nbytes` must be >= pack_size(n) and <= 8, where `pack_size(n)` is the
+/// `nbytes` must be >= `pack_size(n`) and <= 8, where `pack_size(n)` is the
 /// smallest number of bytes that can store the integer given.
 #[inline]
 #[cfg(feature = "std")]
@@ -88,32 +88,32 @@ pub fn pack_uint_in<W: io::Write>(
     mut n: u64,
     nbytes: u8,
 ) -> io::Result<()> {
-    assert!(1 <= nbytes && nbytes <= 8);
+    assert!((1..=8).contains(&nbytes));
     let mut buf = [0u8; 8];
     for i in 0..nbytes {
         buf[i as usize] = n as u8;
-        n = n >> 8;
+        n >>= 8;
     }
     wtr.write_all(&buf[..nbytes as usize])?;
     Ok(())
 }
 
-/// unpack_uint is the dual of pack_uint. It unpacks the integer at the current
+/// `unpack_uint` is the dual of `pack_uint`. It unpacks the integer at the current
 /// position in `slice` after reading `nbytes` bytes.
 ///
 /// `nbytes` must be >= 1 and <= 8.
 #[inline]
 pub fn unpack_uint(slice: &[u8], nbytes: u8) -> u64 {
-    assert!(1 <= nbytes && nbytes <= 8);
+    assert!((1..=8).contains(&nbytes));
 
     let mut n = 0;
     for (i, &b) in slice[..nbytes as usize].iter().enumerate() {
-        n = n | ((b as u64) << (8 * i));
+        n |= u64::from(b) << (8 * i);
     }
     n
 }
 
-/// pack_size returns the smallest number of bytes that can encode `n`.
+/// `pack_size` returns the smallest number of bytes that can encode `n`.
 #[inline]
 #[cfg(feature = "std")]
 pub fn pack_size(n: u64) -> u8 {

@@ -54,9 +54,16 @@ pub struct OpBuilder<'f> {
 }
 
 #[cfg(feature = "alloc")]
+impl<'f> Default for OpBuilder<'f> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'f> OpBuilder<'f> {
     /// Create a new set operation builder.
     #[inline]
+    #[must_use]
     pub fn new() -> OpBuilder<'f> {
         OpBuilder { streams: vec![] }
     }
@@ -99,6 +106,7 @@ impl<'f> OpBuilder<'f> {
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
     #[inline]
+    #[must_use]
     pub fn union(self) -> Union<'f> {
         Union {
             heap: StreamHeap::new(self.streams),
@@ -117,6 +125,7 @@ impl<'f> OpBuilder<'f> {
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
     #[inline]
+    #[must_use]
     pub fn intersection(self) -> Intersection<'f> {
         Intersection {
             heap: StreamHeap::new(self.streams),
@@ -141,6 +150,7 @@ impl<'f> OpBuilder<'f> {
     /// of `difference`, each yielded key contains exactly one `IndexValue` with
     /// `index` set to 0.
     #[inline]
+    #[must_use]
     pub fn difference(mut self) -> Difference<'f> {
         let first = self.streams.swap_remove(0);
         Difference {
@@ -168,6 +178,7 @@ impl<'f> OpBuilder<'f> {
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
     #[inline]
+    #[must_use]
     pub fn symmetric_difference(self) -> SymmetricDifference<'f> {
         SymmetricDifference {
             heap: StreamHeap::new(self.streams),
@@ -399,7 +410,7 @@ impl<'f> StreamHeap<'f> {
     }
 
     fn peek_is_duplicate(&self, key: &[u8]) -> bool {
-        self.heap.peek().map(|s| s.input() == key).unwrap_or(false)
+        self.heap.peek().is_some_and(|s| s.input() == key)
     }
 
     fn pop_if_equal(&mut self, key: &[u8]) -> Option<Slot> {
@@ -411,7 +422,7 @@ impl<'f> StreamHeap<'f> {
     }
 
     fn pop_if_le(&mut self, key: &[u8]) -> Option<Slot> {
-        if self.heap.peek().map(|s| s.input() <= key).unwrap_or(false) {
+        if self.heap.peek().is_some_and(|s| s.input() <= key) {
             self.pop()
         } else {
             None
@@ -468,11 +479,12 @@ impl Slot {
 }
 
 #[cfg(feature = "alloc")]
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Slot {
     fn partial_cmp(&self, other: &Slot) -> Option<cmp::Ordering> {
         (&self.input, self.output)
             .partial_cmp(&(&other.input, other.output))
-            .map(|ord| ord.reverse())
+            .map(std::cmp::Ordering::reverse)
     }
 }
 

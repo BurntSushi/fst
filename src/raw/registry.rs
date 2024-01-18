@@ -57,12 +57,12 @@ impl Registry {
         //
         // In unscientific experiments, this provides the same compression
         // as `std::hash::SipHasher` but is much much faster.
-        const FNV_PRIME: u64 = 1099511628211;
-        let mut h = 14695981039346656037;
-        h = (h ^ (node.is_final as u64)).wrapping_mul(FNV_PRIME);
+        const FNV_PRIME: u64 = 1_099_511_628_211;
+        let mut h = 14_695_981_039_346_656_037;
+        h = (h ^ u64::from(node.is_final)).wrapping_mul(FNV_PRIME);
         h = (h ^ node.final_output.value()).wrapping_mul(FNV_PRIME);
         for t in &node.trans {
-            h = (h ^ (t.inp as u64)).wrapping_mul(FNV_PRIME);
+            h = (h ^ u64::from(t.inp)).wrapping_mul(FNV_PRIME);
             h = (h ^ t.out.value()).wrapping_mul(FNV_PRIME);
             h = (h ^ (t.addr as u64)).wrapping_mul(FNV_PRIME);
         }
@@ -157,11 +157,11 @@ mod tests {
     }
 
     fn assert_insert_and_found(reg: &mut Registry, bnode: &BuilderNode) {
-        match reg.entry(&bnode) {
+        match reg.entry(bnode) {
             RegistryEntry::NotFound(cell) => cell.insert(1234),
             entry => panic!("unexpected not found entry, got: {:?}", entry),
         }
-        match reg.entry(&bnode) {
+        match reg.entry(bnode) {
             RegistryEntry::Found(addr) => assert_eq!(addr, 1234),
             entry => panic!("unexpected found entry, got: {:?}", entry),
         }

@@ -173,6 +173,7 @@ pub struct Str<'a> {
 impl<'a> Str<'a> {
     /// Constructs automaton that matches an exact string.
     #[inline]
+    #[must_use]
     pub fn new(string: &'a str) -> Str<'a> {
         Str { string: string.as_bytes() }
     }
@@ -201,7 +202,7 @@ impl<'a> Automaton for Str<'a> {
         // if we aren't already past the end...
         if let Some(pos) = *pos {
             // and there is still a matching byte at the current position...
-            if self.string.get(pos).cloned() == Some(byte) {
+            if self.string.get(pos).copied() == Some(byte) {
                 // then move forward
                 return Some(pos + 1);
             }
@@ -246,6 +247,7 @@ impl<'a> Subsequence<'a> {
     /// Constructs automaton that matches input containing the
     /// specified subsequence.
     #[inline]
+    #[must_use]
     pub fn new(subsequence: &'a str) -> Subsequence<'a> {
         Subsequence { subseq: subsequence.as_bytes() }
     }
@@ -279,7 +281,7 @@ impl<'a> Automaton for Subsequence<'a> {
         if state == self.subseq.len() {
             return state;
         }
-        state + (byte == self.subseq[state]) as usize
+        state + usize::from(byte == self.subseq[state])
     }
 }
 
@@ -294,25 +296,21 @@ impl Automaton for AlwaysMatch {
     type State = ();
 
     #[inline]
-    fn start(&self) -> () {
-        ()
-    }
+    fn start(&self) {}
     #[inline]
-    fn is_match(&self, _: &()) -> bool {
+    fn is_match(&self, (): &()) -> bool {
         true
     }
     #[inline]
-    fn can_match(&self, _: &()) -> bool {
+    fn can_match(&self, (): &()) -> bool {
         true
     }
     #[inline]
-    fn will_always_match(&self, _: &()) -> bool {
+    fn will_always_match(&self, (): &()) -> bool {
         true
     }
     #[inline]
-    fn accept(&self, _: &(), _: u8) -> () {
-        ()
-    }
+    fn accept(&self, (): &(), _: u8) {}
 }
 
 /// An automaton that matches a string that begins with something that the

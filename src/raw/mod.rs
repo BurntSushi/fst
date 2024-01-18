@@ -75,14 +75,14 @@ const EMPTY_ADDRESS: CompiledAddr = 0;
 /// This is never the address of a node in a serialized transducer.
 const NONE_ADDRESS: CompiledAddr = 1;
 
-/// FstType is a convention used to indicate the type of the underlying
+/// `FstType` is a convention used to indicate the type of the underlying
 /// transducer.
 ///
 /// This crate reserves the range 0-255 (inclusive) but currently leaves the
 /// meaning of 0-255 unspecified.
 pub type FstType = u64;
 
-/// CompiledAddr is the type used to address nodes in a finite state
+/// `CompiledAddr` is the type used to address nodes in a finite state
 /// transducer.
 ///
 /// It is most useful as a pointer to nodes. It can be used in the `Fst::node`
@@ -361,7 +361,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
         // N bytes (no unexpected EOF).
-        let version = bytes::read_u64_le(&bytes);
+        let version = bytes::read_u64_le(bytes);
         if version == 0 || version > VERSION {
             return Err(
                 Error::Version { expected: VERSION, got: version }.into()
@@ -589,7 +589,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     {
         let mut op = self.op().add(stream).intersection();
         let mut count = 0;
-        while let Some(_) = op.next() {
+        while op.next().is_some() {
             count += 1;
         }
         count == self.len()
@@ -609,7 +609,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     {
         let mut op = self.op().add(stream).union();
         let mut count = 0;
-        while let Some(_) = op.next() {
+        while op.next().is_some() {
             count += 1;
         }
         count == self.len()
@@ -617,7 +617,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
 
     /// Returns the underlying type of this fst.
     ///
-    /// FstType is a convention used to indicate the type of the underlying
+    /// `FstType` is a convention used to indicate the type of the underlying
     /// transducer.
     ///
     /// This crate reserves the range 0-255 (inclusive) but currently leaves
@@ -1001,10 +1001,7 @@ impl Bound {
 
     #[inline]
     fn is_inclusive(&self) -> bool {
-        match *self {
-            Bound::Excluded(_) => false,
-            _ => true,
-        }
+        matches!(*self, Bound::Included(_) | Bound::Unbounded)
     }
 }
 
@@ -1090,7 +1087,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
     type Item = (&'a [u8], Output);
 
     fn next(&'a mut self) -> Option<(&'a [u8], Output)> {
-        self.0.next_with(|_| ()).map(|(key, out, _)| (key, out))
+        self.0.next_with(|_| ()).map(|(key, out, ())| (key, out))
     }
 }
 
@@ -1301,7 +1298,7 @@ where
     type Item = (&'a [u8], Output, A::State);
 
     fn next(&'a mut self) -> Option<(&'a [u8], Output, A::State)> {
-        self.next_with(|state| state.clone())
+        self.next_with(std::clone::Clone::clone)
     }
 }
 
@@ -1324,48 +1321,55 @@ pub struct Output(u64);
 impl Output {
     /// Create a new output from a `u64`.
     #[inline]
+    #[must_use]
     pub fn new(v: u64) -> Output {
         Output(v)
     }
 
     /// Create a zero output.
     #[inline]
+    #[must_use]
     pub fn zero() -> Output {
         Output(0)
     }
 
     /// Retrieve the value inside this output.
     #[inline]
+    #[must_use]
     pub fn value(self) -> u64 {
         self.0
     }
 
     /// Returns true if this is a zero output.
     #[inline]
+    #[must_use]
     pub fn is_zero(self) -> bool {
         self.0 == 0
     }
 
     /// Returns the prefix of this output and `o`.
     #[inline]
+    #[must_use]
     pub fn prefix(self, o: Output) -> Output {
         Output(cmp::min(self.0, o.0))
     }
 
     /// Returns the concatenation of this output and `o`.
     #[inline]
+    #[must_use]
     pub fn cat(self, o: Output) -> Output {
         Output(self.0 + o.0)
     }
+}
 
-    /// Returns the subtraction of `o` from this output.
-    ///
-    /// This function panics if `self < o`.
+impl core::ops::Sub for Output {
+    type Output = Output;
+
     #[inline]
-    pub fn sub(self, o: Output) -> Output {
-        Output(
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(
             self.0
-                .checked_sub(o.0)
+                .checked_sub(rhs.0)
                 .expect("BUG: underflow subtraction not allowed"),
         )
     }

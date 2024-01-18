@@ -47,7 +47,7 @@ impl<'f> fmt::Debug for Node<'f> {
         writeln!(f, "  # transitions: {}", self.len())?;
         writeln!(f, "  transitions:")?;
         for t in self.transitions() {
-            writeln!(f, "    {:?}", t)?;
+            writeln!(f, "    {t:?}")?;
         }
         Ok(())
     }
@@ -76,7 +76,7 @@ impl<'f> Node<'f> {
                 final_output: Output::zero(),
             },
             State::OneTransNext(s) => {
-                let data = &data[..addr + 1];
+                let data = &data[..=addr];
                 Node {
                     data,
                     version,
@@ -90,7 +90,7 @@ impl<'f> Node<'f> {
                 }
             }
             State::OneTrans(s) => {
-                let data = &data[..addr + 1];
+                let data = &data[..=addr];
                 let sizes = s.sizes(data);
                 Node {
                     data,
@@ -105,7 +105,7 @@ impl<'f> Node<'f> {
                 }
             }
             State::AnyTrans(s) => {
-                let data = &data[..addr + 1];
+                let data = &data[..=addr];
                 let sizes = s.sizes(data);
                 let ntrans = s.ntrans(data);
                 Node {
@@ -125,13 +125,13 @@ impl<'f> Node<'f> {
     /// Returns an iterator over all transitions in this node in lexicographic
     /// order.
     #[inline]
-    pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
+    #[must_use] pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
         Transitions { node: self, range: 0..self.len() }
     }
 
     /// Returns the transition at index `i`.
     #[inline(always)]
-    pub fn transition(&self, i: usize) -> Transition {
+    #[must_use] pub fn transition(&self, i: usize) -> Transition {
         // The `inline(always)` annotation on this function appears to
         // dramatically speed up FST traversal. In particular, measuring the
         // time it takes to run `fst range something-big.fst` shows almost a 2x
@@ -165,7 +165,7 @@ impl<'f> Node<'f> {
 
     /// Returns the transition address of the `i`th transition.
     #[inline]
-    pub fn transition_addr(&self, i: usize) -> CompiledAddr {
+    #[must_use] pub fn transition_addr(&self, i: usize) -> CompiledAddr {
         match self.state {
             State::OneTransNext(s) => {
                 assert!(i == 0);
@@ -184,7 +184,7 @@ impl<'f> Node<'f> {
     ///
     /// If no transition for this byte exists, then `None` is returned.
     #[inline]
-    pub fn find_input(&self, b: u8) -> Option<usize> {
+    #[must_use] pub fn find_input(&self, b: u8) -> Option<usize> {
         match self.state {
             State::OneTransNext(s) if s.input(self) == b => Some(0),
             State::OneTransNext(_) => None,
@@ -198,14 +198,14 @@ impl<'f> Node<'f> {
     /// If this node is final and has a terminal output value, then it is
     /// returned. Otherwise, a zero output is returned.
     #[inline]
-    pub fn final_output(&self) -> Output {
+    #[must_use] pub fn final_output(&self) -> Output {
         self.final_output
     }
 
     /// Returns true if and only if this node corresponds to a final or "match"
     /// state in the finite state transducer.
     #[inline]
-    pub fn is_final(&self) -> bool {
+    #[must_use] pub fn is_final(&self) -> bool {
         self.is_final
     }
 
@@ -213,31 +213,31 @@ impl<'f> Node<'f> {
     ///
     /// The maximum number of transitions is 256.
     #[inline]
-    pub fn len(&self) -> usize {
+    #[must_use] pub fn len(&self) -> usize {
         self.ntrans
     }
 
     /// Returns true if and only if this node has zero transitions.
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub fn is_empty(&self) -> bool {
         self.ntrans == 0
     }
 
     /// Return the address of this node.
     #[inline]
-    pub fn addr(&self) -> CompiledAddr {
+    #[must_use] pub fn addr(&self) -> CompiledAddr {
         self.start
     }
 
     #[doc(hidden)]
     #[inline]
-    pub fn as_slice(&self) -> &[u8] {
+    #[must_use] pub fn as_slice(&self) -> &[u8] {
         &self.data[self.end..]
     }
 
     #[doc(hidden)]
     #[inline]
-    pub fn state(&self) -> &'static str {
+    #[must_use] pub fn state(&self) -> &'static str {
         match self.state {
             State::OneTransNext(_) => "OTN",
             State::OneTrans(_) => "OT",
@@ -258,15 +258,13 @@ impl<'f> Node<'f> {
             && node.is_final
             && node.final_output.is_zero()
         {
-            return Ok(());
+            Ok(())
         } else if node.trans.len() != 1 || node.is_final {
             StateAnyTrans::compile(wtr, addr, node)
+        } else if node.trans[0].addr == last_addr && node.trans[0].out.is_zero() {
+            StateOneTransNext::compile(wtr, addr, node.trans[0].inp)
         } else {
-            if node.trans[0].addr == last_addr && node.trans[0].out.is_zero() {
-                StateOneTransNext::compile(wtr, addr, node.trans[0].inp)
-            } else {
-                StateOneTrans::compile(wtr, addr, node.trans[0])
-            }
+            StateOneTrans::compile(wtr, addr, node.trans[0])
         }
     }
 }
@@ -340,7 +338,7 @@ impl StateOneTransNext {
     #[inline]
     #[cfg(feature = "std")]
     fn set_common_input(&mut self, input: u8) {
-        self.0 = (self.0 & 0b11_000000) | common_idx(input, 0b111111);
+        self.0 = (self.0 & 0b11_000000) | common_idx(input, 0b11_1111);
     }
 
     #[inline]
@@ -350,11 +348,7 @@ impl StateOneTransNext {
 
     #[inline]
     fn input_len(&self) -> usize {
-        if self.common_input().is_none() {
-            1
-        } else {
-            0
-        }
+        usize::from(self.common_input().is_none())
     }
 
     #[inline]
@@ -412,7 +406,7 @@ impl StateOneTrans {
     #[inline]
     #[cfg(feature = "std")]
     fn set_common_input(&mut self, input: u8) {
-        self.0 = (self.0 & 0b10_000000) | common_idx(input, 0b111111);
+        self.0 = (self.0 & 0b10_000000) | common_idx(input, 0b11_1111);
     }
 
     #[inline]
@@ -422,11 +416,7 @@ impl StateOneTrans {
 
     #[inline]
     fn input_len(&self) -> usize {
-        if self.common_input().is_none() {
-            1
-        } else {
-            0
-        }
+        usize::from(self.common_input().is_none())
     }
 
     #[inline]
@@ -618,11 +608,7 @@ impl StateAnyTrans {
 
     #[inline]
     fn ntrans_len(&self) -> usize {
-        if self.state_ntrans().is_none() {
-            1
-        } else {
-            0
-        }
+        usize::from(self.state_ntrans().is_none())
     }
 
     #[inline]
@@ -812,7 +798,7 @@ impl<'f, 'n> Iterator for Transitions<'f, 'n> {
     }
 }
 
-/// common_idx translate a byte to an index in the COMMON_INPUTS_INV array.
+/// `common_idx` translate a byte to an index in the `COMMON_INPUTS_INV` array.
 ///
 /// I wonder if it would be prudent to store this mapping in the FST itself.
 /// The advantage of doing so would mean that common inputs would reflect the
@@ -825,7 +811,7 @@ impl<'f, 'n> Iterator for Transitions<'f, 'n> {
 #[inline]
 #[cfg(feature = "std")]
 fn common_idx(input: u8, max: u8) -> u8 {
-    let val = ((COMMON_INPUTS[input as usize] as u32 + 1) % 256) as u8;
+    let val = ((u32::from(COMMON_INPUTS[input as usize]) + 1) % 256) as u8;
     if val > max {
         0
     } else {
@@ -833,7 +819,7 @@ fn common_idx(input: u8, max: u8) -> u8 {
     }
 }
 
-/// common_input translates a common input index stored in a serialized FST
+/// `common_input` translates a common input index stored in a serialized FST
 /// to the corresponding byte.
 #[inline]
 fn common_input(idx: u8) -> Option<u8> {
@@ -927,16 +913,16 @@ mod tests {
             }
             TestResult::from_bool(bs == words)
         }
-        quickcheck(p as fn(Vec<Vec<u8>>) -> TestResult)
+        quickcheck(p as fn(Vec<Vec<u8>>) -> TestResult);
     }
 
     fn nodes_equal(compiled: &Node, uncompiled: &BuilderNode) -> bool {
-        println!("{:?}", compiled);
+        println!("{compiled:?}");
         assert_eq!(compiled.is_final(), uncompiled.is_final);
         assert_eq!(compiled.len(), uncompiled.trans.len());
         assert_eq!(compiled.final_output(), uncompiled.final_output);
         for (ct, ut) in
-            compiled.transitions().zip(uncompiled.trans.iter().cloned())
+            compiled.transitions().zip(uncompiled.trans.iter().copied())
         {
             assert_eq!(ct.inp, ut.inp);
             assert_eq!(ct.out, ut.out);
@@ -954,7 +940,7 @@ mod tests {
     fn roundtrip(bnode: &BuilderNode) -> bool {
         let (addr, bytes) = compile(bnode);
         let node = Node::new(VERSION, addr, &bytes);
-        nodes_equal(&node, &bnode)
+        nodes_equal(&node, bnode)
     }
 
     fn trans(addr: CompiledAddr, inp: u8) -> Transition {

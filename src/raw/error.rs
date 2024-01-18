@@ -91,24 +91,21 @@ impl fmt::Display for Error {
             Error::Version { expected, got } => write!(
                 f,
                 "\
-Error opening FST: expected API version {}, got API version {}. \
+Error opening FST: expected API version {expected}, got API version {got}. \
 It looks like the FST you're trying to open is either not an FST file or it \
 was generated with a different version of the 'fst' crate. You'll either need \
 to change the version of the 'fst' crate you're using, or re-generate the
-FST.",
-                expected, got
+FST."
             ),
             Error::Format { size } => write!(
                 f,
                 "\
-Error opening FST with size {} bytes: An unknown error occurred. This \
-usually means you're trying to read data that isn't actually an encoded FST.",
-                size
+Error opening FST with size {size} bytes: An unknown error occurred. This \
+usually means you're trying to read data that isn't actually an encoded FST."
             ),
             Error::ChecksumMismatch { expected, got } => write!(
                 f,
-                "FST verification failed: expected checksum of {} but got {}",
-                expected, got,
+                "FST verification failed: expected checksum of {expected} but got {got}",
             ),
             Error::ChecksumMissing => write!(
                 f,
@@ -118,7 +115,7 @@ usually means you're trying to read data that isn't actually an encoded FST.",
             Error::DuplicateKey { ref got } => write!(
                 f,
                 "Error inserting duplicate key: '{}'.",
-                format_bytes(&*got)
+                format_bytes(got)
             ),
             #[cfg(feature = "alloc")]
             Error::OutOfOrder { ref previous, ref got } => write!(
@@ -126,14 +123,13 @@ usually means you're trying to read data that isn't actually an encoded FST.",
                 "\
 Error inserting out-of-order key: '{}'. (Previous key was '{}'.) Keys must be \
 inserted in lexicographic order.",
-                format_bytes(&*got),
-                format_bytes(&*previous)
+                format_bytes(got),
+                format_bytes(previous)
             ),
             Error::WrongType { expected, got } => write!(
                 f,
                 "\
-Error opening FST: expected type '{}', got type '{}'.",
-                expected, got
+Error opening FST: expected type '{expected}', got type '{got}'."
             ),
         }
     }
@@ -184,6 +180,6 @@ impl From<FromUtf8Error> for Error {
 fn format_bytes(bytes: &[u8]) -> String {
     match str::from_utf8(bytes) {
         Ok(s) => s.to_owned(),
-        Err(_) => format!("{:?}", bytes),
+        Err(_) => format!("{bytes:?}"),
     }
 }

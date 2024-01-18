@@ -6,7 +6,7 @@ use fst_no_std::raw::{Builder, Fst};
 use fst_no_std::set::Set;
 use fst_no_std::{self, Automaton, IntoStreamer, Streamer};
 
-static WORDS: &'static str = include_str!("../data/words-10000");
+static WORDS: &str = include_str!("../data/words-10000");
 
 fn get_set() -> Set<Vec<u8>> {
     Set::from_iter(WORDS.lines()).unwrap()
@@ -22,7 +22,7 @@ where
     let mut ss: Vec<Vec<u8>> =
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
     ss.sort();
-    for s in ss.iter().into_iter() {
+    for s in ss.iter() {
         bfst.add(s).unwrap();
     }
     let fst = bfst.into_fst();

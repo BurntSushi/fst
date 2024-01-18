@@ -52,8 +52,8 @@ This requires the `levenshtein` feature in this crate to be enabled. It is not
 enabled by default.
 
 ```rust
-use fst::{IntoStreamer, Streamer, Set};
-use fst::automaton::Levenshtein;
+use fst_no_std::{IntoStreamer, Streamer, Set};
+use fst_no_std::automaton::Levenshtein;
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -300,8 +300,9 @@ data structures found in the standard library, such as `BTreeSet` and
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), feature(error_in_core))]
+#![deny(missing_docs)]
+#![allow(clippy::should_implement_trait)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

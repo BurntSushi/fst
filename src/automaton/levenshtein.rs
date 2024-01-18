@@ -29,8 +29,7 @@ impl fmt::Display for LevenshteinError {
             LevenshteinError::TooManyStates(size_limit) => write!(
                 f,
                 "Levenshtein automaton exceeds size limit of \
-                           {} states",
-                size_limit
+                           {size_limit} states"
             ),
         }
     }
@@ -61,27 +60,26 @@ impl std::error::Error for LevenshteinError {}
 /// from `foo`.
 ///
 /// ```rust
-/// use fst::automaton::Levenshtein;
-/// use fst::{IntoStreamer, Streamer, Set};
+/// use fst_no_std::automaton::Levenshtein;
+/// use fst_no_std::{IntoStreamer, Streamer, Set};
 ///
-/// fn main() {
-///     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-///     let set = Set::from_iter(keys).unwrap();
+/// let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+/// let set = Set::from_iter(keys).unwrap();
 ///
-///     let lev = Levenshtein::new("foo", 1).unwrap();
-///     let mut stream = set.search(&lev).into_stream();
+/// let lev = Levenshtein::new("foo", 1).unwrap();
+/// let mut stream = set.search(&lev).into_stream();
 ///
-///     let mut keys = vec![];
-///     while let Some(key) = stream.next() {
-///         keys.push(key.to_vec());
-///     }
-///     assert_eq!(keys, vec![
-///         "fo".as_bytes(),   // 1 deletion
-///         "fob".as_bytes(),  // 1 substitution
-///         "foo".as_bytes(),  // 0 insertions/deletions/substitutions
-///         "food".as_bytes(), // 1 insertion
-///     ]);
+/// let mut keys = vec![];
+/// while let Some(key) = stream.next() {
+///     keys.push(key.to_vec());
 /// }
+///
+/// assert_eq!(keys, vec![
+///    "fo".as_bytes(),   // 1 deletion
+///     "fob".as_bytes(),  // 1 substitution
+///     "foo".as_bytes(),  // 0 insertions/deletions/substitutions
+///     "food".as_bytes(), // 1 insertion
+/// ]);
 /// ```
 ///
 /// This example only uses ASCII characters, but it will work equally well
@@ -182,17 +180,17 @@ impl DynamicLevenshtein {
     }
 
     fn is_match(&self, state: &[usize]) -> bool {
-        state.last().map(|&n| n <= self.dist).unwrap_or(false)
+        state.last().is_some_and(|&n| n <= self.dist)
     }
 
     fn can_match(&self, state: &[usize]) -> bool {
-        state.iter().min().map(|&n| n <= self.dist).unwrap_or(false)
+        state.iter().min().is_some_and(|&n| n <= self.dist)
     }
 
     fn accept(&self, state: &[usize], chr: Option<char>) -> Vec<usize> {
         let mut next = vec![state[0] + 1];
         for (i, c) in self.query.chars().enumerate() {
-            let cost = if Some(c) == chr { 0 } else { 1 };
+            let cost = usize::from(Some(c) != chr);
             let v = cmp::min(
                 cmp::min(next[i] + 1, state[i + 1] + 1),
                 state[i] + cost,
@@ -245,7 +243,7 @@ impl fmt::Debug for State {
         writeln!(f, "  is_match: {:?}", self.is_match)?;
         for i in 0..256 {
             if let Some(si) = self.next[i] {
-                writeln!(f, "  {:?}: {:?}", i, si)?;
+                writeln!(f, "  {i:?}: {si:?}")?;
             }
         }
         write!(f, "}}")
@@ -341,7 +339,7 @@ impl DfaBuilder {
             // Some((si, false)) => si,
         };
         self.add_utf8_sequences(false, from_si, to_si, '\u{0}', '\u{10FFFF}');
-        return Some((to_si, mismatch_state));
+        Some((to_si, mismatch_state))
     }
 
     fn add_utf8_sequences(
@@ -375,7 +373,7 @@ impl DfaBuilder {
         to: usize,
         range: &Utf8Range,
     ) {
-        for b in range.start as usize..range.end as usize + 1 {
+        for b in (range.start as usize)..=(range.end as usize) {
             if overwrite || self.dfa.states[from].next[b].is_none() {
                 self.dfa.states[from].next[b] = Some(to);
             }

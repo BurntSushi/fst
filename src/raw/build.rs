@@ -103,6 +103,7 @@ struct LastTransition {
 impl Builder<Vec<u8>> {
     /// Create a builder that builds an fst in memory.
     #[inline]
+    #[must_use]
     pub fn memory() -> Builder<Vec<u8>> {
         Builder::new(Vec::with_capacity(10 * (1 << 10))).unwrap()
     }
@@ -284,7 +285,7 @@ impl<W: io::Write> Builder<W> {
         {
             return Ok(EMPTY_ADDRESS);
         }
-        let entry = self.registry.entry(&node);
+        let entry = self.registry.entry(node);
         if let RegistryEntry::Found(ref addr) = entry {
             return Ok(*addr);
         }
@@ -304,7 +305,7 @@ impl<W: io::Write> Builder<W> {
             }
             if bs < &**last {
                 return Err(Error::OutOfOrder {
-                    previous: last.to_vec(),
+                    previous: last.clone(),
                     got: bs.to_vec(),
                 }
                 .into());
@@ -396,8 +397,8 @@ impl UnfinishedNodes {
     fn find_common_prefix(&mut self, bs: &[u8]) -> usize {
         bs.iter()
             .zip(&self.stack)
-            .take_while(|&(&b, ref node)| {
-                node.last.as_ref().map(|t| t.inp == b).unwrap_or(false)
+            .take_while(|&(&b, node)| {
+                node.last.as_ref().is_some_and(|t| t.inp == b)
             })
             .count()
     }
@@ -413,8 +414,8 @@ impl UnfinishedNodes {
                 Some(ref mut t) if t.inp == bs[i] => {
                     i += 1;
                     let common_pre = t.out.prefix(out);
-                    let add_prefix = t.out.sub(common_pre);
-                    out = out.sub(common_pre);
+                    let add_prefix = t.out - common_pre;
+                    out = out - common_pre;
                     t.out = common_pre;
                     add_prefix
                 }

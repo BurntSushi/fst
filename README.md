@@ -1,7 +1,7 @@
 fst no-std mode
 ===
 
-This is a fork of [fst](https://github.com/BurntSushi/fst) adding support for `no_std` targets (see [`no_std` usage](#no-std-usage) for details).
+This is a fork of [fst](https://github.com/BurntSushi/fst) adding support for `no_std` targets (see [`no_std` usage](#no_std-usage) for details).
 
 If you're unsure whether to use this fork or the original one: Just use the original, chances are that's more up-to-date.
 

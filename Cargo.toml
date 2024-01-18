@@ -1,6 +1,6 @@
 [package]
 name = "fst-no-std"
-version = "0.4.7"  #:version
+version = "0.4.7"
 authors = ["Andrew Gallant <jamslam@gmail.com>", "Jonas Kruckenberg <jonas@crabnebula.dev>"]
 description = """
 Use finite state transducers to compactly represents sets or maps of many

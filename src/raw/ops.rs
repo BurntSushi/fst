@@ -60,6 +60,7 @@ impl<'f> Default for OpBuilder<'f> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f> OpBuilder<'f> {
     /// Create a new set operation builder.
     #[inline]
@@ -484,7 +485,7 @@ impl PartialOrd for Slot {
     fn partial_cmp(&self, other: &Slot) -> Option<cmp::Ordering> {
         (&self.input, self.output)
             .partial_cmp(&(&other.input, other.output))
-            .map(std::cmp::Ordering::reverse)
+            .map(core::cmp::Ordering::reverse)
     }
 }
 

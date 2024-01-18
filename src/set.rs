@@ -867,6 +867,7 @@ impl<'s> Default for OpBuilder<'s> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'s> OpBuilder<'s> {
     /// Create a new set operation builder.
     #[inline]

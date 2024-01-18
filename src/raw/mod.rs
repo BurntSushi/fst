@@ -1298,7 +1298,7 @@ where
     type Item = (&'a [u8], Output, A::State);
 
     fn next(&'a mut self) -> Option<(&'a [u8], Output, A::State)> {
-        self.next_with(std::clone::Clone::clone)
+        self.next_with(Clone::clone)
     }
 }
 

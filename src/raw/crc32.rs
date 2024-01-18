@@ -20,7 +20,7 @@ impl CheckSummer {
     /// robust with respect to data that contains the checksum itself.
     pub fn masked(&self) -> u32 {
         let sum = self.sum;
-        (sum.wrapping_shr(15) | sum.wrapping_shl(17)).wrapping_add(0xA282EAD8)
+        (sum.wrapping_shr(15) | sum.wrapping_shl(17)).wrapping_add(0xA282_EAD8)
     }
 
     /// Update the current checksum with the checksum for the given bytes.

@@ -144,10 +144,10 @@ impl<'a, T: Automaton> Automaton for &'a T {
 /// starting with a given prefix.
 ///
 /// ```rust
-/// extern crate fst;
+/// extern crate fst_no_std;
 ///
-/// use fst::{Automaton, IntoStreamer, Streamer, Set};
-/// use fst::automaton::Str;
+/// use fst_no_std::{Automaton, IntoStreamer, Streamer, Set};
+/// use fst_no_std::automaton::Str;
 ///
 /// # fn main() { example().unwrap(); }
 /// fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -173,6 +173,7 @@ pub struct Str<'a> {
 impl<'a> Str<'a> {
     /// Constructs automaton that matches an exact string.
     #[inline]
+    #[must_use]
     pub fn new(string: &'a str) -> Str<'a> {
         Str { string: string.as_bytes() }
     }
@@ -201,7 +202,7 @@ impl<'a> Automaton for Str<'a> {
         // if we aren't already past the end...
         if let Some(pos) = *pos {
             // and there is still a matching byte at the current position...
-            if self.string.get(pos).cloned() == Some(byte) {
+            if self.string.get(pos).copied() == Some(byte) {
                 // then move forward
                 return Some(pos + 1);
             }
@@ -216,10 +217,10 @@ impl<'a> Automaton for Str<'a> {
 /// It can be used to build a simple fuzzy-finder.
 ///
 /// ```rust
-/// extern crate fst;
+/// extern crate fst_no_std;
 ///
-/// use fst::{IntoStreamer, Streamer, Set};
-/// use fst::automaton::Subsequence;
+/// use fst_no_std::{IntoStreamer, Streamer, Set};
+/// use fst_no_std::automaton::Subsequence;
 ///
 /// # fn main() { example().unwrap(); }
 /// fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -246,6 +247,7 @@ impl<'a> Subsequence<'a> {
     /// Constructs automaton that matches input containing the
     /// specified subsequence.
     #[inline]
+    #[must_use]
     pub fn new(subsequence: &'a str) -> Subsequence<'a> {
         Subsequence { subseq: subsequence.as_bytes() }
     }
@@ -279,7 +281,7 @@ impl<'a> Automaton for Subsequence<'a> {
         if state == self.subseq.len() {
             return state;
         }
-        state + (byte == self.subseq[state]) as usize
+        state + usize::from(byte == self.subseq[state])
     }
 }
 
@@ -294,25 +296,21 @@ impl Automaton for AlwaysMatch {
     type State = ();
 
     #[inline]
-    fn start(&self) -> () {
-        ()
-    }
+    fn start(&self) {}
     #[inline]
-    fn is_match(&self, _: &()) -> bool {
+    fn is_match(&self, (): &()) -> bool {
         true
     }
     #[inline]
-    fn can_match(&self, _: &()) -> bool {
+    fn can_match(&self, (): &()) -> bool {
         true
     }
     #[inline]
-    fn will_always_match(&self, _: &()) -> bool {
+    fn will_always_match(&self, (): &()) -> bool {
         true
     }
     #[inline]
-    fn accept(&self, _: &(), _: u8) -> () {
-        ()
-    }
+    fn accept(&self, (): &(), _: u8) {}
 }
 
 /// An automaton that matches a string that begins with something that the

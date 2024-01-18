@@ -1,159 +1,106 @@
-name: ci
-on:
-  pull_request:
-    branches:
-    - master
-  push:
-    branches:
-    - master
-  schedule:
-  - cron: '00 01 * * *'
+name: CI
 
-# The section is needed to drop write-all permissions that are granted on
-# `schedule` event. By specifying any permission explicitly all others are set
-# to none. By using the principle of least privilege the damage a compromised
-# workflow can do (because of an injection or compromised third party tool or
-# action) is restricted. Currently the worklow doesn't need any additional
-# permission except for pulling the code. Adding labels to issues, commenting
-# on pull-requests, etc. may need additional permissions:
-#
-# Syntax for this section:
-# https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions
-#
-# Reference for how to assign permissions on a job-by-job basis:
-# https://docs.github.com/en/actions/using-jobs/assigning-permissions-to-jobs
-#
-# Reference for available permissions that we can enable if needed:
-# https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
+on:
+  push:
+    paths:
+      - ".github/workflows/ci.yml"
+      - "**/*.rs"
+      - "**/Cargo.toml"
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - "**/*.rs"
+      - "**/Cargo.toml"
+
 permissions:
-  # to fetch code (actions/checkout)
   contents: read
 
+env:
+  RUSTFLAGS: -Dwarnings
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  pre_ci:
+    uses: dtolnay/.github/.github/workflows/pre_ci.yml@master
+
   test:
-    name: test
-    env:
-      # For some builds, we use cross to test on 32-bit and big-endian
-      # systems.
-      CARGO: cargo
-      # When CARGO is set to CROSS, TARGET is set to `--target matrix.target`.
-      # Note that we only use cross on Linux, so setting a target on a
-      # different OS will just use normal cargo.
-      TARGET:
-      # Bump this as appropriate. We pin to a version to make sure CI
-      # continues to work as cross releases in the past have broken things
-      # in subtle ways.
-      CROSS_VERSION: v0.2.5
-    runs-on: ${{ matrix.os }}
+    name: Rust ${{matrix.name}}
+    needs: pre_ci
+    if: needs.pre_ci.outputs.continue
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
-        - build: pinned
-          os: ubuntu-latest
-          rust: 1.60.0
-        - build: stable
-          os: ubuntu-latest
-          rust: stable
-        - build: beta
-          os: ubuntu-latest
-          rust: beta
-        - build: nightly
-          os: ubuntu-latest
-          rust: nightly
-        - build: macos
-          os: macos-latest
-          rust: stable
-        - build: win-msvc
-          os: windows-latest
-          rust: stable
-        - build: win-gnu
-          os: windows-latest
-          rust: stable-x86_64-gnu
-        - build: stable-x86
-          os: ubuntu-latest
-          rust: stable
-          target: i686-unknown-linux-gnu
-        - build: stable-aarch64
-          os: ubuntu-latest
-          rust: stable
-          target: aarch64-unknown-linux-gnu
-        - build: stable-powerpc64
-          os: ubuntu-latest
-          rust: stable
-          target: powerpc64-unknown-linux-gnu
-        - build: stable-s390x
-          os: ubuntu-latest
-          rust: stable
-          target: s390x-unknown-linux-gnu
+          - name: stable/std
+            rust: stable
+            features: ""
+          - name: nightly/std
+            rust: nightly
+            features: ""
+          - name: nightly/core
+            rust: nightly
+            features: "--no-default-features"
+          - name: nightly/alloc
+            rust: nightly
+            features: "--no-default-features --features alloc"
+    timeout-minutes: 45
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{matrix.rust}}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace ${{matrix.features}}
+        env:
+          RUSTFLAGS: ${{matrix.rustflags}} ${{env.RUSTFLAGS}}
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
+  msrv:
+    name: Rust MSRV
+    needs: pre_ci
+    if: needs.pre_ci.outputs.continue
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.70.0 # MSRV
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --tests
 
-    - name: Use Cross
-      if: matrix.os == 'ubuntu-latest' && matrix.target != ''
-      run: |
-        # In the past, new releases of 'cross' have broken CI. So for now, we
-        # pin it. We also use their pre-compiled binary releases because cross
-        # has over 100 dependencies and takes a bit to compile.
-        dir="$RUNNER_TEMP/cross-download"
-        mkdir "$dir"
-        echo "$dir" >> $GITHUB_PATH
-        cd "$dir"
-        curl -LO "https://github.com/cross-rs/cross/releases/download/$CROSS_VERSION/cross-x86_64-unknown-linux-musl.tar.gz"
-        tar xf cross-x86_64-unknown-linux-musl.tar.gz
-        echo "CARGO=cross" >> $GITHUB_ENV
-        echo "TARGET=--target ${{ matrix.target }}" >> $GITHUB_ENV
-
-    - name: Show command used for Cargo
-      run: |
-        echo "cargo command is: ${{ env.CARGO }}"
-        echo "target flag is: ${{ env.TARGET }}"
-
-    - name: Build (just fst crate)
-      if: matrix.build == 'pinned'
-      run: ${{ env.CARGO }} build --verbose ${{ env.TARGET }}
-
-    - name: Build
-      if: matrix.build != 'pinned'
-      run: ${{ env.CARGO }} build --verbose --all ${{ env.TARGET }}
-
-    - name: Build docs
-      if: matrix.build != 'pinned'
-      run: ${{ env.CARGO }} doc --verbose --all ${{ env.TARGET }}
-
-    - name: Run tests
-      if: matrix.build != 'pinned'
-      run: ${{ env.CARGO }} test --verbose --all ${{ env.TARGET }}
-
-    - name: Run tests without default features
-      if: matrix.build != 'pinned'
-      run: ${{ env.CARGO }} test --verbose --lib --no-default-features ${{ env.TARGET }}
-
-    - name: Build fst CLI tool
-      if: matrix.build != 'pinned'
-      run: ${{ env.CARGO }} build --verbose --manifest-path fst-bin/Cargo.toml ${{ env.TARGET }}
-
-    - name: Compile benchmarks
-      if: matrix.build != 'pinned'
-      run: ${{ env.CARGO }} bench --manifest-path bench/Cargo.toml --verbose ${{ env.TARGET }} -- --test
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --workspace -- -Dclippy::all
 
   rustfmt:
-    name: rustfmt
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install rustfmt with nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  check-licenses:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: stable
-        components: rustfmt
-    - name: Check formatting
-      run: |
-        cargo fmt --all -- --check
+      - uses: actions/checkout@v3
+      - name: Check Rust Licenses
+        uses: EmbarkStudios/cargo-deny-action@v1

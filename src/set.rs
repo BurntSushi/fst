@@ -1,11 +1,20 @@
-use std::fmt;
-use std::io;
-use std::iter::{self, FromIterator};
-
+#[cfg(feature = "alloc")]
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::raw;
-use crate::stream::{IntoStreamer, Streamer};
+#[cfg(feature = "alloc")]
+use crate::stream::IntoStreamer;
+use crate::stream::Streamer;
 use crate::Result;
+#[cfg(feature = "alloc")]
+use alloc::{string::String, vec::Vec};
+#[cfg(feature = "alloc")]
+use core::fmt;
+#[cfg(feature = "std")]
+use core::iter;
+#[cfg(feature = "alloc")]
+use core::iter::FromIterator;
+#[cfg(feature = "std")]
+use std::io;
 
 /// Set is a lexicographically ordered set of byte strings.
 ///
@@ -29,6 +38,7 @@ use crate::Result;
 #[derive(Clone)]
 pub struct Set<D>(raw::Fst<D>);
 
+#[cfg(feature = "alloc")]
 impl Set<Vec<u8>> {
     /// Create a `Set` from an iterator of lexicographically ordered byte
     /// strings.
@@ -39,6 +49,7 @@ impl Set<Vec<u8>> {
     /// Note that this is a convenience function to build a set in memory.
     /// To build a set that streams to an arbitrary `io::Write`, use
     /// `SetBuilder`.
+    #[cfg(feature = "std")]
     pub fn from_iter<T, I>(iter: I) -> Result<Set<Vec<u8>>>
     where
         T: AsRef<[u8]>,
@@ -61,7 +72,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// # Example
     ///
     /// ```no_run
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// // File written from a build script using SetBuilder.
     /// # const IGNORE: &str = stringify! {
@@ -80,7 +91,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
     ///
@@ -107,7 +118,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// used. `while let` is useful instead:
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let mut stream = set.stream();
@@ -119,6 +130,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// assert_eq!(keys, vec![b"a", b"b", b"c"]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn stream(&self) -> Stream<'_> {
         Stream(self.0.stream())
     }
@@ -137,7 +149,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// Returns only the keys in the range given.
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set = Set::from_iter(&["a", "b", "c", "d", "e"]).unwrap();
     /// let mut stream = set.range().ge("b").lt("e").into_stream();
@@ -149,6 +161,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// assert_eq!(keys, vec![b"b", b"c", b"d"]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn range(&self) -> StreamBuilder<'_> {
         StreamBuilder(self.0.range())
     }
@@ -166,8 +179,8 @@ impl<D: AsRef<[u8]>> Set<D> {
     /// to search sets:
     ///
     /// ```rust
-    /// use fst::automaton::Subsequence;
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::automaton::Subsequence;
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// # fn main() { example().unwrap(); }
     /// fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -189,6 +202,7 @@ impl<D: AsRef<[u8]>> Set<D> {
     ///     Ok(())
     /// }
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
         StreamBuilder(self.0.search(aut))
     }
@@ -211,8 +225,8 @@ An implementation of fuzzy search using Levenshtein automata can be used
 to search sets:
 
 ```rust
-use fst::automaton::Levenshtein;
-use fst::{IntoStreamer, Streamer, Set};
+use fst_no_std::automaton::Levenshtein;
+use fst_no_std::{IntoStreamer, Streamer, Set};
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -242,6 +256,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
 ```
 "##
     )]
+    #[cfg(feature = "alloc")]
     pub fn search_with_state<A: Automaton>(
         &self,
         aut: A,
@@ -270,7 +285,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -284,6 +299,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// assert_eq!(keys, vec![b"a", b"b", b"c", b"y", b"z"]);
     /// ```
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn op(&self) -> OpBuilder<'_> {
         OpBuilder::new().add(self)
     }
@@ -296,7 +312,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
@@ -307,6 +323,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     ///
     /// assert_eq!(set1.is_disjoint(&set3), false);
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
@@ -322,7 +339,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
@@ -334,6 +351,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// assert_eq!(set1.is_subset(&set3), false);
     /// assert_eq!(set3.is_subset(&set1), true);
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
@@ -349,7 +367,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["x", "y", "z"]).unwrap();
@@ -361,6 +379,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// assert_eq!(set1.is_superset(&set3), true);
     /// assert_eq!(set3.is_superset(&set1), false);
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
@@ -392,7 +411,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// ```
     /// use std::borrow::Cow;
     ///
-    /// use fst::Set;
+    /// use fst_no_std::Set;
     ///
     /// let set: Set<Vec<u8>> = Set::from_iter(
     ///     &["hello", "world"],
@@ -410,6 +429,7 @@ fn example() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+#[cfg(feature = "std")]
 impl Default for Set<Vec<u8>> {
     #[inline]
     fn default() -> Set<Vec<u8>> {
@@ -417,6 +437,7 @@ impl Default for Set<Vec<u8>> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<D: AsRef<[u8]>> fmt::Debug for Set<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Set([")?;
@@ -441,6 +462,7 @@ impl<D: AsRef<[u8]>> AsRef<raw::Fst<D>> for Set<D> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'s, 'a, D: AsRef<[u8]>> IntoStreamer<'a> for &'s Set<D> {
     type Item = &'a [u8];
     type Into = Stream<'s>;
@@ -492,7 +514,7 @@ impl<D: AsRef<[u8]>> From<raw::Fst<D>> for Set<D> {
 /// goal without needing to explicitly use `SetBuilder`.
 ///
 /// ```rust
-/// use fst::{IntoStreamer, Streamer, Set, SetBuilder};
+/// use fst_no_std::{IntoStreamer, Streamer, Set, SetBuilder};
 ///
 /// let mut build = SetBuilder::memory();
 /// build.insert("bruce").unwrap();
@@ -523,7 +545,7 @@ impl<D: AsRef<[u8]>> From<raw::Fst<D>> for Set<D> {
 /// use std::fs::File;
 /// use std::io;
 ///
-/// use fst::{IntoStreamer, Streamer, Set, SetBuilder};
+/// use fst_no_std::{IntoStreamer, Streamer, Set, SetBuilder};
 ///
 /// let mut wtr = io::BufWriter::new(File::create("set.fst").unwrap());
 /// let mut build = SetBuilder::new(wtr).unwrap();
@@ -548,22 +570,27 @@ impl<D: AsRef<[u8]>> From<raw::Fst<D>> for Set<D> {
 ///     "bruce".as_bytes(), "clarence".as_bytes(), "stevie".as_bytes(),
 /// ]);
 /// ```
+#[cfg(feature = "std")]
 pub struct SetBuilder<W>(raw::Builder<W>);
 
+#[cfg(feature = "std")]
 impl SetBuilder<Vec<u8>> {
     /// Create a builder that builds a set in memory.
     #[inline]
+    #[must_use]
     pub fn memory() -> SetBuilder<Vec<u8>> {
         SetBuilder(raw::Builder::memory())
     }
 
     /// Finishes the construction of the set and returns it.
     #[inline]
+    #[must_use]
     pub fn into_set(self) -> Set<Vec<u8>> {
         Set(self.0.into_fst())
     }
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> SetBuilder<W> {
     /// Create a builder that builds a set by writing it to `wtr` in a
     /// streaming fashion.
@@ -637,10 +664,12 @@ impl<W: io::Write> SetBuilder<W> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct Stream<'s, A = AlwaysMatch>(raw::Stream<'s, A>)
 where
     A: Automaton;
 
+#[cfg(feature = "alloc")]
 impl<'s, A: Automaton> Stream<'s, A> {
     /// Convert this stream into a vector of Unicode strings.
     ///
@@ -660,6 +689,7 @@ impl<'s, A: Automaton> Stream<'s, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
     type Item = &'a [u8];
 
@@ -677,10 +707,12 @@ impl<'a, 's, A: Automaton> Streamer<'a> for Stream<'s, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct StreamWithState<'m, A = AlwaysMatch>(raw::StreamWithState<'m, A>)
 where
     A: Automaton;
 
+#[cfg(feature = "alloc")]
 impl<'a, 'm, A: 'a + Automaton> Streamer<'a> for StreamWithState<'m, A>
 where
     A::State: Clone,
@@ -704,8 +736,10 @@ where
 /// the stream. By default, no filtering is done.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct StreamBuilder<'s, A = AlwaysMatch>(raw::StreamBuilder<'s, A>);
 
+#[cfg(feature = "alloc")]
 impl<'s, A: Automaton> StreamBuilder<'s, A> {
     /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(self, bound: T) -> StreamBuilder<'s, A> {
@@ -728,6 +762,7 @@ impl<'s, A: Automaton> StreamBuilder<'s, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'s, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'s, A> {
     type Item = &'a [u8];
     type Into = Stream<'s, A>;
@@ -754,10 +789,12 @@ impl<'s, 'a, A: Automaton> IntoStreamer<'a> for StreamBuilder<'s, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct StreamWithStateBuilder<'s, A = AlwaysMatch>(
     raw::StreamWithStateBuilder<'s, A>,
 );
 
+#[cfg(feature = "alloc")]
 impl<'s, A: Automaton> StreamWithStateBuilder<'s, A> {
     /// Specify a greater-than-or-equal-to bound.
     pub fn ge<T: AsRef<[u8]>>(
@@ -792,6 +829,7 @@ impl<'s, A: Automaton> StreamWithStateBuilder<'s, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'s, 'a, A: 'a + Automaton> IntoStreamer<'a>
     for StreamWithStateBuilder<'s, A>
 where
@@ -819,11 +857,21 @@ where
 /// stream.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct OpBuilder<'s>(raw::OpBuilder<'s>);
 
+#[cfg(feature = "alloc")]
+impl<'s> Default for OpBuilder<'s> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "alloc")]
 impl<'s> OpBuilder<'s> {
     /// Create a new set operation builder.
     #[inline]
+    #[must_use]
     pub fn new() -> OpBuilder<'s> {
         OpBuilder(raw::OpBuilder::new())
     }
@@ -861,7 +909,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -875,6 +923,7 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"a", b"b", b"c", b"y", b"z"]);
     /// ```
     #[inline]
+    #[must_use]
     pub fn union(self) -> Union<'s> {
         Union(self.0.union())
     }
@@ -884,7 +933,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -898,6 +947,7 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"a"]);
     /// ```
     #[inline]
+    #[must_use]
     pub fn intersection(self) -> Intersection<'s> {
         Intersection(self.0.intersection())
     }
@@ -909,7 +959,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -923,6 +973,7 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"b", b"c"]);
     /// ```
     #[inline]
+    #[must_use]
     pub fn difference(self) -> Difference<'s> {
         Difference(self.0.difference())
     }
@@ -939,7 +990,7 @@ impl<'s> OpBuilder<'s> {
     /// # Example
     ///
     /// ```rust
-    /// use fst::{IntoStreamer, Streamer, Set};
+    /// use fst_no_std::{IntoStreamer, Streamer, Set};
     ///
     /// let set1 = Set::from_iter(&["a", "b", "c"]).unwrap();
     /// let set2 = Set::from_iter(&["a", "y", "z"]).unwrap();
@@ -953,11 +1004,13 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"b", b"c", b"y", b"z"]);
     /// ```
     #[inline]
+    #[must_use]
     pub fn symmetric_difference(self) -> SymmetricDifference<'s> {
         SymmetricDifference(self.0.symmetric_difference())
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> Extend<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
@@ -973,6 +1026,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = &'a [u8]>,
@@ -991,8 +1045,10 @@ where
 /// A stream of set union over multiple streams in lexicographic order.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct Union<'s>(raw::Union<'s>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 's> Streamer<'a> for Union<'s> {
     type Item = &'a [u8];
 
@@ -1005,8 +1061,10 @@ impl<'a, 's> Streamer<'a> for Union<'s> {
 /// A stream of set intersection over multiple streams in lexicographic order.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct Intersection<'s>(raw::Intersection<'s>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 's> Streamer<'a> for Intersection<'s> {
     type Item = &'a [u8];
 
@@ -1023,8 +1081,10 @@ impl<'a, 's> Streamer<'a> for Intersection<'s> {
 /// appear in any other streams.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct Difference<'s>(raw::Difference<'s>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 's> Streamer<'a> for Difference<'s> {
     type Item = &'a [u8];
 
@@ -1038,8 +1098,10 @@ impl<'a, 's> Streamer<'a> for Difference<'s> {
 /// order.
 ///
 /// The `'s` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct SymmetricDifference<'s>(raw::SymmetricDifference<'s>);
 
+#[cfg(feature = "alloc")]
 impl<'a, 's> Streamer<'a> for SymmetricDifference<'s> {
     type Item = &'a [u8];
 

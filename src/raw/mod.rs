@@ -18,24 +18,32 @@ option of specifying a merge strategy for output values.
 
 Most of the rest of the types are streams from set operations.
 */
-use std::cmp;
-use std::fmt;
+use core::cmp;
+use core::fmt;
 
+#[cfg(feature = "alloc")]
 use crate::automaton::{AlwaysMatch, Automaton};
 use crate::bytes;
 use crate::error::Result;
+#[cfg(feature = "alloc")]
 use crate::stream::{IntoStreamer, Streamer};
 
+#[cfg(feature = "std")]
 pub use crate::raw::build::Builder;
 pub use crate::raw::error::Error;
 pub use crate::raw::node::{Node, Transitions};
+pub use crate::raw::ops::IndexedValue;
+#[cfg(feature = "alloc")]
 pub use crate::raw::ops::{
-    Difference, IndexedValue, Intersection, OpBuilder, SymmetricDifference,
-    Union,
+    Difference, Intersection, OpBuilder, SymmetricDifference, Union,
 };
+#[cfg(feature = "alloc")]
+use alloc::{borrow::ToOwned, string::String, vec, vec::Vec};
 
+#[cfg(feature = "std")]
 mod build;
 mod common_inputs;
+#[cfg(feature = "std")]
 mod counting_writer;
 mod crc32;
 mod crc32_table;
@@ -67,14 +75,14 @@ const EMPTY_ADDRESS: CompiledAddr = 0;
 /// This is never the address of a node in a serialized transducer.
 const NONE_ADDRESS: CompiledAddr = 1;
 
-/// FstType is a convention used to indicate the type of the underlying
+/// `FstType` is a convention used to indicate the type of the underlying
 /// transducer.
 ///
 /// This crate reserves the range 0-255 (inclusive) but currently leaves the
 /// meaning of 0-255 unspecified.
 pub type FstType = u64;
 
-/// CompiledAddr is the type used to address nodes in a finite state
+/// `CompiledAddr` is the type used to address nodes in a finite state
 /// transducer.
 ///
 /// It is most useful as a pointer to nodes. It can be used in the `Fst::node`
@@ -282,6 +290,7 @@ struct Meta {
     checksum: Option<u32>,
 }
 
+#[cfg(feature = "alloc")]
 impl Fst<Vec<u8>> {
     /// Create a new FST from an iterator of lexicographically ordered byte
     /// strings. Every key's value is set to `0`.
@@ -292,6 +301,7 @@ impl Fst<Vec<u8>> {
     /// Note that this is a convenience function to build an FST in memory.
     /// To build an FST that streams to an arbitrary `io::Write`, use
     /// `raw::Builder`.
+    #[cfg(feature = "std")]
     pub fn from_iter_set<K, I>(iter: I) -> Result<Fst<Vec<u8>>>
     where
         K: AsRef<[u8]>,
@@ -314,6 +324,7 @@ impl Fst<Vec<u8>> {
     /// Note that this is a convenience function to build an FST in memory.
     /// To build an FST that streams to an arbitrary `io::Write`, use
     /// `raw::Builder`.
+    #[cfg(feature = "std")]
     pub fn from_iter_map<K, I>(iter: I) -> Result<Fst<Vec<u8>>>
     where
         K: AsRef<[u8]>,
@@ -350,7 +361,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
         // unexpected EOF. However, we are reading from a byte slice (no
         // IO errors possible) and we've confirmed the byte slice is at least
         // N bytes (no unexpected EOF).
-        let version = bytes::read_u64_le(&bytes);
+        let version = bytes::read_u64_le(bytes);
         if version == 0 || version > VERSION {
             return Err(
                 Error::Version { expected: VERSION, got: version }.into()
@@ -429,6 +440,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// The values in this FST are not monotonically increasing when sorted
     /// lexicographically by key, then this routine has unspecified behavior.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn get_key(&self, value: u64) -> Option<Vec<u8>> {
         let mut key = vec![];
         if self.get_key_into(value, &mut key) {
@@ -448,6 +460,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// The values in this FST are not monotonically increasing when sorted
     /// lexicographically by key, then this routine has unspecified behavior.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn get_key_into(&self, value: u64, key: &mut Vec<u8>) -> bool {
         self.as_ref().get_key_into(value, key)
     }
@@ -455,6 +468,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// Return a lexicographically ordered stream of all key-value pairs in
     /// this fst.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn stream(&self) -> Stream<'_> {
         StreamBuilder::new(self.as_ref(), AlwaysMatch).into_stream()
     }
@@ -464,12 +478,14 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// A range query returns a subset of key-value pairs in this fst in a
     /// range given in lexicographic order.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn range(&self) -> StreamBuilder<'_> {
         StreamBuilder::new(self.as_ref(), AlwaysMatch)
     }
 
     /// Executes an automaton on the keys of this FST.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn search<A: Automaton>(&self, aut: A) -> StreamBuilder<'_, A> {
         StreamBuilder::new(self.as_ref(), aut)
     }
@@ -478,6 +494,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// keys along with the corresponding matching states in the given
     /// automaton.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn search_with_state<A: Automaton>(
         &self,
         aut: A,
@@ -538,6 +555,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// symmetric difference on the keys of the fst. These set operations also
     /// allow one to specify how conflicting values are merged in the stream.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn op(&self) -> OpBuilder<'_> {
         OpBuilder::new().add(self)
     }
@@ -548,6 +566,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn is_disjoint<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -562,6 +581,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn is_subset<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -569,7 +589,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     {
         let mut op = self.op().add(stream).intersection();
         let mut count = 0;
-        while let Some(_) = op.next() {
+        while op.next().is_some() {
             count += 1;
         }
         count == self.len()
@@ -581,6 +601,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     /// `stream` must be a lexicographically ordered sequence of byte strings
     /// with associated values.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn is_superset<'f, I, S>(&self, stream: I) -> bool
     where
         I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -588,7 +609,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     {
         let mut op = self.op().add(stream).union();
         let mut count = 0;
-        while let Some(_) = op.next() {
+        while op.next().is_some() {
             count += 1;
         }
         count == self.len()
@@ -596,7 +617,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
 
     /// Returns the underlying type of this fst.
     ///
-    /// FstType is a convention used to indicate the type of the underlying
+    /// `FstType` is a convention used to indicate the type of the underlying
     /// transducer.
     ///
     /// This crate reserves the range 0-255 (inclusive) but currently leaves
@@ -622,6 +643,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
 
     /// Returns a copy of the binary contents of this FST.
     #[inline]
+    #[cfg(feature = "alloc")]
     pub fn to_vec(&self) -> Vec<u8> {
         self.as_ref().to_vec()
     }
@@ -662,11 +684,13 @@ impl<D> Fst<D> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f, D: AsRef<[u8]>> IntoStreamer<'a> for &'f Fst<D> {
     type Item = (&'a [u8], Output);
     type Into = Stream<'f>;
 
     #[inline]
+    #[cfg(feature = "alloc")]
     fn into_stream(self) -> Stream<'f> {
         StreamBuilder::new(self.as_ref(), AlwaysMatch).into_stream()
     }
@@ -712,6 +736,7 @@ impl<'f> FstRef<'f> {
     }
 
     #[inline]
+    #[cfg(feature = "alloc")]
     fn get_key_into(&self, mut value: u64, key: &mut Vec<u8>) -> bool {
         let mut node = self.root();
         while value != 0 || !node.is_final() {
@@ -767,6 +792,7 @@ impl<'f> FstRef<'f> {
     }
 
     #[inline]
+    #[cfg(feature = "alloc")]
     fn to_vec(&self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }
@@ -777,6 +803,7 @@ impl<'f> FstRef<'f> {
     }
 
     #[inline]
+    #[cfg(feature = "alloc")]
     fn empty_final_output(&self) -> Option<Output> {
         let root = self.root();
         if root.is_final() {
@@ -799,6 +826,7 @@ impl<'f> FstRef<'f> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct StreamBuilder<'f, A = AlwaysMatch> {
     fst: FstRef<'f>,
     aut: A,
@@ -806,6 +834,7 @@ pub struct StreamBuilder<'f, A = AlwaysMatch> {
     max: Bound,
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, A: Automaton> StreamBuilder<'f, A> {
     fn new(fst: FstRef<'f>, aut: A) -> StreamBuilder<'f, A> {
         StreamBuilder {
@@ -817,30 +846,35 @@ impl<'f, A: Automaton> StreamBuilder<'f, A> {
     }
 
     /// Specify a greater-than-or-equal-to bound.
+    #[cfg(feature = "alloc")]
     pub fn ge<T: AsRef<[u8]>>(mut self, bound: T) -> StreamBuilder<'f, A> {
         self.min = Bound::Included(bound.as_ref().to_owned());
         self
     }
 
     /// Specify a greater-than bound.
+    #[cfg(feature = "alloc")]
     pub fn gt<T: AsRef<[u8]>>(mut self, bound: T) -> StreamBuilder<'f, A> {
         self.min = Bound::Excluded(bound.as_ref().to_owned());
         self
     }
 
     /// Specify a less-than-or-equal-to bound.
+    #[cfg(feature = "alloc")]
     pub fn le<T: AsRef<[u8]>>(mut self, bound: T) -> StreamBuilder<'f, A> {
         self.max = Bound::Included(bound.as_ref().to_owned());
         self
     }
 
     /// Specify a less-than bound.
+    #[cfg(feature = "alloc")]
     pub fn lt<T: AsRef<[u8]>>(mut self, bound: T) -> StreamBuilder<'f, A> {
         self.max = Bound::Excluded(bound.as_ref().to_owned());
         self
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
     type Item = (&'a [u8], Output);
     type Into = Stream<'f, A>;
@@ -867,6 +901,7 @@ impl<'a, 'f, A: Automaton> IntoStreamer<'a> for StreamBuilder<'f, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct StreamWithStateBuilder<'f, A = AlwaysMatch> {
     fst: FstRef<'f>,
     aut: A,
@@ -874,6 +909,7 @@ pub struct StreamWithStateBuilder<'f, A = AlwaysMatch> {
     max: Bound,
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, A: Automaton> StreamWithStateBuilder<'f, A> {
     fn new(fst: FstRef<'f>, aut: A) -> StreamWithStateBuilder<'f, A> {
         StreamWithStateBuilder {
@@ -921,6 +957,7 @@ impl<'f, A: Automaton> StreamWithStateBuilder<'f, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f, A: 'a + Automaton> IntoStreamer<'a>
     for StreamWithStateBuilder<'f, A>
 where
@@ -935,12 +972,14 @@ where
 }
 
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 enum Bound {
     Included(Vec<u8>),
     Excluded(Vec<u8>),
     Unbounded,
 }
 
+#[cfg(feature = "alloc")]
 impl Bound {
     #[inline]
     fn exceeded_by(&self, inp: &[u8]) -> bool {
@@ -962,10 +1001,7 @@ impl Bound {
 
     #[inline]
     fn is_inclusive(&self) -> bool {
-        match *self {
-            Bound::Excluded(_) => false,
-            _ => true,
-        }
+        matches!(*self, Bound::Included(_) | Bound::Unbounded)
     }
 }
 
@@ -975,8 +1011,10 @@ impl Bound {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct Stream<'f, A: Automaton = AlwaysMatch>(StreamWithState<'f, A>);
 
+#[cfg(feature = "alloc")]
 impl<'f, A: Automaton> Stream<'f, A> {
     fn new(fst: FstRef<'f>, aut: A, min: Bound, max: Bound) -> Stream<'f, A> {
         Stream(StreamWithState::new(fst, aut, min, max))
@@ -1044,11 +1082,12 @@ impl<'f, A: Automaton> Stream<'f, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
     type Item = (&'a [u8], Output);
 
     fn next(&'a mut self) -> Option<(&'a [u8], Output)> {
-        self.0.next_with(|_| ()).map(|(key, out, _)| (key, out))
+        self.0.next_with(|_| ()).map(|(key, out, ())| (key, out))
     }
 }
 
@@ -1062,6 +1101,7 @@ impl<'f, 'a, A: Automaton> Streamer<'a> for Stream<'f, A> {
 /// the stream. By default, no filtering is done.
 ///
 /// The `'m` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct StreamWithState<'f, A = AlwaysMatch>
 where
     A: Automaton,
@@ -1075,6 +1115,7 @@ where
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "alloc")]
 struct StreamState<'f, S> {
     node: Node<'f>,
     trans: usize,
@@ -1082,6 +1123,7 @@ struct StreamState<'f, S> {
     aut_state: S,
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, A: Automaton> StreamWithState<'f, A> {
     fn new(
         fst: FstRef<'f>,
@@ -1248,6 +1290,7 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f, A: 'a + Automaton> Streamer<'a> for StreamWithState<'f, A>
 where
     A::State: Clone,
@@ -1255,7 +1298,7 @@ where
     type Item = (&'a [u8], Output, A::State);
 
     fn next(&'a mut self) -> Option<(&'a [u8], Output, A::State)> {
-        self.next_with(|state| state.clone())
+        self.next_with(Clone::clone)
     }
 }
 
@@ -1278,48 +1321,55 @@ pub struct Output(u64);
 impl Output {
     /// Create a new output from a `u64`.
     #[inline]
+    #[must_use]
     pub fn new(v: u64) -> Output {
         Output(v)
     }
 
     /// Create a zero output.
     #[inline]
+    #[must_use]
     pub fn zero() -> Output {
         Output(0)
     }
 
     /// Retrieve the value inside this output.
     #[inline]
+    #[must_use]
     pub fn value(self) -> u64 {
         self.0
     }
 
     /// Returns true if this is a zero output.
     #[inline]
+    #[must_use]
     pub fn is_zero(self) -> bool {
         self.0 == 0
     }
 
     /// Returns the prefix of this output and `o`.
     #[inline]
+    #[must_use]
     pub fn prefix(self, o: Output) -> Output {
         Output(cmp::min(self.0, o.0))
     }
 
     /// Returns the concatenation of this output and `o`.
     #[inline]
+    #[must_use]
     pub fn cat(self, o: Output) -> Output {
         Output(self.0 + o.0)
     }
+}
 
-    /// Returns the subtraction of `o` from this output.
-    ///
-    /// This function panics if `self < o`.
+impl core::ops::Sub for Output {
+    type Output = Output;
+
     #[inline]
-    pub fn sub(self, o: Output) -> Output {
-        Output(
+    fn sub(self, rhs: Self) -> Self::Output {
+        Self(
             self.0
-                .checked_sub(o.0)
+                .checked_sub(rhs.0)
                 .expect("BUG: underflow subtraction not allowed"),
         )
     }
@@ -1361,6 +1411,7 @@ impl fmt::Debug for Transition {
 
 #[inline]
 #[cfg(target_pointer_width = "64")]
+#[allow(clippy::cast_possible_truncation)]
 fn u64_to_usize(n: u64) -> usize {
     n as usize
 }
@@ -1368,7 +1419,7 @@ fn u64_to_usize(n: u64) -> usize {
 #[inline]
 #[cfg(not(target_pointer_width = "64"))]
 fn u64_to_usize(n: u64) -> usize {
-    if n > std::usize::MAX as u64 {
+    if n > core::usize::MAX as u64 {
         panic!(
             "\
 Cannot convert node address {} to a pointer sized variable. If this FST

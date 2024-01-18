@@ -1,16 +1,15 @@
-use std::io;
-
 use crate::bytes;
 use crate::error::Result;
 use crate::raw::counting_writer::CountingWriter;
 use crate::raw::error::Error;
-use crate::raw::registry::{Registry, RegistryEntry};
-use crate::raw::{
-    CompiledAddr, Fst, FstType, Output, Transition, EMPTY_ADDRESS,
-    NONE_ADDRESS, VERSION,
-};
-// use raw::registry_minimal::{Registry, RegistryEntry};
+use crate::raw::registry::Registry;
+use crate::raw::registry::RegistryEntry;
+use crate::raw::Output;
+use crate::raw::{CompiledAddr, Transition};
+use crate::raw::{Fst, FstType, EMPTY_ADDRESS, NONE_ADDRESS, VERSION};
 use crate::stream::{IntoStreamer, Streamer};
+use alloc::{vec, vec::Vec};
+use std::io;
 
 /// A builder for creating a finite state transducer.
 ///
@@ -40,6 +39,7 @@ use crate::stream::{IntoStreamer, Streamer};
 ///
 /// The algorithmic complexity of fst construction is `O(n)` where `n` is the
 /// number of elements added to the fst.
+#[cfg(feature = "std")]
 pub struct Builder<W> {
     /// The FST raw data is written directly to `wtr`.
     ///
@@ -73,17 +73,20 @@ pub struct Builder<W> {
 }
 
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 struct UnfinishedNodes {
     stack: Vec<BuilderNodeUnfinished>,
 }
 
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 struct BuilderNodeUnfinished {
     node: BuilderNode,
     last: Option<LastTransition>,
 }
 
 #[derive(Debug, Hash, Eq, PartialEq)]
+#[cfg(feature = "alloc")]
 pub struct BuilderNode {
     pub is_final: bool,
     pub final_output: Output,
@@ -96,9 +99,11 @@ struct LastTransition {
     out: Output,
 }
 
+#[cfg(feature = "std")]
 impl Builder<Vec<u8>> {
     /// Create a builder that builds an fst in memory.
     #[inline]
+    #[must_use]
     pub fn memory() -> Builder<Vec<u8>> {
         Builder::new(Vec::with_capacity(10 * (1 << 10))).unwrap()
     }
@@ -110,6 +115,7 @@ impl Builder<Vec<u8>> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<W: io::Write> Builder<W> {
     /// Create a builder that builds an fst by writing it to `wtr` in a
     /// streaming fashion.
@@ -279,7 +285,7 @@ impl<W: io::Write> Builder<W> {
         {
             return Ok(EMPTY_ADDRESS);
         }
-        let entry = self.registry.entry(&node);
+        let entry = self.registry.entry(node);
         if let RegistryEntry::Found(ref addr) = entry {
             return Ok(*addr);
         }
@@ -299,7 +305,7 @@ impl<W: io::Write> Builder<W> {
             }
             if bs < &**last {
                 return Err(Error::OutOfOrder {
-                    previous: last.to_vec(),
+                    previous: last.clone(),
                     got: bs.to_vec(),
                 }
                 .into());
@@ -325,6 +331,7 @@ impl<W: io::Write> Builder<W> {
     }
 }
 
+#[cfg(feature = "std")]
 impl UnfinishedNodes {
     fn new() -> UnfinishedNodes {
         let mut unfinished = UnfinishedNodes { stack: Vec::with_capacity(64) };
@@ -390,8 +397,8 @@ impl UnfinishedNodes {
     fn find_common_prefix(&mut self, bs: &[u8]) -> usize {
         bs.iter()
             .zip(&self.stack)
-            .take_while(|&(&b, ref node)| {
-                node.last.as_ref().map(|t| t.inp == b).unwrap_or(false)
+            .take_while(|&(&b, node)| {
+                node.last.as_ref().is_some_and(|t| t.inp == b)
             })
             .count()
     }
@@ -407,8 +414,8 @@ impl UnfinishedNodes {
                 Some(ref mut t) if t.inp == bs[i] => {
                     i += 1;
                     let common_pre = t.out.prefix(out);
-                    let add_prefix = t.out.sub(common_pre);
-                    out = out.sub(common_pre);
+                    let add_prefix = t.out - common_pre;
+                    out = out - common_pre;
                     t.out = common_pre;
                     add_prefix
                 }
@@ -422,6 +429,7 @@ impl UnfinishedNodes {
     }
 }
 
+#[cfg(feature = "std")]
 impl BuilderNodeUnfinished {
     fn last_compiled(&mut self, addr: CompiledAddr) {
         if let Some(trans) = self.last.take() {
@@ -446,6 +454,7 @@ impl BuilderNodeUnfinished {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Clone for BuilderNode {
     fn clone(&self) -> BuilderNode {
         BuilderNode {
@@ -463,6 +472,7 @@ impl Clone for BuilderNode {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Default for BuilderNode {
     fn default() -> BuilderNode {
         BuilderNode {

@@ -1,11 +1,18 @@
-use std::cmp;
-use std::collections::BinaryHeap;
-use std::iter::FromIterator;
-
+#[cfg(feature = "alloc")]
 use crate::raw::Output;
+#[cfg(feature = "alloc")]
 use crate::stream::{IntoStreamer, Streamer};
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, collections::BinaryHeap};
+#[cfg(feature = "alloc")]
+use alloc::{vec, vec::Vec};
+#[cfg(feature = "alloc")]
+use core::cmp;
+#[cfg(feature = "alloc")]
+use core::iter::FromIterator;
 
 /// Permits stream operations to be hetergeneous with respect to streams.
+#[cfg(feature = "alloc")]
 type BoxedStream<'f> =
     Box<dyn for<'a> Streamer<'a, Item = (&'a [u8], Output)> + 'f>;
 
@@ -41,13 +48,23 @@ pub struct IndexedValue {
 /// stream.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying set.
+#[cfg(feature = "alloc")]
 pub struct OpBuilder<'f> {
     streams: Vec<BoxedStream<'f>>,
 }
 
+#[cfg(feature = "alloc")]
+impl<'f> Default for OpBuilder<'f> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "alloc")]
 impl<'f> OpBuilder<'f> {
     /// Create a new set operation builder.
     #[inline]
+    #[must_use]
     pub fn new() -> OpBuilder<'f> {
         OpBuilder { streams: vec![] }
     }
@@ -90,6 +107,7 @@ impl<'f> OpBuilder<'f> {
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
     #[inline]
+    #[must_use]
     pub fn union(self) -> Union<'f> {
         Union {
             heap: StreamHeap::new(self.streams),
@@ -108,6 +126,7 @@ impl<'f> OpBuilder<'f> {
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
     #[inline]
+    #[must_use]
     pub fn intersection(self) -> Intersection<'f> {
         Intersection {
             heap: StreamHeap::new(self.streams),
@@ -132,6 +151,7 @@ impl<'f> OpBuilder<'f> {
     /// of `difference`, each yielded key contains exactly one `IndexValue` with
     /// `index` set to 0.
     #[inline]
+    #[must_use]
     pub fn difference(mut self) -> Difference<'f> {
         let first = self.streams.swap_remove(0);
         Difference {
@@ -159,6 +179,7 @@ impl<'f> OpBuilder<'f> {
     /// stream, which is an integer that is auto-incremented when a stream
     /// is added to this operation (starting at `0`).
     #[inline]
+    #[must_use]
     pub fn symmetric_difference(self) -> SymmetricDifference<'f> {
         SymmetricDifference {
             heap: StreamHeap::new(self.streams),
@@ -168,6 +189,7 @@ impl<'f> OpBuilder<'f> {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> Extend<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -183,6 +205,7 @@ where
     }
 }
 
+#[cfg(feature = "alloc")]
 impl<'f, I, S> FromIterator<I> for OpBuilder<'f>
 where
     I: for<'a> IntoStreamer<'a, Into = S, Item = (&'a [u8], Output)>,
@@ -201,12 +224,14 @@ where
 /// A stream of set union over multiple fst streams in lexicographic order.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying map.
+#[cfg(feature = "alloc")]
 pub struct Union<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for Union<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -235,12 +260,14 @@ impl<'a, 'f> Streamer<'a> for Union<'f> {
 /// order.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct Intersection<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for Intersection<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -280,6 +307,7 @@ impl<'a, 'f> Streamer<'a> for Intersection<'f> {
 /// appear in any other streams.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct Difference<'f> {
     set: BoxedStream<'f>,
     key: Vec<u8>,
@@ -287,6 +315,7 @@ pub struct Difference<'f> {
     outs: Vec<IndexedValue>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for Difference<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -320,12 +349,14 @@ impl<'a, 'f> Streamer<'a> for Difference<'f> {
 /// lexicographic order.
 ///
 /// The `'f` lifetime parameter refers to the lifetime of the underlying fst.
+#[cfg(feature = "alloc")]
 pub struct SymmetricDifference<'f> {
     heap: StreamHeap<'f>,
     outs: Vec<IndexedValue>,
     cur_slot: Option<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'a, 'f> Streamer<'a> for SymmetricDifference<'f> {
     type Item = (&'a [u8], &'a [IndexedValue]);
 
@@ -359,11 +390,13 @@ impl<'a, 'f> Streamer<'a> for SymmetricDifference<'f> {
     }
 }
 
+#[cfg(feature = "alloc")]
 struct StreamHeap<'f> {
     rdrs: Vec<BoxedStream<'f>>,
     heap: BinaryHeap<Slot>,
 }
 
+#[cfg(feature = "alloc")]
 impl<'f> StreamHeap<'f> {
     fn new(streams: Vec<BoxedStream<'f>>) -> StreamHeap<'f> {
         let mut u = StreamHeap { rdrs: streams, heap: BinaryHeap::new() };
@@ -378,7 +411,7 @@ impl<'f> StreamHeap<'f> {
     }
 
     fn peek_is_duplicate(&self, key: &[u8]) -> bool {
-        self.heap.peek().map(|s| s.input() == key).unwrap_or(false)
+        self.heap.peek().is_some_and(|s| s.input() == key)
     }
 
     fn pop_if_equal(&mut self, key: &[u8]) -> Option<Slot> {
@@ -390,7 +423,7 @@ impl<'f> StreamHeap<'f> {
     }
 
     fn pop_if_le(&mut self, key: &[u8]) -> Option<Slot> {
-        if self.heap.peek().map(|s| s.input() <= key).unwrap_or(false) {
+        if self.heap.peek().is_some_and(|s| s.input() <= key) {
             self.pop()
         } else {
             None
@@ -410,6 +443,7 @@ impl<'f> StreamHeap<'f> {
     }
 }
 
+#[cfg(feature = "alloc")]
 #[derive(Debug, Eq, PartialEq)]
 struct Slot {
     idx: usize,
@@ -417,6 +451,7 @@ struct Slot {
     output: Output,
 }
 
+#[cfg(feature = "alloc")]
 impl Slot {
     fn new(rdr_idx: usize) -> Slot {
         Slot {
@@ -444,14 +479,17 @@ impl Slot {
     }
 }
 
+#[cfg(feature = "alloc")]
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for Slot {
     fn partial_cmp(&self, other: &Slot) -> Option<cmp::Ordering> {
         (&self.input, self.output)
             .partial_cmp(&(&other.input, other.output))
-            .map(|ord| ord.reverse())
+            .map(core::cmp::Ordering::reverse)
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Ord for Slot {
     fn cmp(&self, other: &Slot) -> cmp::Ordering {
         self.partial_cmp(other).unwrap()

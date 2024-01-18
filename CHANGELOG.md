@@ -1,0 +1,598 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.4.8](https://github.com/crabnebula-dev/fst-no-std/compare/fst-no-std-v0.4.7...fst-no-std-v0.4.8) - 2024-01-18
+
+### Added
+- no-std
+
+### Fixed
+- update docs
+- fst-bin polish/clap/refactor
+- fix tests
+- fix [#1](https://github.com/crabnebula-dev/fst-no-std/pull/1)
+- fix
+- fix error
+
+### Other
+- no_std fixes
+- release
+- Update README.md
+- Update release-plz.yml
+- Create deny.toml
+- Update ci.yml
+- fmt
+- clippy
+- clippy
+- cleanup
+- Update Cargo.toml
+- Update Cargo.toml
+- Update Cargo.toml
+- Create release-plz.yml
+- Update ci.yml
+- Update ci.yml
+- Update ci.yml
+- Delete fst-regex directory
+- Delete fst-levenshtein directory
+- Delete fst-bin directory
+- Update Cargo.toml
+- Update README.md
+- Update README.md
+- remove .idea files
+- Update Cargo.toml
+- fix it with updates
+- use latest OS versions
+- bump pinned to Rust 1.60.0
+- fst-bin-0.4.3
+- various updates
+- remove 'num_cpus' and move to 'memmap2'
+- upgrade to bstr 1.3
+- fix build
+- switch to dtolnay/rust-toolchain
+- do not build all docs on pinned Rust either
+- don't run tests on pinned Rust version
+- pin cross to v0.2.1
+- fst-bin-0.4.2
+- 0.4.7
+- fix 'cargo doc' generation again
+- use 'cargo doc --all --no-deps'
+- try to set 'doc = false'
+- remove redundant check in 'compile'
+- 0.4.6
+- remove 'inline' annotations
+- make state limit configurable
+- fix incorrect doc comment
+- introduce the prefix flag to the fuzzy subcommand
+- remove "apr" from example list
+- update and fix some links
+- update for changes in GitHub Actions
+- clarify duplicate terminology
+- 0.4.5
+- Fst::as_inner to give access to underlying data
+- 0.4.4
+- add map_data method
+- fst-0.4.3
+- add {Set,Map}::into_fst and Clone impls
+- fst-0.4.2
+- add new accept_eof method
+- upgrade to actions/checkout@v2
+- fst-0.4.1
+- add into_inner on raw::Fst
+- fix typo
+- replace `ignore` with  `plain` for non code docs
+- fix silly mistake
+- fst-bin-0.4.1
+- remove use of Result::map_or
+- update to regex-automata 0.1.9
+- depend on old fst
+- remove deprecated crates from workspace
+- 0.4.0
+- don't show underlying errors in Display impl
+- add 'verify' sub-command
+- bump FST version and support older FST versions
+- remove AsRef<[u8]> from struct definitions
+- more polishing work
+- tweak inline annotations
+- get rid of hack used before pub(crate)
+- remove byteorder
+- add CRC32C to every FST
+- add "stream with state" APIs
+- remove fst-bin from workspace
+- add from_iter_{set,map} convenient constructors
+- add get_key/get_key_into APIs
+- add knobs for reverse and minimization
+- drop docopt in favor of clap
+- update dependencies and add some polish
+- make FSTs generic over AsRef<[u8]>
+- minor touchups
+- specialize registry case of two cells
+- switch to criterion for benchmarks
+- move levenshtein, remove regex
+- clean up all warnings and make things compile
+- switch to Rust 2018
+- switch to GitHub Actions
+- switch to rustfmt
+- remove superfluous files
+- add convenience for creating an FST from builder
+- don't skip headers
+- 0.3.5
+- add `Str` for exact strings
+- 0.3.4
+- add Set/Map::from_static_slice
+- 0.3.3
+- add as_bytes method
+- explicitly point out that difference has 1 IndexValue
+- make the image of billion strings appear
+- bump minimum version
+- fst-regex-0.2.2
+- add version tag
+- add `mmap` feature
+- add #[inline] to some public non-generic functions
+- implement Clone and Debug on automatons
+- 0.3.2
+- derive common traits
+- tweak version
+- update various dependencies
+- add Subsequence
+- Implement `Default` for Set and Map
+- Updates README Cargo.toml example to say 0.3.0
+- fix example
+- Use the SVG Travis badge
+- 0.3.0
+- replace try! with ?
+- bump minimum rustc version to 1.20
+- update to memmap 0.6
+- remove public dependency on memmap crate
+- core performance improvements
+- remove unnecessary `mut` binding
+- add path to [[bin]]
+- remove unnecessary mut binding
+- remove comment
+- 0.2.3
+- safely expose raw bytes of an FST
+- 0.2.2
+- 0.2.1
+- update fst-bin to fst refactor
+- split regexes and fuzzy search into separate crates
+- comment fix
+- Add syntax highlighting to README
+- 0.1.38
+- don't run benchmarks in travis
+- Run tests without default features.
+- Fix output value bug.
+- 0.1.37
+- Added impl From<Arc<Mmap>> for MmapReadOnly
+- 0.1.36
+- add get_ref(), bytes_written() to MapBuilder/SetBuilder
+- Fix transition iterator for nodes with 256 transitions
+- len is the number of keys, not nodes.
+- 0.1.35
+- Add Rust 1.7.0 to Travis.
+- added mmap feature (default on)
+- Minor edit to readme
+- Rearrange and publish Automaton implementors.
+- 0.1.34
+- Upgrade regex-syntax and memmap.
+- 0.1.33
+- Add support for creating an Fst from a slice of Vec<u8>.
+- remove pushes from Makefile
+- 0.1.32
+- bump byteorder
+- 0.1.31
+- Merge pull request [#17](https://github.com/crabnebula-dev/fst-no-std/pull/17) from fulmicoton/bugfix/14_slice_offset_len
+- rustup
+- 0.1.30
+- Fix set difference operation.
+- 0.1.29
+- remove unused import
+- 0.1.28
+- Closes [#12](https://github.com/crabnebula-dev/fst-no-std/pull/12). Implement From trait for Set and Map.
+- Just test on current stable.
+- Drop duplicate key errors.
+- 0.1.27
+- Closes [#2](https://github.com/crabnebula-dev/fst-no-std/pull/2) Implement Clone and adds len() to MmapReadOnly
+- 0.1.26
+- 0.1.25
+- version bump
+- Add a new command to embed FSTs into Rust source files.
+- Add tests for the automaton adapters
+- Rename must_match to will_always_match
+- Add various automaton adapters
+- memory maps
+- update readme finally
+- 0.1.24
+- Don't use an a huge literal for usize. Just use u64 instead.
+- tweaking and polishing
+- Improve microbenchmarks.
+- add Windows CI
+- Some perf improvements to simple lookups.
+- 0.1.23
+- 0.1.22
+- Tweak the transition numbers again.
+- Add non-generic as_fst methods.
+- 0.1.21
+- Represent 256 transitions as `0`, which always uses an extra byte.
+- Max transitions is not representable by a u8, doy.
+- Escape inputs so we produce valid dot in all cases.
+- 0.1.20
+- Add size method.
+- doc touchups
+- 0.1.19
+- Tweak the mmap setup.
+- Bump byteorder and stop using custom write_uint function.
+- Don't use types yet.
+- 0.1.18
+- 0.1.17
+- 0.1.16
+- Perf improvements.
+- Allow tweaking of state labels.
+- Add a silly rule for installing a bin.
+- 0.1.15
+- Small reorg of nodes.
+- Some addition utility methods for collecting streams.
+- 0.1.14
+- be honest
+- Fix a couple bugs with the checksum and the fst-bin merger.
+- Compression gains. Polishing.
+- various touchups
+- Adding unsorted construction.
+- 0.1.13
+- slight rearrangement
+- Revamp command line utility to be more ergonomic/consistent.
+- doc fixes
+- 0.1.12
+- High level docs.
+- typo
+- 0.1.11
+- docs
+- 0.1.10
+- Docs for regex.
+- 0.1.9
+- Docs, polish, etc.
+- 0.1.8
+- levenshtein poc automaton working
+- Remove bound entirely.
+- Weaken the bound on Automaton's associated type from Copy to Clone.
+- Push Option<State> into the associated type for Automaton.
+- 0.1.7
+- Document map type.
+- Lots of type renaming.
+- 0.1.6
+- More docs, examples and starting on map facade.
+- 0.1.5
+- minor correction
+- minor correction
+- 0.1.4
+- Polish, docs, tests, etc.
+- 0.1.3
+- More progress on streams, sets, set operations and the facade.
+- Introduce stream ops.
+- 0.1.2
+- Impl stream
+- Leave 1.0 and 1.1 behind.
+- don't use unstable features
+- 0.1.1
+- regexes are working
+- Progress on a custom regex engine for searching FSTs.
+- nail down byteorder dependency
+- Re-work merge operations to use streams.
+- intersection
+- Start polishing work. Small optimizations. Start facade.
+- Rename inner fst module to raw.
+- Add a union sub-command.
+- Add range queries to fst-bin.
+- Give more information to the merge function.
+- Pass reader index into callback.
+- Range queries seem to work.
+- Remove unused registry.
+- Lots of progress.
+- ignore
+- Various progress and experiments.
+- progress
+- Progress on merging. Polishing some behavior.
+- progress
+- progress
+- forgot to add
+- Initial refactoring complete. Tests pass. Yay.
+- progress
+- initial working commit
+- initial commit
+
+## [0.4.7](https://github.com/crabnebula-dev/fst-no-std/releases/tag/fst-no-std-v0.4.7) - 2024-01-18
+
+### Added
+- no-std
+
+### Fixed
+- fst-bin polish/clap/refactor
+- fix tests
+- fix [#1](https://github.com/crabnebula-dev/fst-no-std/pull/1)
+- fix
+- fix error
+
+### Other
+- Update README.md
+- Update release-plz.yml
+- Create deny.toml
+- Update ci.yml
+- fmt
+- clippy
+- clippy
+- cleanup
+- Update Cargo.toml
+- Update Cargo.toml
+- Update Cargo.toml
+- Create release-plz.yml
+- Update ci.yml
+- Update ci.yml
+- Update ci.yml
+- Delete fst-regex directory
+- Delete fst-levenshtein directory
+- Delete fst-bin directory
+- Update Cargo.toml
+- Update README.md
+- Update README.md
+- remove .idea files
+- Update Cargo.toml
+- fix it with updates
+- use latest OS versions
+- bump pinned to Rust 1.60.0
+- fst-bin-0.4.3
+- various updates
+- remove 'num_cpus' and move to 'memmap2'
+- upgrade to bstr 1.3
+- fix build
+- switch to dtolnay/rust-toolchain
+- do not build all docs on pinned Rust either
+- don't run tests on pinned Rust version
+- pin cross to v0.2.1
+- fst-bin-0.4.2
+- 0.4.7
+- fix 'cargo doc' generation again
+- use 'cargo doc --all --no-deps'
+- try to set 'doc = false'
+- remove redundant check in 'compile'
+- 0.4.6
+- remove 'inline' annotations
+- make state limit configurable
+- fix incorrect doc comment
+- introduce the prefix flag to the fuzzy subcommand
+- remove "apr" from example list
+- update and fix some links
+- update for changes in GitHub Actions
+- clarify duplicate terminology
+- 0.4.5
+- Fst::as_inner to give access to underlying data
+- 0.4.4
+- add map_data method
+- fst-0.4.3
+- add {Set,Map}::into_fst and Clone impls
+- fst-0.4.2
+- add new accept_eof method
+- upgrade to actions/checkout@v2
+- fst-0.4.1
+- add into_inner on raw::Fst
+- fix typo
+- replace `ignore` with  `plain` for non code docs
+- fix silly mistake
+- fst-bin-0.4.1
+- remove use of Result::map_or
+- update to regex-automata 0.1.9
+- depend on old fst
+- remove deprecated crates from workspace
+- 0.4.0
+- don't show underlying errors in Display impl
+- add 'verify' sub-command
+- bump FST version and support older FST versions
+- remove AsRef<[u8]> from struct definitions
+- more polishing work
+- tweak inline annotations
+- get rid of hack used before pub(crate)
+- remove byteorder
+- add CRC32C to every FST
+- add "stream with state" APIs
+- remove fst-bin from workspace
+- add from_iter_{set,map} convenient constructors
+- add get_key/get_key_into APIs
+- add knobs for reverse and minimization
+- drop docopt in favor of clap
+- update dependencies and add some polish
+- make FSTs generic over AsRef<[u8]>
+- minor touchups
+- specialize registry case of two cells
+- switch to criterion for benchmarks
+- move levenshtein, remove regex
+- clean up all warnings and make things compile
+- switch to Rust 2018
+- switch to GitHub Actions
+- switch to rustfmt
+- remove superfluous files
+- add convenience for creating an FST from builder
+- don't skip headers
+- 0.3.5
+- add `Str` for exact strings
+- 0.3.4
+- add Set/Map::from_static_slice
+- 0.3.3
+- add as_bytes method
+- explicitly point out that difference has 1 IndexValue
+- make the image of billion strings appear
+- bump minimum version
+- fst-regex-0.2.2
+- add version tag
+- add `mmap` feature
+- add #[inline] to some public non-generic functions
+- implement Clone and Debug on automatons
+- 0.3.2
+- derive common traits
+- tweak version
+- update various dependencies
+- add Subsequence
+- Implement `Default` for Set and Map
+- Updates README Cargo.toml example to say 0.3.0
+- fix example
+- Use the SVG Travis badge
+- 0.3.0
+- replace try! with ?
+- bump minimum rustc version to 1.20
+- update to memmap 0.6
+- remove public dependency on memmap crate
+- core performance improvements
+- remove unnecessary `mut` binding
+- add path to [[bin]]
+- remove unnecessary mut binding
+- remove comment
+- 0.2.3
+- safely expose raw bytes of an FST
+- 0.2.2
+- 0.2.1
+- update fst-bin to fst refactor
+- split regexes and fuzzy search into separate crates
+- comment fix
+- Add syntax highlighting to README
+- 0.1.38
+- don't run benchmarks in travis
+- Run tests without default features.
+- Fix output value bug.
+- 0.1.37
+- Added impl From<Arc<Mmap>> for MmapReadOnly
+- 0.1.36
+- add get_ref(), bytes_written() to MapBuilder/SetBuilder
+- Fix transition iterator for nodes with 256 transitions
+- len is the number of keys, not nodes.
+- 0.1.35
+- Add Rust 1.7.0 to Travis.
+- added mmap feature (default on)
+- Minor edit to readme
+- Rearrange and publish Automaton implementors.
+- 0.1.34
+- Upgrade regex-syntax and memmap.
+- 0.1.33
+- Add support for creating an Fst from a slice of Vec<u8>.
+- remove pushes from Makefile
+- 0.1.32
+- bump byteorder
+- 0.1.31
+- Merge pull request [#17](https://github.com/crabnebula-dev/fst-no-std/pull/17) from fulmicoton/bugfix/14_slice_offset_len
+- rustup
+- 0.1.30
+- Fix set difference operation.
+- 0.1.29
+- remove unused import
+- 0.1.28
+- Closes [#12](https://github.com/crabnebula-dev/fst-no-std/pull/12). Implement From trait for Set and Map.
+- Just test on current stable.
+- Drop duplicate key errors.
+- 0.1.27
+- Closes [#2](https://github.com/crabnebula-dev/fst-no-std/pull/2) Implement Clone and adds len() to MmapReadOnly
+- 0.1.26
+- 0.1.25
+- version bump
+- Add a new command to embed FSTs into Rust source files.
+- Add tests for the automaton adapters
+- Rename must_match to will_always_match
+- Add various automaton adapters
+- memory maps
+- update readme finally
+- 0.1.24
+- Don't use an a huge literal for usize. Just use u64 instead.
+- tweaking and polishing
+- Improve microbenchmarks.
+- add Windows CI
+- Some perf improvements to simple lookups.
+- 0.1.23
+- 0.1.22
+- Tweak the transition numbers again.
+- Add non-generic as_fst methods.
+- 0.1.21
+- Represent 256 transitions as `0`, which always uses an extra byte.
+- Max transitions is not representable by a u8, doy.
+- Escape inputs so we produce valid dot in all cases.
+- 0.1.20
+- Add size method.
+- doc touchups
+- 0.1.19
+- Tweak the mmap setup.
+- Bump byteorder and stop using custom write_uint function.
+- Don't use types yet.
+- 0.1.18
+- 0.1.17
+- 0.1.16
+- Perf improvements.
+- Allow tweaking of state labels.
+- Add a silly rule for installing a bin.
+- 0.1.15
+- Small reorg of nodes.
+- Some addition utility methods for collecting streams.
+- 0.1.14
+- be honest
+- Fix a couple bugs with the checksum and the fst-bin merger.
+- Compression gains. Polishing.
+- various touchups
+- Adding unsorted construction.
+- 0.1.13
+- slight rearrangement
+- Revamp command line utility to be more ergonomic/consistent.
+- doc fixes
+- 0.1.12
+- High level docs.
+- typo
+- 0.1.11
+- docs
+- 0.1.10
+- Docs for regex.
+- 0.1.9
+- Docs, polish, etc.
+- 0.1.8
+- levenshtein poc automaton working
+- Remove bound entirely.
+- Weaken the bound on Automaton's associated type from Copy to Clone.
+- Push Option<State> into the associated type for Automaton.
+- 0.1.7
+- Document map type.
+- Lots of type renaming.
+- 0.1.6
+- More docs, examples and starting on map facade.
+- 0.1.5
+- minor correction
+- minor correction
+- 0.1.4
+- Polish, docs, tests, etc.
+- 0.1.3
+- More progress on streams, sets, set operations and the facade.
+- Introduce stream ops.
+- 0.1.2
+- Impl stream
+- Leave 1.0 and 1.1 behind.
+- don't use unstable features
+- 0.1.1
+- regexes are working
+- Progress on a custom regex engine for searching FSTs.
+- nail down byteorder dependency
+- Re-work merge operations to use streams.
+- intersection
+- Start polishing work. Small optimizations. Start facade.
+- Rename inner fst module to raw.
+- Add a union sub-command.
+- Add range queries to fst-bin.
+- Give more information to the merge function.
+- Pass reader index into callback.
+- Range queries seem to work.
+- Remove unused registry.
+- Lots of progress.
+- ignore
+- Various progress and experiments.
+- progress
+- Progress on merging. Polishing some behavior.
+- progress
+- progress
+- forgot to add
+- Initial refactoring complete. Tests pass. Yay.
+- progress
+- initial working commit
+- initial commit

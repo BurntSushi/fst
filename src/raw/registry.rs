@@ -1,7 +1,11 @@
+#[cfg(feature = "std")]
 use crate::raw::build::BuilderNode;
+#[cfg(feature = "std")]
 use crate::raw::{CompiledAddr, NONE_ADDRESS};
-
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 #[derive(Debug)]
+#[cfg(feature = "std")]
 pub struct Registry {
     table: Vec<RegistryCell>,
     table_size: usize, // number of rows
@@ -9,23 +13,27 @@ pub struct Registry {
 }
 
 #[derive(Debug)]
+#[cfg(feature = "std")]
 struct RegistryCache<'a> {
     cells: &'a mut [RegistryCell],
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "std")]
 pub struct RegistryCell {
     addr: CompiledAddr,
     node: BuilderNode,
 }
 
 #[derive(Debug)]
+#[cfg(feature = "std")]
 pub enum RegistryEntry<'a> {
     Found(CompiledAddr),
     NotFound(&'a mut RegistryCell),
     Rejected,
 }
 
+#[cfg(feature = "std")]
 impl Registry {
     pub fn new(table_size: usize, mru_size: usize) -> Registry {
         let empty_cell = RegistryCell::none();
@@ -49,12 +57,12 @@ impl Registry {
         //
         // In unscientific experiments, this provides the same compression
         // as `std::hash::SipHasher` but is much much faster.
-        const FNV_PRIME: u64 = 1099511628211;
-        let mut h = 14695981039346656037;
-        h = (h ^ (node.is_final as u64)).wrapping_mul(FNV_PRIME);
+        const FNV_PRIME: u64 = 1_099_511_628_211;
+        let mut h = 14_695_981_039_346_656_037;
+        h = (h ^ u64::from(node.is_final)).wrapping_mul(FNV_PRIME);
         h = (h ^ node.final_output.value()).wrapping_mul(FNV_PRIME);
         for t in &node.trans {
-            h = (h ^ (t.inp as u64)).wrapping_mul(FNV_PRIME);
+            h = (h ^ u64::from(t.inp)).wrapping_mul(FNV_PRIME);
             h = (h ^ t.out.value()).wrapping_mul(FNV_PRIME);
             h = (h ^ (t.addr as u64)).wrapping_mul(FNV_PRIME);
         }
@@ -62,6 +70,7 @@ impl Registry {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a> RegistryCache<'a> {
     fn entry(mut self, node: &BuilderNode) -> RegistryEntry<'a> {
         if self.cells.len() == 1 {
@@ -112,6 +121,7 @@ impl<'a> RegistryCache<'a> {
     }
 }
 
+#[cfg(feature = "std")]
 impl RegistryCell {
     fn none() -> RegistryCell {
         RegistryCell { addr: NONE_ADDRESS, node: BuilderNode::default() }
@@ -147,11 +157,11 @@ mod tests {
     }
 
     fn assert_insert_and_found(reg: &mut Registry, bnode: &BuilderNode) {
-        match reg.entry(&bnode) {
+        match reg.entry(bnode) {
             RegistryEntry::NotFound(cell) => cell.insert(1234),
             entry => panic!("unexpected not found entry, got: {:?}", entry),
         }
-        match reg.entry(&bnode) {
+        match reg.entry(bnode) {
             RegistryEntry::Found(addr) => assert_eq!(addr, 1234),
             entry => panic!("unexpected found entry, got: {:?}", entry),
         }

@@ -3,7 +3,7 @@ use crate::error::Error;
 use crate::raw::{self, Bound, Builder, Fst, Output, Stream, VERSION};
 use crate::stream::Streamer;
 
-const TEXT: &'static str = include_str!("./../../data/words-100000");
+const TEXT: &str = include_str!("./../../data/words-100000");
 
 pub fn fst_set<I, S>(ss: I) -> Fst<Vec<u8>>
 where
@@ -15,7 +15,7 @@ where
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
     ss.sort();
     ss.dedup();
-    for s in ss.iter().into_iter() {
+    for s in ss.iter() {
         bfst.add(s).unwrap();
     }
     let fst = bfst.into_fst();
@@ -33,7 +33,7 @@ where
         ss.into_iter().map(|(s, o)| (s.as_ref().to_vec(), o)).collect();
     ss.sort();
     ss.dedup();
-    for (s, o) in ss.into_iter() {
+    for (s, o) in ss {
         bfst.insert(s, o).unwrap();
     }
     bfst.into_fst()
@@ -148,10 +148,10 @@ macro_rules! test_map_fail {
 
 test_map!(fst_map_only_empty1, "", 0);
 test_map!(fst_map_only_empty2, "", 100);
-test_map!(fst_map_only_empty3, "", 9999999999);
+test_map!(fst_map_only_empty3, "", 9_999_999_999);
 test_map!(fst_map_one1, "a", 0);
 test_map!(fst_map_one2, "a", 100);
-test_map!(fst_map_one3, "a", 999999999);
+test_map!(fst_map_one3, "a", 999_999_999);
 test_map!(fst_map_two, "a", 1, "b", 2);
 test_map!(fst_map_many1, "a", 34786, "ab", 26);
 test_map!(

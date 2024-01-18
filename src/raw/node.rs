@@ -125,13 +125,15 @@ impl<'f> Node<'f> {
     /// Returns an iterator over all transitions in this node in lexicographic
     /// order.
     #[inline]
-    #[must_use] pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
+    #[must_use]
+    pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
         Transitions { node: self, range: 0..self.len() }
     }
 
     /// Returns the transition at index `i`.
     #[inline(always)]
-    #[must_use] pub fn transition(&self, i: usize) -> Transition {
+    #[must_use]
+    pub fn transition(&self, i: usize) -> Transition {
         // The `inline(always)` annotation on this function appears to
         // dramatically speed up FST traversal. In particular, measuring the
         // time it takes to run `fst range something-big.fst` shows almost a 2x
@@ -165,7 +167,8 @@ impl<'f> Node<'f> {
 
     /// Returns the transition address of the `i`th transition.
     #[inline]
-    #[must_use] pub fn transition_addr(&self, i: usize) -> CompiledAddr {
+    #[must_use]
+    pub fn transition_addr(&self, i: usize) -> CompiledAddr {
         match self.state {
             State::OneTransNext(s) => {
                 assert!(i == 0);
@@ -184,7 +187,8 @@ impl<'f> Node<'f> {
     ///
     /// If no transition for this byte exists, then `None` is returned.
     #[inline]
-    #[must_use] pub fn find_input(&self, b: u8) -> Option<usize> {
+    #[must_use]
+    pub fn find_input(&self, b: u8) -> Option<usize> {
         match self.state {
             State::OneTransNext(s) if s.input(self) == b => Some(0),
             State::OneTransNext(_) => None,
@@ -198,14 +202,16 @@ impl<'f> Node<'f> {
     /// If this node is final and has a terminal output value, then it is
     /// returned. Otherwise, a zero output is returned.
     #[inline]
-    #[must_use] pub fn final_output(&self) -> Output {
+    #[must_use]
+    pub fn final_output(&self) -> Output {
         self.final_output
     }
 
     /// Returns true if and only if this node corresponds to a final or "match"
     /// state in the finite state transducer.
     #[inline]
-    #[must_use] pub fn is_final(&self) -> bool {
+    #[must_use]
+    pub fn is_final(&self) -> bool {
         self.is_final
     }
 
@@ -213,31 +219,36 @@ impl<'f> Node<'f> {
     ///
     /// The maximum number of transitions is 256.
     #[inline]
-    #[must_use] pub fn len(&self) -> usize {
+    #[must_use]
+    pub fn len(&self) -> usize {
         self.ntrans
     }
 
     /// Returns true if and only if this node has zero transitions.
     #[inline]
-    #[must_use] pub fn is_empty(&self) -> bool {
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
         self.ntrans == 0
     }
 
     /// Return the address of this node.
     #[inline]
-    #[must_use] pub fn addr(&self) -> CompiledAddr {
+    #[must_use]
+    pub fn addr(&self) -> CompiledAddr {
         self.start
     }
 
     #[doc(hidden)]
     #[inline]
-    #[must_use] pub fn as_slice(&self) -> &[u8] {
+    #[must_use]
+    pub fn as_slice(&self) -> &[u8] {
         &self.data[self.end..]
     }
 
     #[doc(hidden)]
     #[inline]
-    #[must_use] pub fn state(&self) -> &'static str {
+    #[must_use]
+    pub fn state(&self) -> &'static str {
         match self.state {
             State::OneTransNext(_) => "OTN",
             State::OneTrans(_) => "OT",
@@ -261,7 +272,9 @@ impl<'f> Node<'f> {
             Ok(())
         } else if node.trans.len() != 1 || node.is_final {
             StateAnyTrans::compile(wtr, addr, node)
-        } else if node.trans[0].addr == last_addr && node.trans[0].out.is_zero() {
+        } else if node.trans[0].addr == last_addr
+            && node.trans[0].out.is_zero()
+        {
             StateOneTransNext::compile(wtr, addr, node.trans[0].inp)
         } else {
             StateOneTrans::compile(wtr, addr, node.trans[0])

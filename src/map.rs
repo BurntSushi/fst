@@ -635,13 +635,15 @@ pub struct MapBuilder<W>(raw::Builder<W>);
 impl MapBuilder<Vec<u8>> {
     /// Create a builder that builds a map in memory.
     #[inline]
-    #[must_use] pub fn memory() -> MapBuilder<Vec<u8>> {
+    #[must_use]
+    pub fn memory() -> MapBuilder<Vec<u8>> {
         MapBuilder(raw::Builder::memory())
     }
 
     /// Finishes the construction of the map and returns it.
     #[inline]
-    #[must_use] pub fn into_map(self) -> Map<Vec<u8>> {
+    #[must_use]
+    pub fn into_map(self) -> Map<Vec<u8>> {
         Map(self.0.into_fst())
     }
 }
@@ -996,7 +998,8 @@ impl<'m> Default for OpBuilder<'m> {
 impl<'m> OpBuilder<'m> {
     /// Create a new set operation builder.
     #[inline]
-    #[must_use] pub fn new() -> OpBuilder<'m> {
+    #[must_use]
+    pub fn new() -> OpBuilder<'m> {
         OpBuilder(raw::OpBuilder::new())
     }
 
@@ -1069,7 +1072,8 @@ impl<'m> OpBuilder<'m> {
     /// ]);
     /// ```
     #[inline]
-    #[must_use] pub fn union(self) -> Union<'m> {
+    #[must_use]
+    pub fn union(self) -> Union<'m> {
         Union(self.0.union())
     }
 
@@ -1110,7 +1114,8 @@ impl<'m> OpBuilder<'m> {
     /// ]);
     /// ```
     #[inline]
-    #[must_use] pub fn intersection(self) -> Intersection<'m> {
+    #[must_use]
+    pub fn intersection(self) -> Intersection<'m> {
         Intersection(self.0.intersection())
     }
 
@@ -1155,7 +1160,8 @@ impl<'m> OpBuilder<'m> {
     /// ]);
     /// ```
     #[inline]
-    #[must_use] pub fn difference(self) -> Difference<'m> {
+    #[must_use]
+    pub fn difference(self) -> Difference<'m> {
         Difference(self.0.difference())
     }
 
@@ -1203,7 +1209,8 @@ impl<'m> OpBuilder<'m> {
     /// ]);
     /// ```
     #[inline]
-    #[must_use] pub fn symmetric_difference(self) -> SymmetricDifference<'m> {
+    #[must_use]
+    pub fn symmetric_difference(self) -> SymmetricDifference<'m> {
         SymmetricDifference(self.0.symmetric_difference())
     }
 }

@@ -577,13 +577,15 @@ pub struct SetBuilder<W>(raw::Builder<W>);
 impl SetBuilder<Vec<u8>> {
     /// Create a builder that builds a set in memory.
     #[inline]
-    #[must_use] pub fn memory() -> SetBuilder<Vec<u8>> {
+    #[must_use]
+    pub fn memory() -> SetBuilder<Vec<u8>> {
         SetBuilder(raw::Builder::memory())
     }
 
     /// Finishes the construction of the set and returns it.
     #[inline]
-    #[must_use] pub fn into_set(self) -> Set<Vec<u8>> {
+    #[must_use]
+    pub fn into_set(self) -> Set<Vec<u8>> {
         Set(self.0.into_fst())
     }
 }
@@ -868,7 +870,8 @@ impl<'s> Default for OpBuilder<'s> {
 impl<'s> OpBuilder<'s> {
     /// Create a new set operation builder.
     #[inline]
-    #[must_use] pub fn new() -> OpBuilder<'s> {
+    #[must_use]
+    pub fn new() -> OpBuilder<'s> {
         OpBuilder(raw::OpBuilder::new())
     }
 
@@ -919,7 +922,8 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"a", b"b", b"c", b"y", b"z"]);
     /// ```
     #[inline]
-    #[must_use] pub fn union(self) -> Union<'s> {
+    #[must_use]
+    pub fn union(self) -> Union<'s> {
         Union(self.0.union())
     }
 
@@ -942,7 +946,8 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"a"]);
     /// ```
     #[inline]
-    #[must_use] pub fn intersection(self) -> Intersection<'s> {
+    #[must_use]
+    pub fn intersection(self) -> Intersection<'s> {
         Intersection(self.0.intersection())
     }
 
@@ -967,7 +972,8 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"b", b"c"]);
     /// ```
     #[inline]
-    #[must_use] pub fn difference(self) -> Difference<'s> {
+    #[must_use]
+    pub fn difference(self) -> Difference<'s> {
         Difference(self.0.difference())
     }
 
@@ -997,7 +1003,8 @@ impl<'s> OpBuilder<'s> {
     /// assert_eq!(keys, vec![b"b", b"c", b"y", b"z"]);
     /// ```
     #[inline]
-    #[must_use] pub fn symmetric_difference(self) -> SymmetricDifference<'s> {
+    #[must_use]
+    pub fn symmetric_difference(self) -> SymmetricDifference<'s> {
         SymmetricDifference(self.0.symmetric_difference())
     }
 }

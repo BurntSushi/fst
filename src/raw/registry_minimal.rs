@@ -11,10 +11,10 @@
 
 #![allow(dead_code)]
 #[cfg(feature = "std")]
-use std::collections::hash_map::{Entry, HashMap};
-#[cfg(feature = "std")]
 use crate::raw::build::BuilderNode;
 use crate::raw::CompiledAddr;
+#[cfg(feature = "std")]
+use std::collections::hash_map::{Entry, HashMap};
 
 #[derive(Debug)]
 #[cfg(feature = "std")]

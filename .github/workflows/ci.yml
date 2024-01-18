@@ -27,7 +27,7 @@ jobs:
     uses: dtolnay/.github/.github/workflows/pre_ci.yml@master
 
   test:
-    name: Rust ${{matrix.rust}}
+    name: Rust ${{matrix.name}}
     needs: pre_ci
     if: needs.pre_ci.outputs.continue
     runs-on: ubuntu-latest
@@ -35,13 +35,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - rust: stable
+          - name: stable/std
+            rust: stable
             features: ""
-          - rust: nightly
+          - name: nightly/std
+            rust: nightly
             features: ""
-          - rust: nightly
+          - name: nightly/core
+            rust: nightly
             features: "--no-default-features"
-          - rust: nightly
+          - name: nightly/alloc
+            rust: nightly
             features: "--no-default-features --features alloc"
     timeout-minutes: 45
     steps:

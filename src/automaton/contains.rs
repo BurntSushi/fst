@@ -30,7 +30,7 @@ pub struct Contains<'a> {
 }
 
 impl<'a> Contains<'a> {
-    /// Constructs automaton that matches an exact string.
+    /// Constructs automaton that matches a part of string.
     #[inline]
     pub fn new(string: &'a str) -> Contains<'a> {
         Self { string: string.as_bytes() }

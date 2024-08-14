@@ -32,8 +32,8 @@ pub struct Contains<'a> {
 impl<'a> Contains<'a> {
     /// Constructs automaton that matches an exact string.
     #[inline]
-    pub fn new(string: &'a str) -> StartsWith<Contains<'a>> {
-        Self { string: string.as_bytes() }.starts_with()
+    pub fn new(string: &'a str) -> Contains<'a> {
+        Self { string: string.as_bytes() }
     }
 }
 

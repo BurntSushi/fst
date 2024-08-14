@@ -19,7 +19,7 @@ members = ["bench", "fst-bin"]
 exclude = ["fst-levenshtein", "fst-regex"]
 
 [features]
-default = ["levenshtein", "contains"]
+default = []
 levenshtein = ["utf8-ranges"]
 contains = ["utf8-ranges"]
 

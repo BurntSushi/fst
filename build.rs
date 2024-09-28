@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-const CASTAGNOLI_POLY: u32 = 0x82f63b78;
+const CASTAGNOLI_POLY: u32 = 0x82f6_3b78;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -38,8 +38,8 @@ fn write_tag_lookup_table(out_dir: &Path) -> Result<()> {
 }
 
 fn tag_entry(b: u8) -> u16 {
-    let b = b as u16;
-    match b & 0b00000011 {
+    let b = u16::from(b);
+    match b & 0b0000_0011 {
         0b00 => {
             let lit_len = (b >> 2) + 1;
             if lit_len <= 60 {
@@ -74,16 +74,16 @@ fn write_crc_tables(out_dir: &Path) -> Result<()> {
     let table16 = make_table16(CASTAGNOLI_POLY);
 
     writeln!(out, "pub const TABLE: [u32; 256] = [")?;
-    for &x in table.iter() {
-        writeln!(out, "    {},", x)?;
+    for &x in &table {
+        writeln!(out, "    {x},")?;
     }
     writeln!(out, "];\n")?;
 
     writeln!(out, "pub const TABLE16: [[u32; 256]; 16] = [")?;
-    for table in table16.iter() {
+    for table in &table16 {
         writeln!(out, "    [")?;
-        for &x in table.iter() {
-            writeln!(out, "        {},", x)?;
+        for &x in table {
+            writeln!(out, "        {x},")?;
         }
         writeln!(out, "    ],")?;
     }
@@ -94,6 +94,7 @@ fn write_crc_tables(out_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn make_table16(poly: u32) -> [[u32; 256]; 16] {
     let mut tab = [[0; 256]; 16];
     tab[0] = make_table(poly);

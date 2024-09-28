@@ -1,12 +1,12 @@
 #[cfg(feature = "levenshtein")]
-use fst::automaton::Levenshtein;
-use fst::automaton::{Str, Subsequence};
+use fst_no_std::automaton::Levenshtein;
+use fst_no_std::automaton::{Str, Subsequence};
 #[cfg(feature = "levenshtein")]
-use fst::raw::{Builder, Fst};
-use fst::set::Set;
-use fst::{self, Automaton, IntoStreamer, Streamer};
+use fst_no_std::raw::{Builder, Fst};
+use fst_no_std::set::Set;
+use fst_no_std::{self, Automaton, IntoStreamer, Streamer};
 
-static WORDS: &'static str = include_str!("../data/words-10000");
+static WORDS: &str = include_str!("../data/words-10000");
 
 fn get_set() -> Set<Vec<u8>> {
     Set::from_iter(WORDS.lines()).unwrap()
@@ -22,7 +22,7 @@ where
     let mut ss: Vec<Vec<u8>> =
         ss.into_iter().map(|s| s.as_ref().to_vec()).collect();
     ss.sort();
-    for s in ss.iter().into_iter() {
+    for s in ss.iter() {
         bfst.add(s).unwrap();
     }
     let fst = bfst.into_fst();
@@ -110,7 +110,7 @@ fn union_small() {
 #[cfg(feature = "levenshtein")]
 #[test]
 fn intersection_large() {
-    use fst::set::OpBuilder;
+    use fst_no_std::set::OpBuilder;
 
     let set = get_set();
     let lev = Levenshtein::new("foo", 3).unwrap();
@@ -129,7 +129,7 @@ fn intersection_large() {
 #[cfg(feature = "levenshtein")]
 #[test]
 fn union_large() {
-    use fst::set::OpBuilder;
+    use fst_no_std::set::OpBuilder;
 
     let set = get_set();
     let lev = Levenshtein::new("foo", 3).unwrap();
@@ -177,9 +177,9 @@ fn subsequence() {
 
 #[test]
 fn implements_default() {
-    let map: fst::Map<Vec<u8>> = Default::default();
+    let map: fst_no_std::Map<Vec<u8>> = Default::default();
     assert!(map.is_empty());
 
-    let set: fst::Set<Vec<u8>> = Default::default();
+    let set: fst_no_std::Set<Vec<u8>> = Default::default();
     assert!(set.is_empty());
 }

@@ -106,7 +106,7 @@ pub trait Streamer<'a> {
     fn next(&'a mut self) -> Option<Self::Item>;
 }
 
-/// IntoStreamer describes types that can be converted to streams.
+/// `IntoStreamer` describes types that can be converted to streams.
 ///
 /// This is analogous to the `IntoIterator` trait for `Iterator` in
 /// `std::iter`.

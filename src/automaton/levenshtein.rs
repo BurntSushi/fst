@@ -1,7 +1,9 @@
-use std::cmp;
+use core::cmp;
+use core::fmt;
+#[cfg(feature = "std")]
 use std::collections::hash_map::Entry;
+#[cfg(feature = "std")]
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 
 use utf8_ranges::{Utf8Range, Utf8Sequences};
 
@@ -27,13 +29,16 @@ impl fmt::Display for LevenshteinError {
             LevenshteinError::TooManyStates(size_limit) => write!(
                 f,
                 "Levenshtein automaton exceeds size limit of \
-                           {} states",
-                size_limit
+                           {size_limit} states"
             ),
         }
     }
 }
 
+#[cfg(not(feature = "std"))]
+impl core::error::Error for LevenshteinError {}
+
+#[cfg(feature = "std")]
 impl std::error::Error for LevenshteinError {}
 
 /// A Unicode aware Levenshtein automaton for running efficient fuzzy queries.
@@ -55,27 +60,26 @@ impl std::error::Error for LevenshteinError {}
 /// from `foo`.
 ///
 /// ```rust
-/// use fst::automaton::Levenshtein;
-/// use fst::{IntoStreamer, Streamer, Set};
+/// use fst_no_std::automaton::Levenshtein;
+/// use fst_no_std::{IntoStreamer, Streamer, Set};
 ///
-/// fn main() {
-///     let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
-///     let set = Set::from_iter(keys).unwrap();
+/// let keys = vec!["fa", "fo", "fob", "focus", "foo", "food", "foul"];
+/// let set = Set::from_iter(keys).unwrap();
 ///
-///     let lev = Levenshtein::new("foo", 1).unwrap();
-///     let mut stream = set.search(&lev).into_stream();
+/// let lev = Levenshtein::new("foo", 1).unwrap();
+/// let mut stream = set.search(&lev).into_stream();
 ///
-///     let mut keys = vec![];
-///     while let Some(key) = stream.next() {
-///         keys.push(key.to_vec());
-///     }
-///     assert_eq!(keys, vec![
-///         "fo".as_bytes(),   // 1 deletion
-///         "fob".as_bytes(),  // 1 substitution
-///         "foo".as_bytes(),  // 0 insertions/deletions/substitutions
-///         "food".as_bytes(), // 1 insertion
-///     ]);
+/// let mut keys = vec![];
+/// while let Some(key) = stream.next() {
+///     keys.push(key.to_vec());
 /// }
+///
+/// assert_eq!(keys, vec![
+///    "fo".as_bytes(),   // 1 deletion
+///     "fob".as_bytes(),  // 1 substitution
+///     "foo".as_bytes(),  // 0 insertions/deletions/substitutions
+///     "food".as_bytes(), // 1 insertion
+/// ]);
 /// ```
 ///
 /// This example only uses ASCII characters, but it will work equally well
@@ -92,11 +96,13 @@ impl std::error::Error for LevenshteinError {}
 ///
 /// This is important functionality, so one should count on this implementation
 /// being vastly improved in the future.
+#[cfg(feature = "alloc")]
 pub struct Levenshtein {
     prog: DynamicLevenshtein,
     dfa: Dfa,
 }
 
+#[cfg(feature = "alloc")]
 impl Levenshtein {
     /// Create a new Levenshtein query.
     ///
@@ -109,6 +115,7 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
+    #[cfg(feature = "alloc")]
     pub fn new(
         query: &str,
         distance: u32,
@@ -132,6 +139,7 @@ impl Levenshtein {
     ///
     /// A `Levenshtein` value satisfies the `Automaton` trait, which means it
     /// can be used with the `search` method of any finite state transducer.
+    #[cfg(feature = "alloc")]
     pub fn new_with_limit(
         query: &str,
         distance: u32,
@@ -147,6 +155,7 @@ impl Levenshtein {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl fmt::Debug for Levenshtein {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -158,28 +167,30 @@ impl fmt::Debug for Levenshtein {
 }
 
 #[derive(Clone)]
+#[cfg(feature = "alloc")]
 struct DynamicLevenshtein {
     query: String,
     dist: usize,
 }
 
+#[cfg(feature = "alloc")]
 impl DynamicLevenshtein {
     fn start(&self) -> Vec<usize> {
         (0..self.query.chars().count() + 1).collect()
     }
 
     fn is_match(&self, state: &[usize]) -> bool {
-        state.last().map(|&n| n <= self.dist).unwrap_or(false)
+        state.last().is_some_and(|&n| n <= self.dist)
     }
 
     fn can_match(&self, state: &[usize]) -> bool {
-        state.iter().min().map(|&n| n <= self.dist).unwrap_or(false)
+        state.iter().min().is_some_and(|&n| n <= self.dist)
     }
 
     fn accept(&self, state: &[usize], chr: Option<char>) -> Vec<usize> {
         let mut next = vec![state[0] + 1];
         for (i, c) in self.query.chars().enumerate() {
-            let cost = if Some(c) == chr { 0 } else { 1 };
+            let cost = usize::from(Some(c) != chr);
             let v = cmp::min(
                 cmp::min(next[i] + 1, state[i + 1] + 1),
                 state[i] + cost,
@@ -190,6 +201,7 @@ impl DynamicLevenshtein {
     }
 }
 
+#[cfg(feature = "alloc")]
 impl Automaton for Levenshtein {
     type State = Option<usize>;
 
@@ -215,6 +227,7 @@ impl Automaton for Levenshtein {
 }
 
 #[derive(Debug)]
+#[cfg(feature = "alloc")]
 struct Dfa {
     states: Vec<State>,
 }
@@ -230,19 +243,21 @@ impl fmt::Debug for State {
         writeln!(f, "  is_match: {:?}", self.is_match)?;
         for i in 0..256 {
             if let Some(si) = self.next[i] {
-                writeln!(f, "  {:?}: {:?}", i, si)?;
+                writeln!(f, "  {i:?}: {si:?}")?;
             }
         }
         write!(f, "}}")
     }
 }
 
+#[cfg(feature = "alloc")]
 struct DfaBuilder {
     dfa: Dfa,
     lev: DynamicLevenshtein,
     cache: HashMap<Vec<usize>, usize>,
 }
 
+#[cfg(feature = "alloc")]
 impl DfaBuilder {
     fn new(lev: DynamicLevenshtein) -> DfaBuilder {
         DfaBuilder {
@@ -324,7 +339,7 @@ impl DfaBuilder {
             // Some((si, false)) => si,
         };
         self.add_utf8_sequences(false, from_si, to_si, '\u{0}', '\u{10FFFF}');
-        return Some((to_si, mismatch_state));
+        Some((to_si, mismatch_state))
     }
 
     fn add_utf8_sequences(
@@ -358,7 +373,7 @@ impl DfaBuilder {
         to: usize,
         range: &Utf8Range,
     ) {
-        for b in range.start as usize..range.end as usize + 1 {
+        for b in (range.start as usize)..=(range.end as usize) {
             if overwrite || self.dfa.states[from].next[b].is_none() {
                 self.dfa.states[from].next[b] = Some(to);
             }

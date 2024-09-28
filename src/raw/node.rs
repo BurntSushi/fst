@@ -1,11 +1,16 @@
-use std::cmp;
-use std::fmt;
+#[cfg(feature = "std")]
+use core::cmp;
+use core::fmt;
+use core::ops::Range;
+#[cfg(feature = "std")]
 use std::io;
-use std::ops::Range;
 
 use crate::bytes;
+#[cfg(feature = "std")]
 use crate::raw::build::BuilderNode;
-use crate::raw::common_inputs::{COMMON_INPUTS, COMMON_INPUTS_INV};
+#[cfg(feature = "std")]
+use crate::raw::common_inputs::COMMON_INPUTS;
+use crate::raw::common_inputs::COMMON_INPUTS_INV;
 use crate::raw::{
     u64_to_usize, CompiledAddr, Output, Transition, EMPTY_ADDRESS,
 };
@@ -42,7 +47,7 @@ impl<'f> fmt::Debug for Node<'f> {
         writeln!(f, "  # transitions: {}", self.len())?;
         writeln!(f, "  transitions:")?;
         for t in self.transitions() {
-            writeln!(f, "    {:?}", t)?;
+            writeln!(f, "    {t:?}")?;
         }
         Ok(())
     }
@@ -71,7 +76,7 @@ impl<'f> Node<'f> {
                 final_output: Output::zero(),
             },
             State::OneTransNext(s) => {
-                let data = &data[..addr + 1];
+                let data = &data[..=addr];
                 Node {
                     data,
                     version,
@@ -85,7 +90,7 @@ impl<'f> Node<'f> {
                 }
             }
             State::OneTrans(s) => {
-                let data = &data[..addr + 1];
+                let data = &data[..=addr];
                 let sizes = s.sizes(data);
                 Node {
                     data,
@@ -100,7 +105,7 @@ impl<'f> Node<'f> {
                 }
             }
             State::AnyTrans(s) => {
-                let data = &data[..addr + 1];
+                let data = &data[..=addr];
                 let sizes = s.sizes(data);
                 let ntrans = s.ntrans(data);
                 Node {
@@ -120,12 +125,14 @@ impl<'f> Node<'f> {
     /// Returns an iterator over all transitions in this node in lexicographic
     /// order.
     #[inline]
+    #[must_use]
     pub fn transitions<'n>(&'n self) -> Transitions<'f, 'n> {
         Transitions { node: self, range: 0..self.len() }
     }
 
     /// Returns the transition at index `i`.
     #[inline(always)]
+    #[must_use]
     pub fn transition(&self, i: usize) -> Transition {
         // The `inline(always)` annotation on this function appears to
         // dramatically speed up FST traversal. In particular, measuring the
@@ -160,6 +167,7 @@ impl<'f> Node<'f> {
 
     /// Returns the transition address of the `i`th transition.
     #[inline]
+    #[must_use]
     pub fn transition_addr(&self, i: usize) -> CompiledAddr {
         match self.state {
             State::OneTransNext(s) => {
@@ -179,6 +187,7 @@ impl<'f> Node<'f> {
     ///
     /// If no transition for this byte exists, then `None` is returned.
     #[inline]
+    #[must_use]
     pub fn find_input(&self, b: u8) -> Option<usize> {
         match self.state {
             State::OneTransNext(s) if s.input(self) == b => Some(0),
@@ -193,6 +202,7 @@ impl<'f> Node<'f> {
     /// If this node is final and has a terminal output value, then it is
     /// returned. Otherwise, a zero output is returned.
     #[inline]
+    #[must_use]
     pub fn final_output(&self) -> Output {
         self.final_output
     }
@@ -200,6 +210,7 @@ impl<'f> Node<'f> {
     /// Returns true if and only if this node corresponds to a final or "match"
     /// state in the finite state transducer.
     #[inline]
+    #[must_use]
     pub fn is_final(&self) -> bool {
         self.is_final
     }
@@ -208,30 +219,35 @@ impl<'f> Node<'f> {
     ///
     /// The maximum number of transitions is 256.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.ntrans
     }
 
     /// Returns true if and only if this node has zero transitions.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ntrans == 0
     }
 
     /// Return the address of this node.
     #[inline]
+    #[must_use]
     pub fn addr(&self) -> CompiledAddr {
         self.start
     }
 
     #[doc(hidden)]
     #[inline]
+    #[must_use]
     pub fn as_slice(&self) -> &[u8] {
         &self.data[self.end..]
     }
 
     #[doc(hidden)]
     #[inline]
+    #[must_use]
     pub fn state(&self) -> &'static str {
         match self.state {
             State::OneTransNext(_) => "OTN",
@@ -241,6 +257,7 @@ impl<'f> Node<'f> {
         }
     }
 
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         wtr: W,
         last_addr: CompiledAddr,
@@ -252,19 +269,20 @@ impl<'f> Node<'f> {
             && node.is_final
             && node.final_output.is_zero()
         {
-            return Ok(());
+            Ok(())
         } else if node.trans.len() != 1 || node.is_final {
             StateAnyTrans::compile(wtr, addr, node)
+        } else if node.trans[0].addr == last_addr
+            && node.trans[0].out.is_zero()
+        {
+            StateOneTransNext::compile(wtr, addr, node.trans[0].inp)
         } else {
-            if node.trans[0].addr == last_addr && node.trans[0].out.is_zero() {
-                StateOneTransNext::compile(wtr, addr, node.trans[0].inp)
-            } else {
-                StateOneTrans::compile(wtr, addr, node.trans[0])
-            }
+            StateOneTrans::compile(wtr, addr, node.trans[0])
         }
     }
 }
 
+#[cfg(feature = "std")]
 impl BuilderNode {
     pub fn compile_to<W: io::Write>(
         &self,
@@ -309,6 +327,7 @@ impl State {
 }
 
 impl StateOneTransNext {
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         mut wtr: W,
         _: CompiledAddr,
@@ -324,13 +343,15 @@ impl StateOneTransNext {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn new() -> StateOneTransNext {
         StateOneTransNext(0b11_000000)
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_common_input(&mut self, input: u8) {
-        self.0 = (self.0 & 0b11_000000) | common_idx(input, 0b111111);
+        self.0 = (self.0 & 0b11_000000) | common_idx(input, 0b11_1111);
     }
 
     #[inline]
@@ -340,11 +361,7 @@ impl StateOneTransNext {
 
     #[inline]
     fn input_len(&self) -> usize {
-        if self.common_input().is_none() {
-            1
-        } else {
-            0
-        }
+        usize::from(self.common_input().is_none())
     }
 
     #[inline]
@@ -368,6 +385,7 @@ impl StateOneTransNext {
 }
 
 impl StateOneTrans {
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         mut wtr: W,
         addr: CompiledAddr,
@@ -393,13 +411,15 @@ impl StateOneTrans {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn new() -> StateOneTrans {
         StateOneTrans(0b10_000000)
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_common_input(&mut self, input: u8) {
-        self.0 = (self.0 & 0b10_000000) | common_idx(input, 0b111111);
+        self.0 = (self.0 & 0b10_000000) | common_idx(input, 0b11_1111);
     }
 
     #[inline]
@@ -409,11 +429,7 @@ impl StateOneTrans {
 
     #[inline]
     fn input_len(&self) -> usize {
-        if self.common_input().is_none() {
-            1
-        } else {
-            0
-        }
+        usize::from(self.common_input().is_none())
     }
 
     #[inline]
@@ -466,6 +482,7 @@ impl StateOneTrans {
 }
 
 impl StateAnyTrans {
+    #[cfg(feature = "std")]
     fn compile<W: io::Write>(
         mut wtr: W,
         addr: CompiledAddr,
@@ -540,11 +557,13 @@ impl StateAnyTrans {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn new() -> StateAnyTrans {
         StateAnyTrans(0b00_000000)
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_final_state(&mut self, yes: bool) {
         if yes {
             self.0 |= 0b01_000000;
@@ -557,6 +576,7 @@ impl StateAnyTrans {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_state_ntrans(&mut self, n: u8) {
         if n <= 0b00_111111 {
             self.0 = (self.0 & 0b11_000000) | n;
@@ -601,11 +621,7 @@ impl StateAnyTrans {
 
     #[inline]
     fn ntrans_len(&self) -> usize {
-        if self.state_ntrans().is_none() {
-            1
-        } else {
-            0
-        }
+        usize::from(self.state_ntrans().is_none())
     }
 
     #[inline]
@@ -747,11 +763,13 @@ impl PackSizes {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn encode(&self) -> u8 {
         self.0
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_transition_pack_size(&mut self, size: u8) {
         assert!(size <= 8);
         self.0 = (self.0 & 0b0000_1111) | (size << 4);
@@ -763,6 +781,7 @@ impl PackSizes {
     }
 
     #[inline]
+    #[cfg(feature = "std")]
     fn set_output_pack_size(&mut self, size: u8) {
         assert!(size <= 8);
         self.0 = (self.0 & 0b1111_0000) | size;
@@ -792,7 +811,7 @@ impl<'f, 'n> Iterator for Transitions<'f, 'n> {
     }
 }
 
-/// common_idx translate a byte to an index in the COMMON_INPUTS_INV array.
+/// `common_idx` translate a byte to an index in the `COMMON_INPUTS_INV` array.
 ///
 /// I wonder if it would be prudent to store this mapping in the FST itself.
 /// The advantage of doing so would mean that common inputs would reflect the
@@ -803,8 +822,9 @@ impl<'f, 'n> Iterator for Transitions<'f, 'n> {
 /// Nevertheless, the *caller* may have a priori knowledge that could be
 /// supplied to the builder manually, which could then be embedded in the FST.
 #[inline]
+#[cfg(feature = "std")]
 fn common_idx(input: u8, max: u8) -> u8 {
-    let val = ((COMMON_INPUTS[input as usize] as u32 + 1) % 256) as u8;
+    let val = ((u32::from(COMMON_INPUTS[input as usize]) + 1) % 256) as u8;
     if val > max {
         0
     } else {
@@ -812,7 +832,7 @@ fn common_idx(input: u8, max: u8) -> u8 {
     }
 }
 
-/// common_input translates a common input index stored in a serialized FST
+/// `common_input` translates a common input index stored in a serialized FST
 /// to the corresponding byte.
 #[inline]
 fn common_input(idx: u8) -> Option<u8> {
@@ -824,6 +844,7 @@ fn common_input(idx: u8) -> Option<u8> {
 }
 
 #[inline]
+#[cfg(feature = "std")]
 fn pack_delta<W: io::Write>(
     wtr: W,
     node_addr: CompiledAddr,
@@ -835,6 +856,7 @@ fn pack_delta<W: io::Write>(
 }
 
 #[inline]
+#[cfg(feature = "std")]
 fn pack_delta_in<W: io::Write>(
     wtr: W,
     node_addr: CompiledAddr,
@@ -850,6 +872,7 @@ fn pack_delta_in<W: io::Write>(
 }
 
 #[inline]
+#[cfg(feature = "std")]
 fn pack_delta_size(node_addr: CompiledAddr, trans_addr: CompiledAddr) -> u8 {
     let delta_addr = if trans_addr == EMPTY_ADDRESS {
         EMPTY_ADDRESS
@@ -903,16 +926,16 @@ mod tests {
             }
             TestResult::from_bool(bs == words)
         }
-        quickcheck(p as fn(Vec<Vec<u8>>) -> TestResult)
+        quickcheck(p as fn(Vec<Vec<u8>>) -> TestResult);
     }
 
     fn nodes_equal(compiled: &Node, uncompiled: &BuilderNode) -> bool {
-        println!("{:?}", compiled);
+        println!("{compiled:?}");
         assert_eq!(compiled.is_final(), uncompiled.is_final);
         assert_eq!(compiled.len(), uncompiled.trans.len());
         assert_eq!(compiled.final_output(), uncompiled.final_output);
         for (ct, ut) in
-            compiled.transitions().zip(uncompiled.trans.iter().cloned())
+            compiled.transitions().zip(uncompiled.trans.iter().copied())
         {
             assert_eq!(ct.inp, ut.inp);
             assert_eq!(ct.out, ut.out);
@@ -930,7 +953,7 @@ mod tests {
     fn roundtrip(bnode: &BuilderNode) -> bool {
         let (addr, bytes) = compile(bnode);
         let node = Node::new(VERSION, addr, &bytes);
-        nodes_equal(&node, &bnode)
+        nodes_equal(&node, bnode)
     }
 
     fn trans(addr: CompiledAddr, inp: u8) -> Transition {

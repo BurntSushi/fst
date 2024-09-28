@@ -1,29 +1,27 @@
 [package]
-name = "fst"
-version = "0.4.7"  #:version
-authors = ["Andrew Gallant <jamslam@gmail.com>"]
+name = "fst-no-std"
+version = "0.4.8"
+authors = ["Andrew Gallant <jamslam@gmail.com>", "Jonas Kruckenberg <jonas@crabnebula.dev>"]
 description = """
 Use finite state transducers to compactly represents sets or maps of many
 strings (> 1 billion is possible).
 """
-documentation = "https://docs.rs/fst"
-homepage = "https://github.com/BurntSushi/fst"
-repository = "https://github.com/BurntSushi/fst"
+documentation = "https://docs.rs/fst-no-std"
+homepage = "https://github.com/CrabNejonas/fst"
+repository = "https://github.com/CrabNejonas/fst"
 readme = "README.md"
 keywords = ["search", "information", "retrieval", "dictionary", "map"]
 license = "Unlicense/MIT"
 edition = "2018"
 
 [workspace]
-members = ["bench", "fst-bin"]
-exclude = ["fst-levenshtein", "fst-regex"]
+members = ["bench"]
 
 [features]
-default = []
-levenshtein = ["utf8-ranges"]
-
-[patch.crates-io]
-fst = { path = "." }
+default = ["std"]
+levenshtein = ["utf8-ranges", "std"]
+std = ["alloc"]
+alloc = []
 
 [dependencies]
 utf8-ranges = { version = "1.0.4", optional = true }

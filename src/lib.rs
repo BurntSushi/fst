@@ -1,4 +1,8 @@
 /*!
+This is a fork of [fst](https://github.com/BurntSushi/fst) adding support for `no_std` targets (see [`no_std` usage](#no_std-usage) for details).
+
+If you're unsure whether to use this fork or the original one: Just use the original, chances are that's more up-to-date.
+
 Crate `fst` is a library for efficiently storing and searching ordered sets or
 maps where the keys are byte strings. A key design goal of this crate is to
 support storing and searching *very large* sets or maps (i.e., billions). This
@@ -20,7 +24,7 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 
 ```plain
 [dependencies]
-fst = "0.4"
+fst-no-std = "0.4"
 ```
 
 The examples in this documentation will show the rest.
@@ -52,8 +56,8 @@ This requires the `levenshtein` feature in this crate to be enabled. It is not
 enabled by default.
 
 ```rust
-use fst::{IntoStreamer, Streamer, Set};
-use fst::automaton::Levenshtein;
+use fst_no_std::{IntoStreamer, Streamer, Set};
+use fst_no_std::automaton::Levenshtein;
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -97,11 +101,11 @@ crate to make the file available as a `&[u8]` without necessarily reading it
 all into memory (the operating system will automatically handle that for you).
 
 ```rust,no_run
-# fn example() -> Result<(), fst::Error> {
+# fn example() -> Result<(), fst_no_std::Error> {
 use std::fs::File;
 use std::io;
 
-use fst::{IntoStreamer, Streamer, Map, MapBuilder};
+use fst_no_std::{IntoStreamer, Streamer, Map, MapBuilder};
 use memmap2::Mmap;
 
 // This is where we'll write our map to.
@@ -182,9 +186,9 @@ The example below shows how to find all keys that start with `B` or `G`. The
 example below uses sets, but the same operations are available on maps too.
 
 ```rust
-use fst::automaton::{Automaton, Str};
-use fst::set;
-use fst::{IntoStreamer, Set, Streamer};
+use fst_no_std::automaton::{Automaton, Str};
+use fst_no_std::set;
+use fst_no_std::{IntoStreamer, Set, Streamer};
 
 # fn main() { example().unwrap(); }
 fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -299,15 +303,25 @@ data structures found in the standard library, such as `BTreeSet` and
    `fst-bin/src/merge.rs` from the root of this crate's repository.
 */
 
+#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), feature(error_in_core))]
 #![deny(missing_docs)]
+#![allow(clippy::should_implement_trait)]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
 
 #[cfg(all(feature = "levenshtein", doctest))]
 doc_comment::doctest!("../README.md");
 
 pub use crate::automaton::Automaton;
 pub use crate::error::{Error, Result};
-pub use crate::map::{Map, MapBuilder};
-pub use crate::set::{Set, SetBuilder};
+pub use crate::map::Map;
+#[cfg(feature = "std")]
+pub use crate::map::MapBuilder;
+pub use crate::set::Set;
+#[cfg(feature = "std")]
+pub use crate::set::SetBuilder;
 pub use crate::stream::{IntoStreamer, Streamer};
 
 mod bytes;

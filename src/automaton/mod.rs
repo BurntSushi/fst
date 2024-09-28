@@ -4,6 +4,12 @@ pub use self::levenshtein::{Levenshtein, LevenshteinError};
 #[cfg(feature = "levenshtein")]
 mod levenshtein;
 
+#[cfg(feature = "contains")]
+pub use self::contains::Contains;
+
+#[cfg(feature = "contains")]
+mod contains;
+
 /// Automaton describes types that behave as a finite automaton.
 ///
 /// All implementors of this trait are represented by *byte based* automata.

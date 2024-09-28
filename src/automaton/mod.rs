@@ -178,6 +178,12 @@ impl<'a> Str<'a> {
     }
 }
 
+impl<'a> From<&'a [u8]> for Str<'a> {
+    fn from(string: &'a [u8]) -> Str<'a> {
+        Str { string }
+    }
+}
+
 impl<'a> Automaton for Str<'a> {
     type State = Option<usize>;
 
@@ -248,6 +254,12 @@ impl<'a> Subsequence<'a> {
     #[inline]
     pub fn new(subsequence: &'a str) -> Subsequence<'a> {
         Subsequence { subseq: subsequence.as_bytes() }
+    }
+}
+
+impl<'a> From<&'a [u8]> for Subsequence<'a> {
+    fn from(subsequence: &'a [u8]) -> Subsequence<'a> {
+        Subsequence { subseq: subsequence }
     }
 }
 

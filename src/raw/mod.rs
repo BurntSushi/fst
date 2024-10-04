@@ -1215,13 +1215,16 @@ impl<'f, A: Automaton> StreamWithState<'f, A> {
             let trans = state.node.transition(state.trans);
             let out = state.out.cat(trans.out);
             let next_state = self.aut.accept(&state.aut_state, trans.inp);
-            let t = map(&next_state);
+            let mut t = map(&next_state);
             let mut is_match = self.aut.is_match(&next_state);
             let next_node = self.fst.node(trans.addr);
             self.inp.push(trans.inp);
             if next_node.is_final() {
                 if let Some(eof_state) = self.aut.accept_eof(&next_state) {
                     is_match = self.aut.is_match(&eof_state);
+                    if is_match {
+                        t = map(&eof_state);
+                    }
                 }
             }
             self.stack.push(StreamState { trans: state.trans + 1, ..state });

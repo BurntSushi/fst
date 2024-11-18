@@ -12,11 +12,10 @@ Check out my blog post
 Rust](https://blog.burntsushi.net/transducers/)
 for extensive background, examples and experiments.
 
-[![Build status](https://github.com/BurntSushi/fst/workflows/ci/badge.svg)](https://github.com/BurntSushi/fst/actions)
-[![](https://meritbadge.herokuapp.com/fst)](https://crates.io/crates/fst)
+[![CI](https://github.com/BurntSushi/fst/actions/workflows/ci.yml/badge.svg)](https://github.com/BurntSushi/fst/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/fst.svg)](https://crates.io/crates/fst)
 
 Dual-licensed under MIT or the [UNLICENSE](https://unlicense.org/).
-
 
 ### Documentation
 
@@ -28,7 +27,6 @@ crate provides implementations of the `fst::Automata` trait when its
 `transducer` feature is enabled. This permits using DFAs compiled by
 `regex-automata` to search finite state transducers produced by this crate.
 
-
 ### Installation
 
 Simply add a corresponding entry to your `Cargo.toml` dependency list:
@@ -37,7 +35,6 @@ Simply add a corresponding entry to your `Cargo.toml` dependency list:
 [dependencies]
 fst = "0.4"
 ```
-
 
 ### Example
 
@@ -68,9 +65,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 Check out the documentation for a lot more examples!
 
-
 ### Cargo features
 
 * `levenshtein` - **Disabled** by default. This adds the `Levenshtein`
-  automaton to the `automaton` sub-module. This includes an additional
+  automaton to the `automaton` submodule. This includes an additional
   dependency on `utf8-ranges`.

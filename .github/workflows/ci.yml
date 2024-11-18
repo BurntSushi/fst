@@ -1,4 +1,4 @@
-name: ci
+name: CI
 on:
   pull_request:
     branches:
@@ -11,9 +11,9 @@ on:
 
 # The section is needed to drop write-all permissions that are granted on
 # `schedule` event. By specifying any permission explicitly all others are set
-# to none. By using the principle of least privilege the damage a compromised
+# to none. By using the principle of the least privilege the damage a compromised
 # workflow can do (because of an injection or compromised third party tool or
-# action) is restricted. Currently the worklow doesn't need any additional
+# action) is restricted. Currently, the workflow doesn't need any additional
 # permission except for pulling the code. Adding labels to issues, commenting
 # on pull-requests, etc. may need additional permissions:
 #

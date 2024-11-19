@@ -13,7 +13,7 @@ Rust](https://blog.burntsushi.net/transducers/)
 for extensive background, examples and experiments.
 
 [![Build status](https://github.com/BurntSushi/fst/workflows/ci/badge.svg)](https://github.com/BurntSushi/fst/actions)
-[![](https://meritbadge.herokuapp.com/fst)](https://crates.io/crates/fst)
+[![crates.io](https://img.shields.io/crates/v/fst.svg)](https://crates.io/crates/fst)
 
 Dual-licensed under MIT or the [UNLICENSE](https://unlicense.org/).
 

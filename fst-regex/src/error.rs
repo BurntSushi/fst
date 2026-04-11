@@ -63,7 +63,7 @@ impl fmt::Display for Error {
             ),
             NoLazy => write!(
                 f,
-                "Lazy reptition operators such as '+?' are \
+                "Lazy repetition operators such as '+?' are \
                                  not allowed."
             ),
             NoWordBoundary => write!(

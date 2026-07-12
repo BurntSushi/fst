@@ -183,3 +183,65 @@ fn implements_default() {
     let set: fst::Set<Vec<u8>> = Default::default();
     assert!(set.is_empty());
 }
+
+#[cfg(feature = "epserde")]
+#[test]
+fn test_epserde() -> Result<(), Box<dyn std::error::Error>> {
+    use epserde::{
+        deser::Deserialize, ser::Serialize, utils::AlignedCursor, Aligned64,
+    };
+    use fst::automaton::{Str, Subsequence};
+
+    // (1) Round-trip the Set on its own.
+    let set = get_set();
+    let mut cursor = <AlignedCursor<Aligned64>>::new();
+    unsafe { set.serialize(&mut cursor)? };
+    let mmapd_set =
+        unsafe { <Set<Vec<u8>>>::deserialize_eps(cursor.as_bytes())? };
+    assert_eq!(set.len(), mmapd_set.len());
+
+    let mut stream = set.stream();
+    while let Some(key) = stream.next() {
+        assert!(mmapd_set.contains(key));
+    }
+
+    // (2) Build a composite automaton (Union<Str, Subsequence>) and round-trip
+    // it. This exercises every layer of the Epserde derives: a combinator on
+    // top of two different leaf automata, each holding a borrowed slice.
+    let automaton = Str::new("foo").union(Subsequence::new("od"));
+    let mut acursor = <AlignedCursor<Aligned64>>::new();
+    unsafe { automaton.serialize(&mut acursor)? };
+    let mmapd_automaton = unsafe {
+        <fst::automaton::Union<Str, Subsequence>>::deserialize_eps(
+            acursor.as_bytes(),
+        )?
+    };
+
+    // (3) Search the deserialized Set with the deserialized automaton and
+    // compare results to running the originals against each other.
+    let hits =
+        mmapd_set.search(&mmapd_automaton).into_stream().into_strs()?;
+    let expected = set.search(&automaton).into_stream().into_strs()?;
+    assert_eq!(hits, expected);
+
+    // (4) Round-trip a Levenshtein automaton, which carries owned DFA tables
+    // (`Vec<State>` with `[Option<usize>; 256]` transition arrays). Confirms
+    // that owned-heap leaves compose through epserde the same way borrowed
+    // leaves do.
+    #[cfg(feature = "levenshtein")]
+    {
+        use fst::automaton::Levenshtein;
+        let lev = Levenshtein::new("foo", 1)?;
+        let mut lcursor = <AlignedCursor<Aligned64>>::new();
+        unsafe { lev.serialize(&mut lcursor)? };
+        let mmapd_lev = unsafe {
+            <Levenshtein>::deserialize_eps(lcursor.as_bytes())?
+        };
+        let lev_hits =
+            mmapd_set.search(&mmapd_lev).into_stream().into_strs()?;
+        let lev_expected = set.search(&lev).into_stream().into_strs()?;
+        assert_eq!(lev_hits, lev_expected);
+    }
+
+    Ok(())
+}

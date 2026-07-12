@@ -92,6 +92,7 @@ impl std::error::Error for LevenshteinError {}
 ///
 /// This is important functionality, so one should count on this implementation
 /// being vastly improved in the future.
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 pub struct Levenshtein {
     prog: DynamicLevenshtein,
     dfa: Dfa,
@@ -158,6 +159,7 @@ impl fmt::Debug for Levenshtein {
 }
 
 #[derive(Clone)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 struct DynamicLevenshtein {
     query: String,
     dist: usize,
@@ -215,10 +217,12 @@ impl Automaton for Levenshtein {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 struct Dfa {
     states: Vec<State>,
 }
 
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 struct State {
     next: [Option<usize>; 256],
     is_match: bool,

@@ -266,12 +266,14 @@ pub type CompiledAddr = usize;
 /// * [Comparison of Construction Algorithms for Minimal, Acyclic, Deterministic, Finite-State Automata from Sets of Strings](https://www.cs.mun.ca/~harold/Courses/Old/CS4750/Diary/q3p2qx4lv71m5vew.pdf)
 ///   (excellent for surface level overview)
 #[derive(Clone)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 pub struct Fst<D> {
     meta: Meta,
     data: D,
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 struct Meta {
     version: u64,
     root_addr: CompiledAddr,

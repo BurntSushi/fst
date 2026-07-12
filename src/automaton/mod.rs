@@ -211,6 +211,85 @@ impl<'a> Automaton for Str<'a> {
     }
 }
 
+// ε-serde implementations for `Str`, which cannot be derived: `Str` borrows a
+// slice, and while `&[T]` implements `SerInner` it does not implement
+// `DeserInner.
+#[cfg(feature = "epserde")]
+unsafe impl<'a> ::epserde::traits::CopyType for Str<'a> {
+    type Copy = ::epserde::traits::Deep;
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::ser::SerInner for Str<'a> {
+    type SerType = Str<'a>;
+    const IS_ZERO_COPY: bool = false;
+
+    unsafe fn _ser_inner(
+        &self,
+        backend: &mut impl ::epserde::ser::WriteWithNames,
+    ) -> ::epserde::ser::Result<()> {
+        use ::epserde::ser::WriteWithNames;
+        WriteWithNames::write(backend, "string", &self.string)
+    }
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::deser::DeserInner for Str<'a> {
+    type DeserType<'b> = Str<'b>;
+
+    #[inline(always)]
+    fn __check_covariance<'__long: '__short, '__short>(
+        proof: ::epserde::deser::CovariantProof<Self::DeserType<'__long>>,
+    ) -> ::epserde::deser::CovariantProof<Self::DeserType<'__short>> {
+        proof
+    }
+
+    unsafe fn _deser_full_inner(
+        _backend: &mut impl ::epserde::deser::ReadWithPos,
+    ) -> ::epserde::deser::Result<Self> {
+        // Unlike the derive, we cannot delegate to the field: there is nothing
+        // to own a fully deserialized slice.
+        unimplemented!();
+    }
+
+    unsafe fn _deser_eps_inner<'b>(
+        backend: &mut ::epserde::deser::SliceWithPos<'b>,
+    ) -> ::epserde::deser::Result<Self::DeserType<'b>> {
+        // What `<Vec<u8> as DeserInner>::_deser_eps_inner` delegates to.
+        unsafe {
+            Ok(Str {
+                string: ::epserde::deser::deser_eps_slice_zero(backend)?,
+            })
+        }
+    }
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::traits::TypeHash for Str<'a> {
+    fn type_hash(hasher: &mut impl ::core::hash::Hasher) {
+        use ::core::hash::Hash;
+        use ::epserde::ser::SerType;
+        use ::epserde::traits::TypeHash;
+        Hash::hash("DeepCopy", hasher);
+        Hash::hash(::core::module_path!(), hasher);
+        Hash::hash("Str", hasher);
+        Hash::hash("string", hasher);
+        <SerType<&[u8]> as TypeHash>::type_hash(hasher);
+    }
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::traits::AlignHash for Str<'a> {
+    fn align_hash(
+        hasher: &mut impl ::core::hash::Hasher,
+        _offset_of: &mut usize,
+    ) {
+        use ::epserde::ser::SerType;
+        use ::epserde::traits::AlignHash;
+        <SerType<&[u8]> as AlignHash>::align_hash(hasher, &mut 0);
+    }
+}
+
 /// An automaton that matches if the input contains a specific subsequence.
 ///
 /// It can be used to build a simple fuzzy-finder.
@@ -283,11 +362,86 @@ impl<'a> Automaton for Subsequence<'a> {
     }
 }
 
+// ε-serde implementations for `Subsequence`; see the ones for `Str` above.
+#[cfg(feature = "epserde")]
+unsafe impl<'a> ::epserde::traits::CopyType for Subsequence<'a> {
+    type Copy = ::epserde::traits::Deep;
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::ser::SerInner for Subsequence<'a> {
+    type SerType = Subsequence<'a>;
+    const IS_ZERO_COPY: bool = false;
+
+    unsafe fn _ser_inner(
+        &self,
+        backend: &mut impl ::epserde::ser::WriteWithNames,
+    ) -> ::epserde::ser::Result<()> {
+        use ::epserde::ser::WriteWithNames;
+        WriteWithNames::write(backend, "subseq", &self.subseq)
+    }
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::deser::DeserInner for Subsequence<'a> {
+    type DeserType<'b> = Subsequence<'b>;
+
+    #[inline(always)]
+    fn __check_covariance<'__long: '__short, '__short>(
+        proof: ::epserde::deser::CovariantProof<Self::DeserType<'__long>>,
+    ) -> ::epserde::deser::CovariantProof<Self::DeserType<'__short>> {
+        proof
+    }
+
+    unsafe fn _deser_full_inner(
+        _backend: &mut impl ::epserde::deser::ReadWithPos,
+    ) -> ::epserde::deser::Result<Self> {
+        unimplemented!();
+    }
+
+    unsafe fn _deser_eps_inner<'b>(
+        backend: &mut ::epserde::deser::SliceWithPos<'b>,
+    ) -> ::epserde::deser::Result<Self::DeserType<'b>> {
+        unsafe {
+            Ok(Subsequence {
+                subseq: ::epserde::deser::deser_eps_slice_zero(backend)?,
+            })
+        }
+    }
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::traits::TypeHash for Subsequence<'a> {
+    fn type_hash(hasher: &mut impl ::core::hash::Hasher) {
+        use ::core::hash::Hash;
+        use ::epserde::ser::SerType;
+        use ::epserde::traits::TypeHash;
+        Hash::hash("DeepCopy", hasher);
+        Hash::hash(::core::module_path!(), hasher);
+        Hash::hash("Subsequence", hasher);
+        Hash::hash("subseq", hasher);
+        <SerType<&[u8]> as TypeHash>::type_hash(hasher);
+    }
+}
+
+#[cfg(feature = "epserde")]
+impl<'a> ::epserde::traits::AlignHash for Subsequence<'a> {
+    fn align_hash(
+        hasher: &mut impl ::core::hash::Hasher,
+        _offset_of: &mut usize,
+    ) {
+        use ::epserde::ser::SerType;
+        use ::epserde::traits::AlignHash;
+        <SerType<&[u8]> as AlignHash>::align_hash(hasher, &mut 0);
+    }
+}
+
 /// An automaton that always matches.
 ///
 /// This is useful in a generic context as a way to express that no automaton
 /// should be used.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 pub struct AlwaysMatch;
 
 impl Automaton for AlwaysMatch {
@@ -318,6 +472,7 @@ impl Automaton for AlwaysMatch {
 /// An automaton that matches a string that begins with something that the
 /// wrapped automaton matches.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 pub struct StartsWith<A>(A);
 
 /// The `Automaton` state for `StartsWith<A>`.
@@ -384,6 +539,7 @@ impl<A: Automaton> Automaton for StartsWith<A> {
 
 /// An automaton that matches when one of its component automata match.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 pub struct Union<A, B>(A, B);
 
 /// The `Automaton` state for `Union<A, B>`.
@@ -419,6 +575,7 @@ impl<A: Automaton, B: Automaton> Automaton for Union<A, B> {
 
 /// An automaton that matches when both of its component automata match.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 pub struct Intersection<A, B>(A, B);
 
 /// The `Automaton` state for `Intersection<A, B>`.
@@ -458,6 +615,7 @@ impl<A: Automaton, B: Automaton> Automaton for Intersection<A, B> {
 
 /// An automaton that matches exactly when the automaton it wraps does not.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "epserde", derive(epserde::Epserde))]
 pub struct Complement<A>(A);
 
 /// The `Automaton` state for `Complement<A>`.

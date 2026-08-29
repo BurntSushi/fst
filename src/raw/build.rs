@@ -85,9 +85,111 @@ struct BuilderNodeUnfinished {
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub struct BuilderNode {
-    pub is_final: bool,
-    pub final_output: Output,
-    pub trans: Vec<Transition>,
+    pub(super) is_final: bool,
+    pub(super) final_output: Output,
+    pub(super) trans: BuilderTransitions,
+}
+
+/// Transitions held by an unfinished or registry-owned builder node.
+///
+/// Sorted FST construction produces many nodes with zero or one transition.
+/// Keeping those cases inline avoids allocating a `Vec` until a node branches.
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub(super) enum BuilderTransitions {
+    Empty,
+    One(Transition),
+    Many(Vec<Transition>),
+}
+
+impl BuilderTransitions {
+    fn push(&mut self, transition: Transition) {
+        *self = match std::mem::replace(self, Self::Empty) {
+            Self::Empty => Self::One(transition),
+            Self::One(first) => Self::Many(vec![first, transition]),
+            Self::Many(mut transitions) => {
+                transitions.push(transition);
+                Self::Many(transitions)
+            }
+        };
+    }
+
+    fn as_slice(&self) -> &[Transition] {
+        match self {
+            Self::Empty => &[],
+            Self::One(transition) => std::slice::from_ref(transition),
+            Self::Many(transitions) => transitions,
+        }
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [Transition] {
+        match self {
+            Self::Empty => &mut [],
+            Self::One(transition) => std::slice::from_mut(transition),
+            Self::Many(transitions) => transitions,
+        }
+    }
+}
+
+impl Clone for BuilderTransitions {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Empty => Self::Empty,
+            Self::One(transition) => Self::One(*transition),
+            Self::Many(transitions) => Self::Many(transitions.clone()),
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        match (self, source) {
+            (Self::Many(target), Self::Many(source)) => {
+                target.clone_from(source)
+            }
+            (target, source) => *target = source.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<Vec<Transition>> for BuilderTransitions {
+    fn from(mut transitions: Vec<Transition>) -> Self {
+        match transitions.len() {
+            0 => Self::Empty,
+            1 => Self::One(transitions.pop().unwrap()),
+            _ => Self::Many(transitions),
+        }
+    }
+}
+
+impl std::ops::Deref for BuilderTransitions {
+    type Target = [Transition];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for BuilderTransitions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
+}
+
+impl<'a> IntoIterator for &'a BuilderTransitions {
+    type Item = &'a Transition;
+    type IntoIter = std::slice::Iter<'a, Transition>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut BuilderTransitions {
+    type Item = &'a mut Transition;
+    type IntoIter = std::slice::IterMut<'a, Transition>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
 }
 
 #[derive(Debug)]
@@ -458,8 +560,7 @@ impl Clone for BuilderNode {
     fn clone_from(&mut self, source: &BuilderNode) {
         self.is_final = source.is_final;
         self.final_output = source.final_output;
-        self.trans.clear();
-        self.trans.extend(source.trans.iter());
+        self.trans.clone_from(&source.trans);
     }
 }
 
@@ -468,7 +569,73 @@ impl Default for BuilderNode {
         BuilderNode {
             is_final: false,
             final_output: Output::zero(),
-            trans: vec![],
+            trans: BuilderTransitions::Empty,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn transition(inp: u8) -> Transition {
+        Transition {
+            inp,
+            out: Output::new(u64::from(inp)),
+            addr: usize::from(inp) + 1,
+        }
+    }
+
+    #[test]
+    fn builder_transitions_preserve_order_for_all_arities() {
+        let mut transitions = BuilderTransitions::Empty;
+        assert!(matches!(transitions, BuilderTransitions::Empty));
+        assert_eq!(transitions.as_slice(), &[]);
+
+        transitions.push(transition(0));
+        assert!(matches!(transitions, BuilderTransitions::One(_)));
+        assert_eq!(transitions.as_slice(), &[transition(0)]);
+
+        transitions.push(transition(1));
+        assert!(matches!(transitions, BuilderTransitions::Many(_)));
+        assert_eq!(transitions.as_slice(), &[transition(0), transition(1)]);
+
+        for inp in 2..=u8::MAX {
+            transitions.push(transition(inp));
+        }
+        assert!(matches!(transitions, BuilderTransitions::Many(_)));
+        assert_eq!(transitions.len(), 256);
+        for (inp, value) in (0..=u8::MAX).zip(transitions.iter()) {
+            assert_eq!(*value, transition(inp));
+        }
+    }
+
+    #[test]
+    fn builder_transitions_clone_from_preserves_contents_and_reuses_many() {
+        let source = BuilderTransitions::from(vec![
+            transition(1),
+            transition(2),
+            transition(3),
+        ]);
+        let mut target = BuilderTransitions::from(vec![
+            transition(4),
+            transition(5),
+            transition(6),
+            transition(7),
+        ]);
+        let allocation = match &target {
+            BuilderTransitions::Many(transitions) => transitions.as_ptr(),
+            _ => unreachable!(),
+        };
+
+        target.clone_from(&source);
+
+        assert_eq!(target, source);
+        match target {
+            BuilderTransitions::Many(transitions) => {
+                assert_eq!(transitions.as_ptr(), allocation);
+            }
+            _ => unreachable!(),
         }
     }
 }

@@ -307,6 +307,7 @@ doc_comment::doctest!("../README.md");
 pub use crate::automaton::Automaton;
 pub use crate::error::{Error, Result};
 pub use crate::map::{Map, MapBuilder};
+pub use crate::raw::RegistryConfig;
 pub use crate::set::{Set, SetBuilder};
 pub use crate::stream::{IntoStreamer, Streamer};
 

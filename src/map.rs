@@ -629,6 +629,14 @@ impl<W: io::Write> MapBuilder<W> {
         raw::Builder::new_type(wtr, 0).map(MapBuilder)
     }
 
+    /// Creates a map builder using the given bounded node registry.
+    pub fn new_with_registry(
+        wtr: W,
+        registry: raw::RegistryConfig,
+    ) -> Result<MapBuilder<W>> {
+        raw::Builder::new_type_with_registry(wtr, 0, registry).map(MapBuilder)
+    }
+
     /// Insert a new key-value pair into the map.
     ///
     /// Keys must be convertible to byte strings. Values must be a `u64`, which

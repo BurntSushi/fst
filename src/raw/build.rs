@@ -31,8 +31,10 @@ use crate::stream::{IntoStreamer, Streamer};
 ///
 /// With that said, the builder does use memory, but **memory usage is bounded
 /// to a constant size**. The amount of memory used trades off with the
-/// compression ratio. Currently, the implementation hard codes this trade off
-/// which can result in about 5-20MB of heap usage during construction. (N.B.
+/// compression ratio. The default registry can result in about 5-20MB of heap
+/// usage during construction, while [`RegistryConfig`] lets callers choose a
+/// smaller bounded registry when construction space matters more than maximal
+/// FST compression. (N.B.
 /// Guaranteeing a maximal compression ratio requires memory proportional to
 /// the size of the fst, which defeats some of the benefit of streaming
 /// it to disk. In practice, a small bounded amount of memory achieves
@@ -85,9 +87,149 @@ struct BuilderNodeUnfinished {
 
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub struct BuilderNode {
-    pub is_final: bool,
-    pub final_output: Output,
-    pub trans: Vec<Transition>,
+    pub(super) is_final: bool,
+    pub(super) final_output: Output,
+    pub(super) trans: BuilderTransitions,
+}
+
+/// Configuration for the bounded node registry used during construction.
+///
+/// More rows and ways generally improve state deduplication and produce a
+/// smaller FST at the cost of additional temporary memory and state-copying
+/// work. This setting affects construction only and does not change the FST
+/// format.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RegistryConfig {
+    table_size: usize,
+    mru_size: usize,
+}
+
+impl RegistryConfig {
+    /// The registry configuration used by the existing builder constructors.
+    pub const DEFAULT: Self = Self { table_size: 10_000, mru_size: 2 };
+
+    /// Creates a registry with `table_size` rows and `mru_size` ways per row.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either dimension is zero or their product overflows `usize`.
+    pub const fn new(table_size: usize, mru_size: usize) -> Self {
+        assert!(table_size != 0, "registry table size must be nonzero");
+        assert!(mru_size != 0, "registry MRU size must be nonzero");
+        assert!(
+            table_size.checked_mul(mru_size).is_some(),
+            "registry dimensions overflow"
+        );
+        Self { table_size, mru_size }
+    }
+}
+
+impl Default for RegistryConfig {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// Transitions held by an unfinished or registry-owned builder node.
+///
+/// Sorted FST construction produces many nodes with zero or one transition.
+/// Keeping those cases inline avoids allocating a `Vec` until a node branches.
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub(super) enum BuilderTransitions {
+    Empty,
+    One(Transition),
+    Many(Vec<Transition>),
+}
+
+impl BuilderTransitions {
+    fn push(&mut self, transition: Transition) {
+        *self = match std::mem::replace(self, Self::Empty) {
+            Self::Empty => Self::One(transition),
+            Self::One(first) => Self::Many(vec![first, transition]),
+            Self::Many(mut transitions) => {
+                transitions.push(transition);
+                Self::Many(transitions)
+            }
+        };
+    }
+
+    fn as_slice(&self) -> &[Transition] {
+        match self {
+            Self::Empty => &[],
+            Self::One(transition) => std::slice::from_ref(transition),
+            Self::Many(transitions) => transitions,
+        }
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [Transition] {
+        match self {
+            Self::Empty => &mut [],
+            Self::One(transition) => std::slice::from_mut(transition),
+            Self::Many(transitions) => transitions,
+        }
+    }
+}
+
+impl Clone for BuilderTransitions {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Empty => Self::Empty,
+            Self::One(transition) => Self::One(*transition),
+            Self::Many(transitions) => Self::Many(transitions.clone()),
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        match (self, source) {
+            (Self::Many(target), Self::Many(source)) => {
+                target.clone_from(source)
+            }
+            (target, source) => *target = source.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+impl From<Vec<Transition>> for BuilderTransitions {
+    fn from(mut transitions: Vec<Transition>) -> Self {
+        match transitions.len() {
+            0 => Self::Empty,
+            1 => Self::One(transitions.pop().unwrap()),
+            _ => Self::Many(transitions),
+        }
+    }
+}
+
+impl std::ops::Deref for BuilderTransitions {
+    type Target = [Transition];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl std::ops::DerefMut for BuilderTransitions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_slice()
+    }
+}
+
+impl<'a> IntoIterator for &'a BuilderTransitions {
+    type Item = &'a Transition;
+    type IntoIter = std::slice::Iter<'a, Transition>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a mut BuilderTransitions {
+    type Item = &'a mut Transition;
+    type IntoIter = std::slice::IterMut<'a, Transition>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
 }
 
 #[derive(Debug)]
@@ -117,9 +259,26 @@ impl<W: io::Write> Builder<W> {
         Builder::new_type(wtr, 0)
     }
 
+    /// Creates a builder using the given bounded node registry.
+    pub fn new_with_registry(
+        wtr: W,
+        registry: RegistryConfig,
+    ) -> Result<Builder<W>> {
+        Builder::new_type_with_registry(wtr, 0, registry)
+    }
+
     /// The same as `new`, except it sets the type of the fst to the type
     /// given.
     pub fn new_type(wtr: W, ty: FstType) -> Result<Builder<W>> {
+        Builder::new_type_with_registry(wtr, ty, RegistryConfig::default())
+    }
+
+    /// The same as [`Builder::new_type`], with an explicit bounded registry.
+    pub fn new_type_with_registry(
+        wtr: W,
+        ty: FstType,
+        registry: RegistryConfig,
+    ) -> Result<Builder<W>> {
         let mut wtr = CountingWriter::new(wtr);
         // Don't allow any nodes to have address 0-7. We use these to encode
         // the API version. We also use addresses `0` and `1` as special
@@ -130,7 +289,7 @@ impl<W: io::Write> Builder<W> {
         Ok(Builder {
             wtr,
             unfinished: UnfinishedNodes::new(),
-            registry: Registry::new(10_000, 2),
+            registry: Registry::new(registry.table_size, registry.mru_size),
             last: None,
             last_addr: NONE_ADDRESS,
             len: 0,
@@ -458,8 +617,7 @@ impl Clone for BuilderNode {
     fn clone_from(&mut self, source: &BuilderNode) {
         self.is_final = source.is_final;
         self.final_output = source.final_output;
-        self.trans.clear();
-        self.trans.extend(source.trans.iter());
+        self.trans.clone_from(&source.trans);
     }
 }
 
@@ -468,7 +626,81 @@ impl Default for BuilderNode {
         BuilderNode {
             is_final: false,
             final_output: Output::zero(),
-            trans: vec![],
+            trans: BuilderTransitions::Empty,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn transition(inp: u8) -> Transition {
+        Transition {
+            inp,
+            out: Output::new(u64::from(inp)),
+            addr: usize::from(inp) + 1,
+        }
+    }
+
+    #[test]
+    fn builder_transitions_preserve_order_for_all_arities() {
+        let mut transitions = BuilderTransitions::Empty;
+        assert!(matches!(transitions, BuilderTransitions::Empty));
+        assert_eq!(transitions.as_slice(), &[]);
+
+        transitions.push(transition(0));
+        assert!(matches!(transitions, BuilderTransitions::One(_)));
+        assert_eq!(transitions.as_slice(), &[transition(0)]);
+
+        transitions.push(transition(1));
+        assert!(matches!(transitions, BuilderTransitions::Many(_)));
+        assert_eq!(transitions.as_slice(), &[transition(0), transition(1)]);
+
+        for inp in 2..=u8::MAX {
+            transitions.push(transition(inp));
+        }
+        assert!(matches!(transitions, BuilderTransitions::Many(_)));
+        assert_eq!(transitions.len(), 256);
+        for (inp, value) in (0..=u8::MAX).zip(transitions.iter()) {
+            assert_eq!(*value, transition(inp));
+        }
+    }
+
+    #[test]
+    fn builder_transitions_clone_from_preserves_contents_and_reuses_many() {
+        let source = BuilderTransitions::from(vec![
+            transition(1),
+            transition(2),
+            transition(3),
+        ]);
+        let mut target = BuilderTransitions::from(vec![
+            transition(4),
+            transition(5),
+            transition(6),
+            transition(7),
+        ]);
+        let allocation = match &target {
+            BuilderTransitions::Many(transitions) => transitions.as_ptr(),
+            _ => unreachable!(),
+        };
+
+        target.clone_from(&source);
+
+        assert_eq!(target, source);
+        match target {
+            BuilderTransitions::Many(transitions) => {
+                assert_eq!(transitions.as_ptr(), allocation);
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn registry_default_remains_ten_thousand_by_two() {
+        let config = RegistryConfig::default();
+        assert_eq!(config.table_size, 10_000);
+        assert_eq!(config.mru_size, 2);
+        assert_eq!(config, RegistryConfig::DEFAULT);
     }
 }

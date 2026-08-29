@@ -942,11 +942,12 @@ mod tests {
         let bnode = BuilderNode {
             is_final: false,
             final_output: Output::zero(),
-            trans: vec![],
+            trans: vec![].into(),
         };
         let (addr, buf) = compile(&bnode);
         let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 3);
+        assert_eq!(&buf[24..], &[0, 0, 0]);
         roundtrip(&bnode);
     }
 
@@ -955,11 +956,12 @@ mod tests {
         let bnode = BuilderNode {
             is_final: false,
             final_output: Output::zero(),
-            trans: vec![trans(20, b'a')],
+            trans: vec![trans(20, b'a')].into(),
         };
         let (addr, buf) = compile(&bnode);
         let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 3);
+        assert_eq!(&buf[24..], &[4, 16, 133]);
         roundtrip(&bnode);
     }
 
@@ -968,11 +970,12 @@ mod tests {
         let bnode = BuilderNode {
             is_final: false,
             final_output: Output::zero(),
-            trans: vec![trans(2, b'\xff')],
+            trans: vec![trans(2, b'\xff')].into(),
         };
         let (addr, buf) = compile(&bnode);
         let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 4);
+        assert_eq!(&buf[24..], &[22, 16, 255, 128]);
         roundtrip(&bnode);
     }
 
@@ -988,11 +991,16 @@ mod tests {
                 trans(5, b'd'),
                 trans(6, b'e'),
                 trans(7, b'f'),
-            ],
+            ]
+            .into(),
         };
         let (addr, buf) = compile(&bnode);
         let node = Node::new(VERSION, addr, &buf);
         assert_eq!(node.as_slice().len(), 14);
+        assert_eq!(
+            &buf[24..],
+            &[17, 18, 19, 20, 21, 22, 102, 101, 100, 99, 98, 97, 16, 6]
+        );
         roundtrip(&bnode);
     }
 
@@ -1001,7 +1009,10 @@ mod tests {
         let bnode = BuilderNode {
             is_final: false,
             final_output: Output::zero(),
-            trans: (0..256).map(|i| trans(0, i as u8)).collect(),
+            trans: (0..256)
+                .map(|i| trans(0, i as u8))
+                .collect::<Vec<_>>()
+                .into(),
         };
         let (addr, buf) = compile(&bnode);
         let node = Node::new(VERSION, addr, &buf);

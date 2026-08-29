@@ -571,6 +571,14 @@ impl<W: io::Write> SetBuilder<W> {
         raw::Builder::new_type(wtr, 0).map(SetBuilder)
     }
 
+    /// Creates a set builder using the given bounded node registry.
+    pub fn new_with_registry(
+        wtr: W,
+        registry: raw::RegistryConfig,
+    ) -> Result<SetBuilder<W>> {
+        raw::Builder::new_type_with_registry(wtr, 0, registry).map(SetBuilder)
+    }
+
     /// Insert a new key into the set.
     ///
     /// If a key is inserted that is less than any previous key added, then

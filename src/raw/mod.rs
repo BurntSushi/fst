@@ -26,7 +26,7 @@ use crate::bytes;
 use crate::error::Result;
 use crate::stream::{IntoStreamer, Streamer};
 
-pub use crate::raw::build::Builder;
+pub use crate::raw::build::{Builder, RegistryConfig};
 pub use crate::raw::error::Error;
 pub use crate::raw::node::{Node, Transitions};
 pub use crate::raw::ops::{

@@ -633,7 +633,7 @@ impl<D: AsRef<[u8]>> Fst<D> {
     }
 
     #[inline]
-    fn as_ref(&self) -> FstRef {
+    fn as_ref(&self) -> FstRef<'_> {
         FstRef { meta: &self.meta, data: self.data.as_ref() }
     }
 }

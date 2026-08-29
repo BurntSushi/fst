@@ -183,3 +183,102 @@ fn implements_default() {
     let set: fst::Set<Vec<u8>> = Default::default();
     assert!(set.is_empty());
 }
+
+#[test]
+fn configurable_registry_preserves_map_and_set_semantics() {
+    let entries = [(&b"alpha"[..], 1), (&b"alpine"[..], 2), (&b"beta"[..], 3)];
+    let small_registry = fst::RegistryConfig::new(1, 1);
+
+    let mut map =
+        fst::MapBuilder::new_with_registry(Vec::new(), small_registry)
+            .unwrap();
+    for (key, value) in entries {
+        map.insert(key, value).unwrap();
+    }
+    let map = fst::Map::new(map.into_inner().unwrap()).unwrap();
+    for (key, value) in entries {
+        assert_eq!(map.get(key), Some(value));
+    }
+
+    let mut set =
+        fst::SetBuilder::new_with_registry(Vec::new(), small_registry)
+            .unwrap();
+    for (key, _) in entries {
+        set.insert(key).unwrap();
+    }
+    let set = fst::Set::new(set.into_inner().unwrap()).unwrap();
+    for (key, _) in entries {
+        assert!(set.contains(key));
+    }
+}
+
+#[test]
+fn explicit_default_registry_is_byte_identical() {
+    let entries = (0..4_096u64)
+        .map(|value| {
+            let branch = "x".repeat((value as usize) % 17);
+            (format!("{value:04}-{branch}-tail-{:02}", value % 31), value)
+        })
+        .collect::<Vec<_>>();
+
+    let mut default_map = fst::MapBuilder::new(Vec::new()).unwrap();
+    let mut explicit_map = fst::MapBuilder::new_with_registry(
+        Vec::new(),
+        fst::RegistryConfig::default(),
+    )
+    .unwrap();
+    let mut default_set = fst::SetBuilder::new(Vec::new()).unwrap();
+    let mut explicit_set = fst::SetBuilder::new_with_registry(
+        Vec::new(),
+        fst::RegistryConfig::default(),
+    )
+    .unwrap();
+    for (key, value) in &entries {
+        default_map.insert(key, *value).unwrap();
+        explicit_map.insert(key, *value).unwrap();
+        default_set.insert(key).unwrap();
+        explicit_set.insert(key).unwrap();
+    }
+    assert_eq!(
+        default_map.into_inner().unwrap(),
+        explicit_map.into_inner().unwrap()
+    );
+    assert_eq!(
+        default_set.into_inner().unwrap(),
+        explicit_set.into_inner().unwrap()
+    );
+
+    let mut default_raw = fst::raw::Builder::new_type(Vec::new(), 7).unwrap();
+    let mut explicit_raw = fst::raw::Builder::new_type_with_registry(
+        Vec::new(),
+        7,
+        fst::RegistryConfig::default(),
+    )
+    .unwrap();
+    for (key, value) in entries {
+        default_raw.insert(&key, value).unwrap();
+        explicit_raw.insert(&key, value).unwrap();
+    }
+    assert_eq!(
+        default_raw.into_inner().unwrap(),
+        explicit_raw.into_inner().unwrap()
+    );
+}
+
+#[test]
+#[should_panic(expected = "registry table size must be nonzero")]
+fn configurable_registry_rejects_zero_rows() {
+    let _ = fst::RegistryConfig::new(0, 1);
+}
+
+#[test]
+#[should_panic(expected = "registry MRU size must be nonzero")]
+fn configurable_registry_rejects_zero_ways() {
+    let _ = fst::RegistryConfig::new(1, 0);
+}
+
+#[test]
+#[should_panic(expected = "registry dimensions overflow")]
+fn configurable_registry_rejects_overflow() {
+    let _ = fst::RegistryConfig::new(usize::MAX, 2);
+}

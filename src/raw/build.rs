@@ -31,8 +31,10 @@ use crate::stream::{IntoStreamer, Streamer};
 ///
 /// With that said, the builder does use memory, but **memory usage is bounded
 /// to a constant size**. The amount of memory used trades off with the
-/// compression ratio. Currently, the implementation hard codes this trade off
-/// which can result in about 5-20MB of heap usage during construction. (N.B.
+/// compression ratio. The default registry can result in about 5-20MB of heap
+/// usage during construction, while [`RegistryConfig`] lets callers choose a
+/// smaller bounded registry when construction space matters more than maximal
+/// FST compression. (N.B.
 /// Guaranteeing a maximal compression ratio requires memory proportional to
 /// the size of the fst, which defeats some of the benefit of streaming
 /// it to disk. In practice, a small bounded amount of memory achieves
@@ -88,6 +90,44 @@ pub struct BuilderNode {
     pub(super) is_final: bool,
     pub(super) final_output: Output,
     pub(super) trans: BuilderTransitions,
+}
+
+/// Configuration for the bounded node registry used during construction.
+///
+/// More rows and ways generally improve state deduplication and produce a
+/// smaller FST at the cost of additional temporary memory and state-copying
+/// work. This setting affects construction only and does not change the FST
+/// format.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RegistryConfig {
+    table_size: usize,
+    mru_size: usize,
+}
+
+impl RegistryConfig {
+    /// The registry configuration used by the existing builder constructors.
+    pub const DEFAULT: Self = Self { table_size: 10_000, mru_size: 2 };
+
+    /// Creates a registry with `table_size` rows and `mru_size` ways per row.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either dimension is zero or their product overflows `usize`.
+    pub const fn new(table_size: usize, mru_size: usize) -> Self {
+        assert!(table_size != 0, "registry table size must be nonzero");
+        assert!(mru_size != 0, "registry MRU size must be nonzero");
+        assert!(
+            table_size.checked_mul(mru_size).is_some(),
+            "registry dimensions overflow"
+        );
+        Self { table_size, mru_size }
+    }
+}
+
+impl Default for RegistryConfig {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
 }
 
 /// Transitions held by an unfinished or registry-owned builder node.
@@ -219,9 +259,26 @@ impl<W: io::Write> Builder<W> {
         Builder::new_type(wtr, 0)
     }
 
+    /// Creates a builder using the given bounded node registry.
+    pub fn new_with_registry(
+        wtr: W,
+        registry: RegistryConfig,
+    ) -> Result<Builder<W>> {
+        Builder::new_type_with_registry(wtr, 0, registry)
+    }
+
     /// The same as `new`, except it sets the type of the fst to the type
     /// given.
     pub fn new_type(wtr: W, ty: FstType) -> Result<Builder<W>> {
+        Builder::new_type_with_registry(wtr, ty, RegistryConfig::default())
+    }
+
+    /// The same as [`Builder::new_type`], with an explicit bounded registry.
+    pub fn new_type_with_registry(
+        wtr: W,
+        ty: FstType,
+        registry: RegistryConfig,
+    ) -> Result<Builder<W>> {
         let mut wtr = CountingWriter::new(wtr);
         // Don't allow any nodes to have address 0-7. We use these to encode
         // the API version. We also use addresses `0` and `1` as special
@@ -232,7 +289,7 @@ impl<W: io::Write> Builder<W> {
         Ok(Builder {
             wtr,
             unfinished: UnfinishedNodes::new(),
-            registry: Registry::new(10_000, 2),
+            registry: Registry::new(registry.table_size, registry.mru_size),
             last: None,
             last_addr: NONE_ADDRESS,
             len: 0,
@@ -637,5 +694,13 @@ mod tests {
             }
             _ => unreachable!(),
         }
+    }
+
+    #[test]
+    fn registry_default_remains_ten_thousand_by_two() {
+        let config = RegistryConfig::default();
+        assert_eq!(config.table_size, 10_000);
+        assert_eq!(config.mru_size, 2);
+        assert_eq!(config, RegistryConfig::DEFAULT);
     }
 }
